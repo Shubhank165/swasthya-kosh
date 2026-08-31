@@ -122,6 +122,11 @@ class ClinicalFactRecord(Base):
     recorded_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     supersedes: Mapped[str | None] = mapped_column(String(64), index=True)
     note: Mapped[str | None] = mapped_column(Text)
+    #: True for a fact read off a document or prior record for a concept the
+    #: patient has already answered. It stays out of the live view — a scan must
+    #: never overwrite what the patient said — but it stays on the record as the
+    #: other half of a contradiction.
+    record_channel: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     intake: Mapped[IntakeRecord] = relationship(back_populates="facts")
 

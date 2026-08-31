@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
@@ -49,6 +49,15 @@ from app.repositories.mappers import (
     queue_from_row,
     ticket_from_row,
     ticket_to_row,
+)
+
+#: States a ticket may be called from. Used by both the candidate read and the
+#: re-check inside the row lock, so the two can never disagree.
+_CALLABLE_STATE_VALUES: tuple[str, ...] = (
+    QueueState.ISSUED.value,
+    QueueState.WAITING.value,
+    QueueState.DEFERRED.value,
+    QueueState.ESCALATED.value,
 )
 
 
@@ -207,28 +216,58 @@ class QueueRepository:
         result = await self._session.execute(stmt)
         return tuple(ticket_from_row(r) for r in result.scalars().all())
 
-    async def lock_callable_tickets(self, instance_id: str) -> tuple[Ticket, ...]:
-        """Callable tickets, locked `FOR UPDATE SKIP LOCKED`.
+    async def list_callable_tickets(self, instance_id: str) -> tuple[Ticket, ...]:
+        """Candidate tickets, read without locking.
 
-        SKIP LOCKED rather than a plain FOR UPDATE: a second caller must get a
-        *different* ticket immediately, not wait behind the first. Waiting would
-        turn two practitioners into a queue of their own.
+        The ordering decision needs to see the whole callable set — priority
+        classes, appointment times, the intake-ready window — so the read is
+        unlocked and the *chosen* row is locked afterwards by
+        `claim_ticket`. Locking the whole set here instead would be safe but
+        would serialise callers: the second practitioner would find every row
+        locked and be told the queue was empty.
+        """
+        result = await self._session.execute(
+            select(TicketRecord).where(
+                TicketRecord.instance_id == instance_id,
+                TicketRecord.state.in_(_CALLABLE_STATE_VALUES),
+            )
+        )
+        return tuple(ticket_from_row(r) for r in result.scalars().all())
+
+    async def claim_ticket(self, ticket_id: str) -> Ticket | None:
+        """Lock one ticket for calling, or return None if someone else got it.
+
+        `FOR UPDATE SKIP LOCKED` on a single row: a concurrent caller that has
+        already locked this ticket causes an immediate miss rather than a wait,
+        and the caller moves on to its next candidate. The state predicate is
+        re-checked inside the lock, so a ticket called between the unlocked read
+        and this claim is not called twice.
         """
         stmt = select(TicketRecord).where(
-            TicketRecord.instance_id == instance_id,
-            TicketRecord.state.in_(
-                [
-                    QueueState.ISSUED.value,
-                    QueueState.WAITING.value,
-                    QueueState.DEFERRED.value,
-                    QueueState.ESCALATED.value,
-                ]
-            ),
+            TicketRecord.id == ticket_id,
+            TicketRecord.state.in_(_CALLABLE_STATE_VALUES),
         )
         if self._supports_row_locking():
             stmt = stmt.with_for_update(skip_locked=True)
         result = await self._session.execute(stmt)
-        return tuple(ticket_from_row(r) for r in result.scalars().all())
+        row = result.scalar_one_or_none()
+        return None if row is None else ticket_from_row(row)
+
+    async def increment_overtaken(self, ticket_ids: tuple[str, ...]) -> None:
+        """Bump `overtaken_count` atomically in SQL.
+
+        Read-modify-write in Python would lose increments when two callers pass
+        the same waiting patient at once — and that counter is the starvation
+        guard, so losing increments would let a patient be passed indefinitely.
+        """
+        if not ticket_ids:
+            return
+        await self._session.execute(
+            update(TicketRecord)
+            .where(TicketRecord.id.in_(ticket_ids))
+            .values(overtaken_count=TicketRecord.overtaken_count + 1)
+        )
+        await self._session.flush()
 
     async def intake_states_for(self, tickets: tuple[Ticket, ...]) -> IntakeStateLookup:
         """Intake state for the tickets that have an intake.

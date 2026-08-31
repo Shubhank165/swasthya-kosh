@@ -181,7 +181,9 @@ def source_ref_from_json(raw: dict[str, Any]) -> SourceRef:
 # --- facts -------------------------------------------------------------------
 
 
-def fact_to_row(fact: ClinicalFact, *, intake_id: str, seq: int) -> ClinicalFactRecord:
+def fact_to_row(
+    fact: ClinicalFact, *, intake_id: str, seq: int, record_channel: bool = False
+) -> ClinicalFactRecord:
     return ClinicalFactRecord(
         id=str(fact.fact_id),
         seq=seq,
@@ -206,6 +208,7 @@ def fact_to_row(fact: ClinicalFact, *, intake_id: str, seq: int) -> ClinicalFact
         recorded_at=fact.recorded_at,
         supersedes=str(fact.supersedes) if fact.supersedes else None,
         note=fact.note,
+        record_channel=record_channel,
     )
 
 
@@ -245,9 +248,11 @@ def intake_from_rows(
     facts: list[ClinicalFactRecord],
     documents: list[DocumentRecordRow],
 ) -> PatientIntakeState:
+    ordered = sorted(facts, key=lambda f: f.seq)
     return PatientIntakeState(
         intake_id=IntakeId(row.id),
-        facts=tuple(fact_from_row(f) for f in sorted(facts, key=lambda f: f.seq)),
+        facts=tuple(fact_from_row(f) for f in ordered if not f.record_channel),
+        record_facts=tuple(fact_from_row(f) for f in ordered if f.record_channel),
         state=IntakeState(row.state),
         revision=row.revision,
         patient_id=PatientId(row.patient_id) if row.patient_id else None,

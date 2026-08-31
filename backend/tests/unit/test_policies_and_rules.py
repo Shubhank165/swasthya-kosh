@@ -132,7 +132,6 @@ class TestRuleSet:
 class TestAlertDiffing:
     def _firing(self, content: ClinicalContent) -> tuple:
         from app.domain.clinical.enums import FactStatus, Section
-
         from tests.conftest import make_fact
 
         state = PatientIntakeState(intake_id=IntakeId("i"))

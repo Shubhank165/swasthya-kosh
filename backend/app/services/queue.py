@@ -106,7 +106,9 @@ class QueueService:
                 )
             )
 
-    async def _commit(self, result: ops.OperationResult, queue: Queue) -> None:
+    async def _commit(
+        self, result: ops.OperationResult, queue: Queue, *, atomic_overtaken: bool = False
+    ) -> None:
         if result.instance is not None:
             await self._queues.save_instance(result.instance)
         if result.ticket is not None:
@@ -115,7 +117,14 @@ class QueueService:
                 await self._queues.add_ticket(result.ticket)
             else:
                 await self._queues.save_ticket(result.ticket)
-        await self._queues.save_tickets(result.affected_tickets)
+        if atomic_overtaken:
+            # The passed-over tickets are not locked by this transaction, so their
+            # counter is incremented in SQL rather than written back wholesale.
+            await self._queues.increment_overtaken(
+                tuple(str(t.ticket_id) for t in result.affected_tickets)
+            )
+        else:
+            await self._queues.save_tickets(result.affected_tickets)
         await self._publish(result.events, department_code=queue.department_code)
 
     # --- instances ------------------------------------------------------------
@@ -242,33 +251,50 @@ class QueueService:
     ) -> TicketView | None:
         """Call the next patient, or None when nothing is callable.
 
-        The candidate rows are locked SKIP LOCKED for the length of the
-        transaction, so a concurrent caller sees a different candidate set and
-        the same token can never be issued twice.
+        Read the candidates unlocked, let the domain choose, then lock the chosen
+        row with `FOR UPDATE SKIP LOCKED`. If a concurrent caller already holds
+        it, drop that ticket from the pool and choose again — so two
+        practitioners pressing "call next" at the same instant get two different
+        patients rather than one of them being told the queue is empty.
+
+        The loop is bounded by the size of the candidate set, so a busy queue
+        cannot spin.
         """
         instance = await self._queues.require_instance(instance_id)
         queue = await self._queues.require_queue(str(instance.queue_id))
-        tickets = await self._queues.lock_callable_tickets(instance_id)
-        if not tickets:
+        candidates = await self._queues.list_callable_tickets(instance_id)
+        if not candidates:
             return None
-        intake_states = await self._queues.intake_states_for(tickets)
-        try:
-            result = ops.call_next(
-                queue,
-                instance,
-                tickets,
-                intake_states,
-                now=self._clock.now(),
-                practitioner_id=practitioner_id,
-                service_point=service_point,
-            )
-        except ops.QueueOperationError as exc:
-            raise QueueError(str(exc)) from exc
-        if result is None:
-            return None
-        await self._commit(result, queue)
-        assert result.ticket is not None
-        return await self.ticket_view(str(result.ticket.ticket_id))
+        intake_states = await self._queues.intake_states_for(candidates)
+
+        remaining = list(candidates)
+        for _attempt in range(len(candidates)):
+            try:
+                result = ops.call_next(
+                    queue,
+                    instance,
+                    remaining,
+                    intake_states,
+                    now=self._clock.now(),
+                    practitioner_id=practitioner_id,
+                    service_point=service_point,
+                )
+            except ops.QueueOperationError as exc:
+                raise QueueError(str(exc)) from exc
+            if result is None or result.ticket is None:
+                return None
+
+            chosen_id = str(result.ticket.ticket_id)
+            if await self._queues.claim_ticket(chosen_id) is None:
+                # Another caller has it. Try the next candidate.
+                remaining = [t for t in remaining if str(t.ticket_id) != chosen_id]
+                if not remaining:
+                    return None
+                continue
+
+            await self._commit(result, queue, atomic_overtaken=True)
+            return await self.ticket_view(chosen_id)
+        return None
 
     async def recall(self, ticket_id: str) -> TicketView:
         ticket, queue, instance = await self._load(ticket_id)

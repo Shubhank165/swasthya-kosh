@@ -12,12 +12,15 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.api.deps import get_clock, get_ids, get_settings_dep
 from app.core.clock import FrozenClock
 from app.core.config import Settings
 from app.core.content import ClinicalContent, load_clinical_content
 from app.core.ids import SequentialIdFactory
+from app.db import get_session
 from app.domain.clinical.enums import (
     Certainty,
     FactStatus,
@@ -36,8 +39,10 @@ from app.domain.clinical.provenance import (
     SourceRef,
 )
 from app.domain.statemachine.engine import ClinicalStateMachine
-from app.events.bus import InProcessBus, reset_event_bus
+from app.events.bus import InProcessBus, get_event_bus, reset_event_bus
+from app.main import create_app
 from app.models import Base
+from app.services.seed import seed_facility
 
 START = datetime(2026, 1, 15, 9, 0, 0, tzinfo=UTC)
 
@@ -155,3 +160,56 @@ def make_fact(
 @pytest.fixture
 def fact_factory():  # type: ignore[no-untyped-def]
     return make_fact
+
+
+# --- API fixtures ------------------------------------------------------------
+
+@pytest_asyncio.fixture
+async def api() -> AsyncIterator[AsyncClient]:
+    """An app wired to an in-memory database, a frozen clock and sequential ids.
+
+    Deterministic end to end: the same request sequence produces the same ids
+    and the same timestamps every run.
+    """
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+    settings = Settings(environment="test", database_url="sqlite+aiosqlite:///:memory:")
+    clock = FrozenClock(start=START)
+    ids = SequentialIdFactory()
+    bus = InProcessBus()
+    bus.record_history(True)
+
+    async with factory() as seed_session:
+        await seed_facility(seed_session, settings=settings, clock=clock)
+        await seed_session.commit()
+
+    async def _session() -> AsyncIterator[AsyncSession]:
+        async with factory() as db:
+            try:
+                yield db
+                await db.commit()
+            except Exception:
+                await db.rollback()
+                raise
+
+    app = create_app()
+    app.dependency_overrides[get_session] = _session
+    app.dependency_overrides[get_settings_dep] = lambda: settings
+    app.dependency_overrides[get_clock] = lambda: clock
+    app.dependency_overrides[get_ids] = lambda: ids
+    app.dependency_overrides[get_event_bus] = lambda: bus
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Attached so a test can reach the same database the app is using —
+        # needed where a test has to stand in for a component this build mocks,
+        # such as the async OCR worker.
+        client.bus = bus  # type: ignore[attr-defined]
+        client.clock = clock  # type: ignore[attr-defined]
+        client.sessions = factory  # type: ignore[attr-defined]
+        client.settings = settings  # type: ignore[attr-defined]
+        yield client
+    await engine.dispose()

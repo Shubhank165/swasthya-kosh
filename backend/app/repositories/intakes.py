@@ -97,7 +97,16 @@ class IntakeRepository:
         return row
 
     async def save(self, state: PatientIntakeState, *, now: datetime) -> None:
-        """Persist session metadata and append any facts not already stored."""
+        """Persist session metadata and append any facts not already stored.
+
+        Append-only: the diff finds facts the database has not seen and inserts
+        them. Nothing is updated, because a correction is a new revision.
+
+        Both channels are written — the live log and the parallel record channel
+        — with `record_channel` marking which is which, so a document fact
+        parked beside a patient's own answer survives the round trip. Losing it
+        here would silently discard one half of every contradiction.
+        """
         row = await self.row(str(state.intake_id))
         apply_intake_to_row(row, state)
         row.last_activity_at = now
@@ -113,11 +122,22 @@ class IntakeRepository:
             .scalars()
             .all()
         )
-        max_seq = len(existing)
-        for offset, fact in enumerate(f for f in state.facts if str(f.fact_id) not in existing):
+        seq = len(existing)
+        for fact, channel in (
+            *((f, False) for f in state.facts),
+            *((f, True) for f in state.record_facts),
+        ):
+            if str(fact.fact_id) in existing:
+                continue
             self._session.add(
-                fact_to_row(fact, intake_id=str(state.intake_id), seq=max_seq + offset)
+                fact_to_row(
+                    fact,
+                    intake_id=str(state.intake_id),
+                    seq=seq,
+                    record_channel=channel,
+                )
             )
+            seq += 1
         await self._session.flush()
 
     async def list_stale(

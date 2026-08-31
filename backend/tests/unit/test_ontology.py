@@ -198,14 +198,13 @@ class TestExpressions:
         state = state_with(
             ("fever", FactStatus.PRESENT, None), ("cough", FactStatus.ABSENT, None)
         )
-        assert parse_expression(
-            {"all": [{"concept": "fever", "status": "present"}, {"concept": "cough", "status": "absent"}]}
-        ).evaluate(state)
-        assert parse_expression(
-            {"any": [{"concept": "cough", "status": "present"}, {"concept": "fever", "status": "present"}]}
-        ).evaluate(state)
-        assert parse_expression({"none": [{"concept": "cough", "status": "present"}]}).evaluate(state)
-        assert parse_expression({"not": {"concept": "cough", "status": "present"}}).evaluate(state)
+        fever_present = {"concept": "fever", "status": "present"}
+        cough_present = {"concept": "cough", "status": "present"}
+        cough_absent = {"concept": "cough", "status": "absent"}
+        assert parse_expression({"all": [fever_present, cough_absent]}).evaluate(state)
+        assert parse_expression({"any": [cough_present, fever_present]}).evaluate(state)
+        assert parse_expression({"none": [cough_present]}).evaluate(state)
+        assert parse_expression({"not": cough_present}).evaluate(state)
 
     def test_concepts_are_reported_for_screen_coverage_checking(self) -> None:
         expr = parse_expression(
@@ -216,7 +215,12 @@ class TestExpressions:
     def test_describe_is_human_readable(self) -> None:
         """The description ends up on the alert, so triage can see the basis."""
         described = parse_expression(
-            {"all": [{"concept": "fever", "status": "present"}, {"concept": "severity", "gte": 7}]}
+            {
+                "all": [
+                    {"concept": "fever", "status": "present"},
+                    {"concept": "severity", "gte": 7},
+                ]
+            }
         ).describe()
         assert "fever is present" in described
         assert "AND" in described
@@ -253,7 +257,12 @@ class TestPathwayParsing:
                 "version": 2,
                 "matches_concepts": ["x"],
                 "review_of_systems": ["gi"],
-                "fields": [{"concept": "onset", "answer": {"type": "single_choice", "options": ["a"]}}],
+                "fields": [
+                    {
+                        "concept": "onset",
+                        "answer": {"type": "single_choice", "options": ["a"]},
+                    }
+                ],
             }
         )
         assert pathway.version == 2

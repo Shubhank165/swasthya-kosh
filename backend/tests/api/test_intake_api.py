@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
-from tests.api.conftest import KIOSK, PHYSICIAN, STAFF, TRIAGE
+from tests.api.conftest import KIOSK, PHYSICIAN, STAFF
 
 PREFIX = "/api/v1"
 
