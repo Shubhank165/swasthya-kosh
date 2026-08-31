@@ -71,6 +71,21 @@ class Complete:
 
 
 class StateMachine(Protocol):
+    def step_for(self, state: PatientIntakeState, concept: str) -> Step | None:
+        """The `Step` for any planned concept, current or not.
+
+        Answers do not always arrive for the question just asked: a touch UI can
+        show a whole section at once, and a patient can go back and correct an
+        earlier one. The answer's expected shape is a property of the content, so
+        it must be resolvable from the concept alone — deriving it from "is this
+        the current step" silently downgraded out-of-order answers to free text.
+        """
+        language = self._policy.resolve_language(state.language)
+        for planned in self.plan(state):
+            if planned.concept == concept:
+                return self._to_step(state, planned, language, rank=0)
+        return None
+
     def next_step(self, state: PatientIntakeState) -> Step | Complete: ...
 
 
@@ -117,6 +132,21 @@ class ClinicalStateMachine:
             (p, p.field.precondition_reason() or "precondition not satisfied")
             for p in inapplicable_fields(state, plan)
         )
+
+    def step_for(self, state: PatientIntakeState, concept: str) -> Step | None:
+        """The `Step` for any planned concept, current or not.
+
+        Answers do not always arrive for the question just asked: a touch UI can
+        show a whole section at once, and a patient can go back and correct an
+        earlier one. The answer's expected shape is a property of the content, so
+        it must be resolvable from the concept alone — deriving it from "is this
+        the current step" silently downgraded out-of-order answers to free text.
+        """
+        language = self._policy.resolve_language(state.language)
+        for planned in self.plan(state):
+            if planned.concept == concept:
+                return self._to_step(state, planned, language, rank=0)
+        return None
 
     def next_step(self, state: PatientIntakeState) -> Step | Complete:
         """The next question, or `Complete`.

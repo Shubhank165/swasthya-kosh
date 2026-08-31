@@ -17,7 +17,6 @@ from sqlalchemy import (
     JSON,
     Boolean,
     Date,
-    DateTime,
     Float,
     ForeignKey,
     Index,
@@ -28,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, TimestampMixin, UtcDateTime
 
 
 class DepartmentRecord(Base, TimestampMixin):
@@ -98,9 +97,9 @@ class QueueInstanceRecord(Base, TimestampMixin):
     no_show_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     avg_service_seconds: Mapped[float | None] = mapped_column(Float)
     served_sample: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    opened_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    paused_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    closed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     merged_into: Mapped[str | None] = mapped_column(String(64))
 
     queue: Mapped[QueueRecord] = relationship(back_populates="instances")
@@ -134,12 +133,12 @@ class TicketRecord(Base, TimestampMixin):
     state: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     patient_id: Mapped[str | None] = mapped_column(String(64), index=True)
     intake_id: Mapped[str | None] = mapped_column(String(64), index=True)
-    appointment_slot_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    called_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    deferred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    appointment_slot_time: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    issued_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    called_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    deferred_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     recall_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     #: How many times this ticket has been passed by a better-prepared one.
     #: Surfaced on the dashboard and capped, so the preference cannot starve it.
@@ -152,7 +151,7 @@ class TicketRecord(Base, TimestampMixin):
     escalation_alert_id: Mapped[str | None] = mapped_column(String(64))
     escalation_acknowledged_by: Mapped[str | None] = mapped_column(String(64))
     escalation_escalated_by: Mapped[str | None] = mapped_column(String(64))
-    escalation_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    escalation_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     escalation_reason: Mapped[str | None] = mapped_column(Text)
 
     instance: Mapped[QueueInstanceRecord] = relationship(back_populates="tickets")

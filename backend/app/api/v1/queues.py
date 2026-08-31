@@ -10,9 +10,10 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import (
+    Principal,
     PrincipalDep,
     QueueRepoDep,
     QueueServiceDep,
@@ -104,7 +105,7 @@ async def open_instance(
     body: OpenInstanceRequest,
     service: QueueServiceDep,
     settings: SettingsDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> QueueInstanceOut:
     require_shadow_mode_guard(settings, "open queue instance")
     instance = await service.open_instance(
@@ -124,7 +125,7 @@ async def issue_ticket(
     service: QueueServiceDep,
     repo: QueueRepoDep,
     settings: SettingsDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> TicketOut:
     """Issue a token.
 
@@ -176,7 +177,7 @@ async def call_next(
     service: QueueServiceDep,
     repo: QueueRepoDep,
     settings: SettingsDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN))],
     practitioner_id: Annotated[str | None, Query()] = None,
     service_point: Annotated[str | None, Query()] = None,
 ) -> TicketOut | None:
@@ -201,7 +202,7 @@ async def pause_instance(
     instance_id: str,
     body: PauseRequest,
     service: QueueServiceDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> QueueInstanceOut:
     return instance_out(await service.pause(instance_id, reason=body.reason))
 
@@ -210,7 +211,7 @@ async def pause_instance(
 async def resume_instance(
     instance_id: str,
     service: QueueServiceDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> QueueInstanceOut:
     return instance_out(await service.resume(instance_id))
 
@@ -219,7 +220,7 @@ async def resume_instance(
 async def close_instance(
     instance_id: str,
     service: QueueServiceDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> QueueInstanceOut:
     """Close the session. Unserved tickets are disposed of by configured policy —
     carried forward, cancelled or reassigned — never silently dropped."""
@@ -251,7 +252,7 @@ async def call_ticket(
     ticket_id: str,
     service: QueueServiceDep,
     repo: QueueRepoDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN))],
 ) -> TicketOut:
     """Call the next patient on the instance this ticket belongs to.
 
@@ -270,7 +271,7 @@ async def recall_ticket(
     ticket_id: str,
     service: QueueServiceDep,
     repo: QueueRepoDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN))],
 ) -> TicketOut:
     """Re-insert a called-but-absent patient, or mark NO_SHOW once recalls run out."""
     view = await service.recall(ticket_id)
@@ -282,7 +283,7 @@ async def start_ticket(
     ticket_id: str,
     service: QueueServiceDep,
     repo: QueueRepoDep,
-    principal: Annotated[object, require_roles(Role.PHYSICIAN, Role.STAFF, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.PHYSICIAN, Role.STAFF, Role.ADMIN))],
 ) -> TicketOut:
     view = await service.start_consultation(ticket_id)
     return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
@@ -293,7 +294,7 @@ async def complete_ticket(
     ticket_id: str,
     service: QueueServiceDep,
     repo: QueueRepoDep,
-    principal: Annotated[object, require_roles(Role.PHYSICIAN, Role.STAFF, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.PHYSICIAN, Role.STAFF, Role.ADMIN))],
 ) -> TicketOut:
     view = await service.complete(ticket_id)
     return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
@@ -305,7 +306,7 @@ async def defer_ticket(
     body: DeferRequest,
     service: QueueServiceDep,
     repo: QueueRepoDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN))],
 ) -> TicketOut:
     """Defer for a test or a payment. Priority and accrued wait are preserved."""
     view = await service.defer(ticket_id, reason=body.reason)
@@ -317,7 +318,7 @@ async def no_show_ticket(
     ticket_id: str,
     service: QueueServiceDep,
     repo: QueueRepoDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> TicketOut:
     view = await service.no_show(ticket_id)
     return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
@@ -329,7 +330,7 @@ async def cancel_ticket(
     body: CancelRequest,
     service: QueueServiceDep,
     repo: QueueRepoDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> TicketOut:
     view = await service.cancel(ticket_id, reason=body.reason)
     return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
@@ -341,7 +342,7 @@ async def transfer_ticket(
     body: TransferRequest,
     service: QueueServiceDep,
     repo: QueueRepoDep,
-    principal: Annotated[object, require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN))],
 ) -> TicketOut:
     """Move a patient to another queue. The intake goes with them and is not re-run."""
     view = await service.transfer(
@@ -360,7 +361,9 @@ async def escalate_ticket(
     body: EscalateRequest,
     service: QueueServiceDep,
     repo: QueueRepoDep,
-    principal: Annotated[object, require_roles(Role.TRIAGE, Role.PHYSICIAN, Role.ADMIN)],
+    principal: Annotated[
+        Principal, Depends(require_roles(Role.TRIAGE, Role.PHYSICIAN, Role.ADMIN))
+    ],
 ) -> TicketOut:
     """Escalate on the strength of an acknowledged red flag.
 

@@ -39,7 +39,7 @@ _MATRAS: dict[str, str] = {
 }
 
 #: Marks that modify without supplying a vowel.
-_SIGNS: dict[str, str] = {"ं": "n", "ँ": "n", "ः": "h", "़": ""}
+_SIGNS: dict[str, str] = {"ं": "n", "ँ": "n", "ः": "h", "़": ""}  # noqa: RUF001
 
 #: Suppresses the inherent vowel of the consonant it follows.
 _VIRAMA = "्"

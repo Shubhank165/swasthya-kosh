@@ -15,7 +15,6 @@ from sqlalchemy import (
     JSON,
     Boolean,
     Date,
-    DateTime,
     Float,
     ForeignKey,
     Index,
@@ -26,7 +25,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, TimestampMixin, UtcDateTime
 
 
 class PatientRecord(Base, TimestampMixin):
@@ -76,9 +75,9 @@ class IntakeRecord(Base, TimestampMixin):
     consent_artefact_id: Mapped[str | None] = mapped_column(String(64), index=True)
     kiosk_id: Mapped[str | None] = mapped_column(String(64), index=True)
     department_code: Mapped[str | None] = mapped_column(String(32), index=True)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    last_activity_at: Mapped[datetime | None] = mapped_column(UtcDateTime, index=True)
 
     facts: Mapped[list[ClinicalFactRecord]] = relationship(
         back_populates="intake", cascade="all, delete-orphan", order_by="ClinicalFactRecord.seq"
@@ -120,7 +119,7 @@ class ClinicalFactRecord(Base):
     reported_by: Mapped[str] = mapped_column(String(32), nullable=False)
     patient_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     physician_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     supersedes: Mapped[str | None] = mapped_column(String(64), index=True)
     note: Mapped[str | None] = mapped_column(Text)
 
@@ -157,8 +156,8 @@ class ConsentArtefact(Base):
     refused_purposes: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     granting_party: Mapped[str] = mapped_column(String(32), nullable=False)
     granting_party_name: Mapped[str | None] = mapped_column(String(256))
-    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    granted_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    withdrawn_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     #: Set on the superseding artefact when consent is re-taken or withdrawn.
     supersedes: Mapped[str | None] = mapped_column(String(64))
 
@@ -182,8 +181,8 @@ class DocumentRecordRow(Base, TimestampMixin):
     #: the original when the machine was unsure.
     low_confidence: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     overall_confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    uploaded_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
 
 
 class RedFlagAlertRecord(Base):
@@ -209,11 +208,11 @@ class RedFlagAlertRecord(Base):
     notify: Mapped[str] = mapped_column(String(32), nullable=False, default="triage")
     #: A hint for the human, never applied automatically.
     priority_hint: Mapped[str | None] = mapped_column(String(32))
-    raised_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    raised_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     acknowledged_by: Mapped[str | None] = mapped_column(String(64), index=True)
-    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    acknowledged_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     dismissed_by: Mapped[str | None] = mapped_column(String(64))
-    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dismissed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     dismissal_reason: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
@@ -232,7 +231,7 @@ class AuditLogEntry(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     occurred_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UtcDateTime, nullable=False, index=True
     )
     actor_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     actor_role: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -255,7 +254,7 @@ class IdempotencyKeyRecord(Base):
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     response_body: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     status_code: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
 
 class TerminologyConcept(Base):
@@ -315,7 +314,7 @@ class ReportRecord(Base, TimestampMixin):
     coverage_percentage: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     #: Structured summary. The rendered text is derived from it, not stored twice.
     body: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
-    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     physician_verified_by: Mapped[str | None] = mapped_column(String(64), index=True)
-    physician_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    physician_verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     service_date: Mapped[date | None] = mapped_column(Date, index=True)

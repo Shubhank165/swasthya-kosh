@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.adapters.mocks import MockOCRProvider
 from app.api.deps import (
@@ -18,6 +18,7 @@ from app.api.deps import (
     IdempotencyDep,
     IdsDep,
     IntakeServiceDep,
+    Principal,
     PrincipalDep,
     Role,
     SettingsDep,
@@ -29,6 +30,7 @@ from app.api.serialisers import (
     report_out,
     snapshot_out,
 )
+from app.domain.clinical.provenance import UserId
 from app.schemas.common import Acknowledgement
 from app.schemas.intake import (
     CompleteOut,
@@ -250,11 +252,9 @@ async def physician_verify(
     intake_id: str,
     body: PhysicianVerifyRequest,
     service: IntakeServiceDep,
-    principal: Annotated[object, require_roles(Role.PHYSICIAN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.PHYSICIAN))],
 ) -> IntakeSnapshotOut:
     """Physician sign-off. Physician-only, enforced by `require_roles`."""
-    from app.domain.clinical.provenance import UserId
-
     snapshot = await service.physician_verify(
         intake_id, physician_id=UserId(body.physician_id), concepts=body.concepts
     )
@@ -268,17 +268,15 @@ alerts_router = APIRouter(prefix="/alerts", tags=["alerts"])
 async def acknowledge_alert(
     alert_id: str,
     service: IntakeServiceDep,
-    principal: Annotated[object, require_roles(Role.TRIAGE, Role.PHYSICIAN, Role.STAFF)],
+    principal: Annotated[
+        Principal, Depends(require_roles(Role.TRIAGE, Role.PHYSICIAN, Role.STAFF))
+    ],
 ) -> Acknowledgement:
     """A human takes responsibility for an alert.
 
     This is the only thing that permits `POST /tickets/{id}/escalate`, and it
     records who did it. Nothing automatic can reach this endpoint.
     """
-    from app.api.deps import Principal
-    from app.domain.clinical.provenance import UserId
-
-    assert isinstance(principal, Principal)
     alert = await service.acknowledge_alert(alert_id, user_id=UserId(principal.user_id))
     return Acknowledgement(
         ok=True, message=f"alert {alert.rule_id} acknowledged by {principal.user_id}"
@@ -290,12 +288,8 @@ async def dismiss_alert(
     alert_id: str,
     reason: Annotated[str, Query(min_length=1)],
     service: IntakeServiceDep,
-    principal: Annotated[object, require_roles(Role.TRIAGE, Role.PHYSICIAN)],
+    principal: Annotated[Principal, Depends(require_roles(Role.TRIAGE, Role.PHYSICIAN))],
 ) -> Acknowledgement:
-    from app.api.deps import Principal
-    from app.domain.clinical.provenance import UserId
-
-    assert isinstance(principal, Principal)
     alert = await service.dismiss_alert(
         alert_id, user_id=UserId(principal.user_id), reason=reason
     )

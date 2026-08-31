@@ -20,10 +20,22 @@ from app.core.content import ClinicalContent
 from app.core.errors import ConflictError, ConsentError, NotFoundError, ValidationError
 from app.core.ids import IdFactory, UuidIdFactory
 from app.core.logging import get_logger
-from app.domain.clinical.enums import FactStatus, IntakeState, ReporterRole, SourceType
+from app.domain.clinical.enums import (
+    FactStatus,
+    IntakeState,
+    ReporterRole,
+    Section,
+    SourceType,
+)
 from app.domain.clinical.fact import ClinicalFact
 from app.domain.clinical.patient_state import DocumentRecord, PatientIntakeState
-from app.domain.clinical.provenance import AlertId, FactId, PatientId, UserId
+from app.domain.clinical.provenance import (
+    AlertId,
+    CodedValue,
+    FactId,
+    PatientId,
+    UserId,
+)
 from app.domain.contradictions.detector import Contradiction, detect
 from app.domain.coverage.coverage import CoverageReport, compute
 from app.domain.redflags.evaluator import RedFlagAlert, diff_alerts, evaluate
@@ -198,19 +210,21 @@ class IntakeService:
             # A decline is recorded as a decline. It is neither an answer nor a gap.
             state = state.with_declined(answer.concept)
         else:
-            step = self._machine.next_step(state)
-            asked = isinstance(step, Step) and step.concept == answer.concept
-            active_step = step if asked else None
+            # Resolved by concept rather than by "is this the current step", so a
+            # section-at-a-time touch UI and a back-navigation correction both
+            # get the answer shape the content actually declares.
+            step = self._machine.step_for(state, answer.concept)
             fact = build_fact(
                 answer,
                 state,
                 self._content.concepts,
                 fact_id=self._ids.new_id("fact"),
                 now=now,
-                step=active_step,
+                step=step,
             )
             state = self._apply_or_supersede(state, fact)
             state = self._apply_side_effects(state, answer, fact_status=fact.status)
+            state = self._record_complaint_concept(state, fact, now=now)
 
         state = self._record_inapplicable(state, now=now)
         state = self._advance_lifecycle(state, now=now)
@@ -271,6 +285,49 @@ class IntakeService:
             pathway = self._content.pathways.match_or_fallback(raw)
             state = state.with_pathway(pathway.pathway_id, pathway.review_of_systems)
         return state
+
+    def _record_complaint_concept(
+        self, state: PatientIntakeState, fact: ClinicalFact, *, now: datetime
+    ) -> PatientIntakeState:
+        """Record the presenting complaint as a fact about the complaint itself.
+
+        `chief_complaint = chest_pain` says which pathway to run. It does not, on
+        its own, say that the patient has chest pain — and the red-flag rules are
+        written against the complaint concept, because that is how a clinician
+        states the criterion. Without this, every complaint-anchored rule reads a
+        concept nothing ever sets and can never fire.
+
+        The derived fact inherits the answer's certainty and its verbatim words:
+        it is a restatement, not a new claim, and it must not be more confident
+        than what the patient actually said.
+        """
+        if fact.concept.concept_id != self._content.content_set.chief_complaint_concept:
+            return state
+        if fact.status is not FactStatus.PRESENT:
+            return state
+        value = fact.value
+        complaint_id = value.code if isinstance(value, CodedValue) else None
+        if complaint_id is None or complaint_id not in self._content.concepts:
+            return state
+
+        concept = self._content.concepts.require(complaint_id)
+        derived = ClinicalFact(
+            fact_id=FactId(self._ids.new_id("fact")),
+            concept=concept.ref(),
+            status=FactStatus.PRESENT,
+            certainty=fact.certainty,
+            temporality=fact.temporality,
+            source_type=fact.source_type,
+            source_ref=fact.source_ref,
+            confidence=fact.confidence,
+            reported_by=fact.reported_by,
+            recorded_at=now,
+            section=Section.CHIEF_COMPLAINT,
+            original_expression=fact.original_expression,
+            original_language=fact.original_language,
+            note=f"derived from {fact.concept.concept_id}={complaint_id}",
+        )
+        return self._apply_or_supersede(state, derived)
 
     def _record_inapplicable(
         self, state: PatientIntakeState, *, now: datetime
