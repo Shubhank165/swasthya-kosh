@@ -286,7 +286,9 @@ def run_scenario(scenario: Scenario, content: ClinicalContent) -> ScenarioResult
             recorded_at=now,
             section=step.section,
             value=value,
-            original_expression=str(raw) if turn is not None and raw is not None else None,
+            # Only a scripted utterance becomes the verbatim expression. A coded
+            # option is the system's token, not the patient's words.
+            original_expression=turn.said if turn is not None else None,
             original_language=language,
             supersedes=live.fact_id if live is not None else None,
         )

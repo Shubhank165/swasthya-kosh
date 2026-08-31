@@ -45,8 +45,14 @@ scenarios:
       - {ask: age, answer: {magnitude: 63, unit: years}}
       - {ask: sex, answer: female}
       - {ask: consent_given, answer: granted}
-      - {ask: chief_complaint, answer: joint_pain, lang: hi}
-      - {ask: complaint_duration, answer: {magnitude: 4, unit: years}}
+      - ask: chief_complaint
+        answer: joint_pain
+        said: "ghutnon mein dard rehta hai"
+        lang: hi
+      - ask: complaint_duration
+        answer: {magnitude: 4, unit: years}
+        said: "chaar saal se"
+        lang: hi
       - {ask: onset, answer: gradual}
       - {ask: duration, answer: {magnitude: 4, unit: years}}
       - {ask: site, answer: [knee]}
@@ -55,7 +61,10 @@ scenarios:
       - {ask: morning_stiffness, answer: under_30_minutes}
       - {ask: timing_pattern, answer: worse_on_movement}
       - {ask: aggravating_factors, answer: [cold_weather, climbing_stairs]}
-      - {ask: relieving_factors, answer: [warmth, oil_massage]}
+      - ask: relieving_factors
+        answer: [warmth, oil_massage]
+        said: "sikai aur tel maalish se aaram milta hai"
+        lang: hi
       - {ask: ritu_seasonal_variation, answer: worse_in_winter}
       - {ask: joint_redness_warmth, answer: "no"}
       - {ask: associated_fever, answer: "no"}

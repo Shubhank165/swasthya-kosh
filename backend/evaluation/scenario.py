@@ -34,6 +34,11 @@ class ScriptedTurn:
 
     ask: str
     answer: Any = None
+    #: The patient's verbatim words, when the scenario models a spoken answer.
+    #: Only this becomes `original_expression`: stringifying a structured answer
+    #: would put `{'magnitude': 2, 'unit': 'hours'}` in the report as though the
+    #: patient had said it.
+    said: str | None = None
     lang: str | None = None
     declined: bool = False
     source: str = "voice"
@@ -88,6 +93,7 @@ class Scenario:
                 ScriptedTurn(
                     ask=str(entry["ask"]),
                     answer=entry.get("answer"),
+                    said=str(entry["said"]) if entry.get("said") else None,
                     lang=str(entry["lang"]) if entry.get("lang") else None,
                     declined=bool(entry.get("declined", False)),
                     source=str(entry.get("source", "voice")),

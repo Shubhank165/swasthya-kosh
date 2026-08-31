@@ -7,12 +7,24 @@ so every domain behaviour is reproducible.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Protocol
+from zoneinfo import ZoneInfo
 
 
 class Clock(Protocol):
     def now(self) -> datetime: ...
+
+
+def service_date(now: datetime, timezone: str) -> date:
+    """The facility's own calendar date for `now`.
+
+    "Today's OPD" means today where the hospital is, not today in UTC. In IST
+    those differ for five and a half hours every night, so an evening session
+    looked for an instance under yesterday's date — which is exactly the sort of
+    bug that only appears at 6pm on the day of the demo.
+    """
+    return now.astimezone(ZoneInfo(timezone)).date()
 
 
 class SystemClock:

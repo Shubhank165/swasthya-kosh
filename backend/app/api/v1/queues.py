@@ -82,13 +82,14 @@ async def list_queues(
 async def get_instance(
     queue_id: str,
     repo: QueueRepoDep,
+    settings: SettingsDep,
     _: PrincipalDep,
     service_date: Annotated[date | None, Query(alias="date")] = None,
     session: Annotated[SessionName, Query()] = SessionName.FULL_DAY,
 ) -> QueueInstanceOut:
     instance = await repo.instance_for(
         queue_id,
-        service_date=service_date or date.today(),
+        service_date=service_date or settings.today(),
         session_name=session.value,
     )
     if instance is None:
@@ -110,7 +111,7 @@ async def open_instance(
     require_shadow_mode_guard(settings, "open queue instance")
     instance = await service.open_instance(
         queue_id,
-        service_date=body.service_date or date.today(),
+        service_date=body.service_date or settings.today(),
         session=body.session,
         practitioner_id=body.practitioner_id,
         service_point=body.service_point,
@@ -159,12 +160,13 @@ async def queue_dashboard(
     queue_id: str,
     repo: QueueRepoDep,
     service: QueueServiceDep,
+    settings: SettingsDep,
     _: PrincipalDep,
     service_date: Annotated[date | None, Query(alias="date")] = None,
     session: Annotated[SessionName, Query()] = SessionName.FULL_DAY,
 ) -> DashboardOut:
     instance = await repo.instance_for(
-        queue_id, service_date=service_date or date.today(), session_name=session.value
+        queue_id, service_date=service_date or settings.today(), session_name=session.value
     )
     if instance is None:
         raise NotFoundError(f"no instance for queue {queue_id}")

@@ -13,9 +13,15 @@ scenarios:
       - {ask: age, answer: {magnitude: 58, unit: years}}
       - {ask: sex, answer: male}
       - {ask: consent_given, answer: granted}
-      - {ask: chief_complaint, answer: chest_pain, lang: hi}
-      - {ask: complaint_duration, answer: {magnitude: 2, unit: hours}}
-      - {ask: onset, answer: sudden}
+      - ask: chief_complaint
+        answer: chest_pain
+        said: "seene mein jalan aur saans phoolna"
+        lang: hi
+      - ask: complaint_duration
+        answer: {magnitude: 2, unit: hours}
+        said: "do ghante se"
+        lang: hi
+      - {ask: onset, answer: sudden, said: "achanak shuru hua", lang: hi}
       - {ask: duration, answer: {magnitude: 2, unit: hours}}
       - {ask: site, answer: centre}
       - {ask: radiation, answer: to_left_arm}

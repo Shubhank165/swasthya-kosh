@@ -8,6 +8,7 @@ leaked forever.
 
 from __future__ import annotations
 
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -31,6 +32,9 @@ class Settings(BaseSettings):
     debug: bool = False
     app_name: str = "MediKiosk"
     api_prefix: str = "/api/v1"
+    #: The facility's own timezone. Queue instances are keyed by the local
+    #: calendar date, never by the server's UTC date.
+    facility_timezone: str = "Asia/Kolkata"
 
     # --- persistence ---------------------------------------------------------
     database_url: str = "postgresql+asyncpg://medikiosk:medikiosk@localhost:5432/medikiosk"
@@ -125,6 +129,13 @@ class Settings(BaseSettings):
     @property
     def is_shadow_mode(self) -> bool:
         return self.queue_mode == "shadow"
+
+    def today(self, clock: object | None = None) -> date:
+        """The facility's current service date."""
+        from app.core.clock import SystemClock, service_date
+
+        now = (clock or SystemClock()).now()  # type: ignore[union-attr]
+        return service_date(now, self.facility_timezone)
 
 
 @lru_cache(maxsize=1)

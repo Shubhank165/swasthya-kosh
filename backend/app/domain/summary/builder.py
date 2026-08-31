@@ -156,6 +156,24 @@ def _line_for(fact: ClinicalFact) -> SummaryLine:
     )
 
 
+#: Marker written on a fact that restates another one. The source fact is not
+#: rendered separately — printing both "Chest pain" and "Chief complaint:
+#: chest_pain" says the same thing twice, once in the patient's language and once
+#: in the system's.
+_DERIVED_FROM = "derived from "
+
+
+def _restated_concepts(facts: Sequence[ClinicalFact]) -> frozenset[str]:
+    """Concepts that another live fact already restates more readably."""
+    sources: set[str] = set()
+    for fact in facts:
+        if fact.note and fact.note.startswith(_DERIVED_FROM):
+            source = fact.note[len(_DERIVED_FROM) :].split("=", 1)[0].strip()
+            if source:
+                sources.add(source)
+    return frozenset(sources)
+
+
 def _sort_facts(facts: Sequence[ClinicalFact]) -> tuple[ClinicalFact, ...]:
     """Positive findings first, then denials, then unknowns; stable within groups.
 
@@ -173,12 +191,14 @@ def build(
     alerts: Sequence[RedFlagAlert] = (),
 ) -> ClinicalSummary:
     """Assemble the summary. Pure: no clock, no I/O, no model."""
+    restated = _restated_concepts(state.current())
     sections: list[SummarySection] = []
     for section in REPORT_SECTIONS:
         facts = [
             f
             for f in state.facts_for(section)
             if f.status not in {FactStatus.NOT_ASKED, FactStatus.NOT_APPLICABLE}
+            and f.concept.concept_id not in restated
         ]
         if section is Section.AYURVEDA and not state.ayurveda_enabled:
             continue

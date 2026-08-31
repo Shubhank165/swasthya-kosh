@@ -97,6 +97,7 @@ scenarios passed                       22/22  all
 required-field recall                 100.0%  100%
 missing-field rate                      3.4%  low
 irrelevant questions / session          0.00  0.00
+unscripted questions / session         35.91  script coverage
 red-flag recall                       100.0%  100%
 red-flag false-positive rate            0.0%  0%
 unsupported-assertion rate              0.00  0.00 (hard)

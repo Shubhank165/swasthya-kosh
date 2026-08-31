@@ -180,7 +180,7 @@ async def seed_facility(
     """
     settings = settings or get_settings()
     clock = clock or SystemClock()
-    today = service_date or clock.now().date()
+    today = service_date or settings.today(clock)
     counts = {"departments": 0, "queues": 0, "instances": 0, "terminology": 0}
 
     for code, name in DEPARTMENTS:
