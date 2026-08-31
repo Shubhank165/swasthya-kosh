@@ -1,0 +1,129 @@
+"""Event payloads.
+
+Every event carries identifiers, enums and counters — never clinical text. That
+is not an accident of design: these payloads fan out to a waiting-room display
+and into logs, and both are places a patient's history must never appear. The
+PHI filter in `core/logging.py` is the backstop; this is the first line.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import StrEnum
+from typing import Any
+
+
+class EventName(StrEnum):
+    """The complete published event vocabulary."""
+
+    INTAKE_STARTED = "intake.started"
+    INTAKE_UPDATED = "intake.updated"
+    INTAKE_READY = "intake.ready"
+    INTAKE_CONFIRMED = "intake.confirmed"
+    INTAKE_ABANDONED = "intake.abandoned"
+
+    REDFLAG_RAISED = "intake.redflag.raised"
+    REDFLAG_ACKNOWLEDGED = "intake.redflag.acknowledged"
+    REDFLAG_DISMISSED = "intake.redflag.dismissed"
+
+    DOCUMENT_UPLOADED = "document.uploaded"
+    DOCUMENT_PROCESSED = "document.processed"
+    DOCUMENT_LOW_CONFIDENCE = "document.low_confidence"
+
+    TICKET_ISSUED = "queue.ticket.issued"
+    TICKET_CALLED = "queue.ticket.called"
+    TICKET_RECALLED = "queue.ticket.recalled"
+    TICKET_STARTED = "queue.ticket.started"
+    TICKET_COMPLETED = "queue.ticket.completed"
+    TICKET_NO_SHOW = "queue.ticket.no_show"
+    TICKET_DEFERRED = "queue.ticket.deferred"
+    TICKET_TRANSFERRED = "queue.ticket.transferred"
+    TICKET_ESCALATED = "queue.ticket.escalated"
+    TICKET_CANCELLED = "queue.ticket.cancelled"
+    TICKET_OVERTAKEN = "queue.ticket.overtaken"
+
+    INSTANCE_OPENED = "queue.instance.opened"
+    INSTANCE_PAUSED = "queue.instance.paused"
+    INSTANCE_RESUMED = "queue.instance.resumed"
+    INSTANCE_CLOSED = "queue.instance.closed"
+
+    REPORT_READY = "report.ready"
+    REPORT_PHYSICIAN_VERIFIED = "report.physician_verified"
+
+
+#: Payload keys that may never appear on an event. Enforced by `Event.__post_init__`
+#: and by a safety test, so a well-meaning addition cannot leak PHI to a display.
+FORBIDDEN_PAYLOAD_KEYS: frozenset[str] = frozenset(
+    {
+        "text",
+        "answer",
+        "utterance",
+        "transcript",
+        "original_expression",
+        "summary",
+        "report",
+        "patient_name",
+        "name",
+        "phone",
+        "address",
+        "abha_id",
+        "diagnosis",
+        "medications",
+        "value",
+        "question",
+        "prompt",
+    }
+)
+
+
+class PayloadError(ValueError):
+    """An event payload carried a forbidden key."""
+
+
+@dataclass(frozen=True, slots=True)
+class Event:
+    """One published event."""
+
+    name: EventName
+    occurred_at: datetime
+    #: Fan-out key: the dashboard subscribes by department.
+    department_code: str | None = None
+    intake_id: str | None = None
+    ticket_id: str | None = None
+    queue_id: str | None = None
+    instance_id: str | None = None
+    alert_id: str | None = None
+    document_id: str | None = None
+    actor_id: str | None = None
+    payload: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        forbidden = sorted(set(self.payload) & FORBIDDEN_PAYLOAD_KEYS)
+        if forbidden:
+            raise PayloadError(
+                f"event {self.name} carries forbidden payload keys {forbidden}; "
+                "events must never contain clinical text"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Wire form. Used by the WebSocket hub and the event log."""
+        body: dict[str, Any] = {
+            "event": self.name.value,
+            "occurred_at": self.occurred_at.isoformat(),
+        }
+        for key, value in (
+            ("department_code", self.department_code),
+            ("intake_id", self.intake_id),
+            ("ticket_id", self.ticket_id),
+            ("queue_id", self.queue_id),
+            ("instance_id", self.instance_id),
+            ("alert_id", self.alert_id),
+            ("document_id", self.document_id),
+            ("actor_id", self.actor_id),
+        ):
+            if value is not None:
+                body[key] = value
+        if self.payload:
+            body["payload"] = dict(self.payload)
+        return body
