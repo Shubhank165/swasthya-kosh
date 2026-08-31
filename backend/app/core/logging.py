@@ -130,11 +130,24 @@ REDACTED = "[redacted]"
 _SENTENCE_LIKE = re.compile(r"\S+\s+\S+\s+\S+")
 #: Devanagari and other Indic scripts — a patient's own words, always.
 _INDIC = re.compile(r"[ऀ-෿]")
+#: A run of digits long enough to be a phone number, an Aadhaar or an ABHA
+#: number. Our own identifiers are prefixed and never bare digit runs this long.
+_LONG_DIGIT_RUN = re.compile(r"\d{7,}")
 _MAX_SAFE_LEN = 64
 
 
+def _is_always_unsafe(value: str) -> bool:
+    """True for text no key may exempt.
+
+    Indic script is a patient speaking in their own language; a long digit run is
+    a phone or identity number. Neither has a legitimate reason to appear in an
+    operational log under any key, so the allowlist does not get a vote.
+    """
+    return bool(_INDIC.search(value) or _LONG_DIGIT_RUN.search(value))
+
+
 def _looks_like_clinical_text(value: str) -> bool:
-    if _INDIC.search(value):
+    if _is_always_unsafe(value):
         return True
     if len(value) > _MAX_SAFE_LEN:
         return True
@@ -146,13 +159,18 @@ def scrub(value: Any, *, key: str | None = None) -> Any:
 
     Rules, in order:
       - a denylisted key is redacted whatever its value,
-      - a string that reads like a sentence, or contains Indic script, or is long,
-        is redacted unless its key is explicitly allowlisted,
+      - Indic script and long digit runs are redacted whatever their key — the
+        allowlist does not get a vote on a patient's own words or their phone
+        number,
+      - a string that reads like a sentence, or is long, is redacted unless its
+        key is explicitly allowlisted,
       - containers are walked; scalars pass through.
     """
     if key is not None and key.lower() in DENYLISTED_KEYS:
         return REDACTED
     if isinstance(value, str):
+        if _is_always_unsafe(value):
+            return REDACTED
         if key is not None and key.lower() in ALLOWLISTED_KEYS:
             return value
         return REDACTED if _looks_like_clinical_text(value) else value

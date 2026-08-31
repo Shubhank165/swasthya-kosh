@@ -8,6 +8,7 @@ module only knows how to parse an already-decoded mapping and answer questions.
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -16,13 +17,23 @@ from app.domain.clinical.enums import Section
 from app.domain.clinical.provenance import ConceptRef
 
 
+def _is_kept(ch: str) -> bool:
+    """True for characters that carry meaning in a lookup token.
+
+    Combining marks matter: Devanagari matras and the virama are category `M`,
+    not alphanumeric, and dropping them turns `"सीने में दर्द"` into
+    `"स न म दर द"` — a different word, and one that matches nothing.
+    """
+    return ch.isalnum() or ch.isspace() or unicodedata.category(ch).startswith("M")
+
+
 def normalise_token(text: str) -> str:
     """Lowercase, strip punctuation, collapse whitespace.
 
     Deliberately conservative: it must not mangle Devanagari or IAST diacritics,
     because `"seene mein jalan"` and `"सीने में जलन"` both have to survive it.
     """
-    cleaned = "".join(ch if ch.isalnum() or ch.isspace() else " " for ch in text.lower())
+    cleaned = "".join(ch if _is_kept(ch) else " " for ch in text.lower())
     return " ".join(cleaned.split())
 
 

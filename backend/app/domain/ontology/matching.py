@@ -14,23 +14,38 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-#: Devanagari -> Latin, for the transliterated forms patients and staff type.
-#: Covers the vowels, consonants and matras needed for the terminology seeds;
-#: it is a search aid, not a scholarly transliteration scheme.
-_DEVANAGARI_MAP: dict[str, str] = {
-    "अ": "a", "आ": "aa", "इ": "i", "ई": "ii", "उ": "u", "ऊ": "uu",
-    "ऋ": "ri", "ए": "e", "ऐ": "ai", "ओ": "o", "औ": "au", "अं": "am",
+#: Devanagari consonants, without the inherent vowel. Each carries an implicit
+#: "a" unless a matra or a virama follows, which `transliterate` applies.
+_CONSONANTS: dict[str, str] = {
     "क": "k", "ख": "kh", "ग": "g", "घ": "gh", "ङ": "ng",
     "च": "ch", "छ": "chh", "ज": "j", "झ": "jh", "ञ": "ny",
     "ट": "t", "ठ": "th", "ड": "d", "ढ": "dh", "ण": "n",
     "त": "t", "थ": "th", "द": "d", "ध": "dh", "न": "n",
     "प": "p", "फ": "ph", "ब": "b", "भ": "bh", "म": "m",
-    "य": "y", "र": "r", "ल": "l", "व": "v",
-    "श": "sh", "ष": "sh", "स": "s", "ह": "h", "ळ": "l",
+    "य": "y", "र": "r", "ल": "l", "व": "v", "ळ": "l",
+    "श": "sh", "ष": "sh", "स": "s", "ह": "h",
+}
+
+#: Independent vowels.
+_VOWELS: dict[str, str] = {
+    "अ": "a", "आ": "aa", "इ": "i", "ई": "ii", "उ": "u", "ऊ": "uu",
+    "ऋ": "ri", "ए": "e", "ऐ": "ai", "ओ": "o", "औ": "au",
+}
+
+#: Dependent vowel signs (matras). They replace a consonant's inherent "a".
+_MATRAS: dict[str, str] = {
     "ा": "a", "ि": "i", "ी": "i", "ु": "u", "ू": "u", "ृ": "ri",
     "े": "e", "ै": "ai", "ो": "o", "ौ": "au",
-    "ं": "n", "ँ": "n", "ः": "h", "्": "", "़": "",  # noqa: RUF001
 }
+
+#: Marks that modify without supplying a vowel.
+_SIGNS: dict[str, str] = {"ं": "n", "ँ": "n", "ः": "h", "़": ""}
+
+#: Suppresses the inherent vowel of the consonant it follows.
+_VIRAMA = "्"
+
+#: The vowel a bare consonant carries when nothing follows it.
+_INHERENT = "a"
 
 #: Latin spellings that vary between transliteration conventions. Folding these
 #: is what makes "shula", "sula" and "shoola" all find the same concept.
@@ -56,8 +71,40 @@ _FOLDINGS: tuple[tuple[str, str], ...] = (
 
 
 def transliterate(text: str) -> str:
-    """Devanagari to a Latin approximation, leaving Latin text untouched."""
-    return "".join(_DEVANAGARI_MAP.get(ch, ch) for ch in text)
+    """Devanagari to a Latin approximation, leaving Latin text untouched.
+
+    Devanagari consonants carry an inherent "a" that the script does not write.
+    Dropping it turns `"संधिगत"` into `"sndhigt"`, which matches nothing —
+    so the vowel is emitted unless a matra supplies a different one or a virama
+    suppresses it.
+    """
+    out: list[str] = []
+    index = 0
+    length = len(text)
+    while index < length:
+        ch = text[index]
+        if ch in _CONSONANTS:
+            out.append(_CONSONANTS[ch])
+            following = text[index + 1] if index + 1 < length else ""
+            if following in _MATRAS:
+                out.append(_MATRAS[following])
+                index += 2
+                continue
+            if following == _VIRAMA:
+                index += 2
+                continue
+            out.append(_INHERENT)
+        elif ch in _VOWELS:
+            out.append(_VOWELS[ch])
+        elif ch in _SIGNS:
+            out.append(_SIGNS[ch])
+        elif ch in _MATRAS or ch == _VIRAMA:
+            # A stray mark with no consonant before it; nothing to attach to.
+            out.append(_MATRAS.get(ch, ""))
+        else:
+            out.append(ch)
+        index += 1
+    return "".join(out)
 
 
 def fold(text: str) -> str:

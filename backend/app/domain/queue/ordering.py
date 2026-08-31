@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app.domain.clinical.enums import IntakeState
 from app.domain.clinical.provenance import IntakeId
@@ -33,15 +33,25 @@ READY_INTAKE_STATES: frozenset[IntakeState] = frozenset(
 
 IntakeStateLookup = Mapping[IntakeId, IntakeState]
 
-#: Sorts after every real appointment time, so walk-ins never displace a booked slot.
-_NO_APPOINTMENT = datetime.max
+def _appointment_key(slot: datetime | None) -> tuple[int, float]:
+    """Sortable appointment key.
+
+    A ticket with no appointment sorts after every ticket that has one, so a
+    walk-in never displaces a booked slot. The two-part key avoids comparing a
+    real datetime against a sentinel — the sentinel and the real values differ in
+    timezone awareness, and mixing them raises rather than mis-sorting.
+    """
+    if slot is None:
+        return (1, 0.0)
+    aware = slot if slot.tzinfo is not None else slot.replace(tzinfo=UTC)
+    return (0, aware.timestamp())
 
 
-def base_sort_key(ticket: Ticket) -> tuple[int, datetime, int]:
-    """The strict clinical ordering key."""
+def base_sort_key(ticket: Ticket) -> tuple[int, tuple[int, float], int]:
+    """The strict clinical ordering key: priority, then slot time, then token."""
     return (
         PRIORITY_RANK[ticket.priority_class],
-        ticket.appointment_slot_time or _NO_APPOINTMENT,
+        _appointment_key(ticket.appointment_slot_time),
         ticket.effective_sequence,
     )
 

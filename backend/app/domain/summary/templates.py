@@ -86,40 +86,86 @@ REPORTER_MARKERS: Mapping[ReporterRole, str] = {
     ReporterRole.STAFF: "entered by staff",
 }
 
-#: Phrases that would turn a draft intake into a diagnosis or a piece of advice.
-#: `find_unsupported_assertions` scans rendered output for these, and the
-#: evaluation harness fails the build on any hit. The target is zero, always.
-FORBIDDEN_ASSERTION_PATTERNS: tuple[str, ...] = (
-    "you have",
-    "you are suffering",
+#: Phrasing that turns something into clinical advice or an interpretation,
+#: wherever it appears. Banned in prompts and in rendered output alike.
+ADVICE_PATTERNS: tuple[str, ...] = (
     "you should take",
     "you must take",
+    "you should stop",
+    "we recommend",
+    "i recommend",
+    "you are advised",
+    "prescribed for you",
+    "treatment plan",
+)
+
+#: Phrasing that asserts an interpretation of the patient's findings. Also banned
+#: everywhere: a kiosk that says "consistent with" has crossed the line whether
+#: it said it in a question or in a report.
+INTERPRETATION_PATTERNS: tuple[str, ...] = (
+    "you are suffering",
     "diagnosis is",
-    "diagnosed with",
+    "you have been diagnosed",
     "likely due to",
     "probably due to",
     "consistent with",
     "suggestive of",
     "rule out",
-    "treatment plan",
-    "we recommend",
-    "i recommend",
-    "prescribed for you",
+    "in your case this means",
+)
+
+#: Named conditions and second-person assertions. Banned in *output* only.
+#:
+#: They cannot be banned in prompts, because a legitimate past-medical question
+#: is "has a doctor ever told you that you have diabetes?" — the disease name and
+#: the words "you have" are doing honest work there. In a generated report the
+#: same phrases would be the system asserting a diagnosis, which it must never do.
+FORBIDDEN_OUTPUT_PATTERNS: tuple[str, ...] = (
+    "you have",
+    "you are having",
+    "diagnosed with",
     "myocardial infarction",
     "heart attack",
     "appendicitis",
     "stroke",
+    "sepsis",
+    "cancer",
 )
+
+#: What `find_unsupported_assertions` scans rendered output for. The evaluation
+#: harness fails the build on any hit; the target is zero, always.
+FORBIDDEN_ASSERTION_PATTERNS: tuple[str, ...] = (
+    *FORBIDDEN_OUTPUT_PATTERNS,
+    *ADVICE_PATTERNS,
+    *INTERPRETATION_PATTERNS,
+)
+
+#: What prompts are scanned for. Narrower by design — see the note above.
+FORBIDDEN_PROMPT_PATTERNS: tuple[str, ...] = (*ADVICE_PATTERNS, *INTERPRETATION_PATTERNS)
+
+
+def _matches(text: str, patterns: tuple[str, ...]) -> tuple[str, ...]:
+    lowered = text.lower()
+    return tuple(p for p in patterns if p in lowered)
 
 
 def find_unsupported_assertions(text: str) -> tuple[str, ...]:
-    """Forbidden phrases present in `text`, in declaration order.
+    """Forbidden phrases present in generated output, in declaration order.
 
-    Case-insensitive substring matching, deliberately blunt. A blunt check that
-    a content author cannot argue with is worth more here than a clever one.
+    Case-insensitive substring matching, deliberately blunt. A blunt check a
+    content author cannot argue with is worth more here than a clever one.
     """
-    lowered = text.lower()
-    return tuple(p for p in FORBIDDEN_ASSERTION_PATTERNS if p in lowered)
+    return _matches(text, FORBIDDEN_ASSERTION_PATTERNS)
+
+
+def find_prompt_violations(text: str) -> tuple[str, ...]:
+    """Advice or interpretation in a question put to a patient.
+
+    A question may name a disease — "has a doctor ever told you that you have
+    diabetes?" is exactly the right way to take a past medical history. It may
+    never give advice or offer an interpretation.
+    """
+    return _matches(text, FORBIDDEN_PROMPT_PATTERNS)
 
 
 def annotate(certainty: Certainty, reporter: ReporterRole, verified: bool) -> str:
