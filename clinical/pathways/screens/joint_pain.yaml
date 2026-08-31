@@ -1,0 +1,49 @@
+id: joint_pain
+version: 1
+label: Joint pain red-flag screen
+clinical_source: "septic arthritis screening questions; pending AIIA mentor review"
+section: red_flag_screen
+matches_concepts: []
+fields:
+  - concept: joint_redness_warmth
+    required: true
+    priority: 10
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Is any one joint red, hot and very tender?"
+      hi: "क्या कोई एक जोड़ लाल, गरम और बहुत दर्दनाक है?"
+
+  - concept: associated_fever
+    required: true
+    priority: 20
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Do you have fever along with the joint pain?"
+      hi: "क्या जोड़ों के दर्द के साथ बुखार भी है?"
+
+  - concept: inability_to_bear_weight
+    required: true
+    priority: 30
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Are you unable to put weight on the joint at all?"
+      hi: "क्या आप उस जोड़ पर बिल्कुल भी वज़न नहीं डाल पा रहे हैं?"
+
+  - concept: unintentional_weight_loss
+    required: true
+    priority: 40
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you lost weight without trying to?"
+      hi: "क्या बिना कोशिश किए आपका वज़न घटा है?"
+
+  - concept: altered_sensorium
+    required: true
+    priority: 50
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has the patient been unusually drowsy or confused?"
+      hi: "क्या मरीज़ असामान्य रूप से सुस्त या भ्रमित रहे हैं?"

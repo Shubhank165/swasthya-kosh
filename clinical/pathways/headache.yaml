@@ -1,0 +1,110 @@
+id: headache
+version: 1
+label: Headache (Shirah Shula)
+clinical_source: "SOCRATES pain history plus SNOOP red-flag limbs; pending AIIA mentor review"
+matches_concepts: [headache, shirah_shula, cephalalgia]
+review_of_systems: [neurological]
+fields:
+  - concept: onset
+    required: true
+    priority: 10
+    answer: {type: single_choice, options: [sudden, gradual, unknown]}
+    prompts:
+      en: "Did the headache start suddenly or gradually?"
+      hi: "सिर दर्द अचानक शुरू हुआ था या धीरे-धीरे?"
+
+  - concept: duration
+    required: true
+    priority: 20
+    answer: {type: duration}
+    prompts:
+      en: "How long have you had this headache?"
+      hi: "यह सिर दर्द कब से है?"
+
+  - concept: site
+    required: true
+    priority: 30
+    answer:
+      type: single_choice
+      options: [one_side, both_sides, forehead, back_of_head, around_eye, whole_head, unknown]
+    prompts:
+      en: "Which part of your head hurts?"
+      hi: "सिर के किस हिस्से में दर्द होता है?"
+
+  - concept: severity
+    required: true
+    priority: 40
+    answer: {type: scale, min: 0, max: 10}
+    prompts:
+      en: "On a scale of nought to ten, how bad is it at its worst?"
+      hi: "शून्य से दस के बीच, सबसे ज़्यादा होने पर यह कितना रहता है?"
+
+  - concept: character
+    required: false
+    priority: 50
+    answer:
+      type: single_choice
+      options: [throbbing, pressing, band_like, stabbing, unknown]
+    prompts:
+      en: "What does the headache feel like?"
+      hi: "सिर दर्द कैसा महसूस होता है?"
+
+  - concept: timing_pattern
+    required: true
+    priority: 60
+    answer:
+      type: single_choice
+      options: [constant, episodic, worse_morning, worse_evening, unknown]
+    prompts:
+      en: "Is it there all the time, or does it come in episodes?"
+      hi: "क्या यह हर समय रहता है या दौरे की तरह आता है?"
+
+  - concept: associated_vomiting
+    required: true
+    priority: 70
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Do you vomit with the headache?"
+      hi: "क्या सिर दर्द के साथ उल्टी होती है?"
+
+  - concept: photophobia
+    required: true
+    priority: 80
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Does bright light make it worse?"
+      hi: "क्या तेज़ रोशनी से यह बढ़ जाता है?"
+
+  - concept: visual_disturbance
+    required: true
+    priority: 90
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you had any change in your vision with it?"
+      hi: "क्या इसके साथ आपकी नज़र में कोई बदलाव आया है?"
+
+  - concept: aggravating_factors
+    required: false
+    priority: 100
+    answer:
+      type: multi_choice
+      options: [coughing, bending_forward, screen_use, lack_of_sleep, hunger, stress, unknown]
+    prompts:
+      en: "Is there anything that brings it on or makes it worse?"
+      hi: "क्या कोई चीज़ इसे शुरू करती है या बढ़ाती है?"
+
+  - concept: prior_episodes
+    required: true
+    priority: 110
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you had headaches like this before?"
+      hi: "क्या पहले भी ऐसा सिर दर्द होता रहा है?"
+
+  - concept: treatment_taken
+    required: true
+    priority: 120
+    answer: {type: free_text}
+    prompts:
+      en: "Have you taken anything for it?"
+      hi: "इसके लिए आपने कुछ लिया है?"

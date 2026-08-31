@@ -1,0 +1,56 @@
+rules:
+  - id: septic_arthritis_screen
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: joint_pain, status: present}
+        - {concept: joint_redness_warmth, status: present}
+        - any:
+            - {concept: associated_fever, status: present}
+            - {concept: inability_to_bear_weight, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: altered_sensorium_any_presentation
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: altered_sensorium, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: syncope_any_presentation
+    version: 1
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: syncope, status: present}
+    action: {notify: triage, priority_hint: priority}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: unexplained_weight_loss
+    version: 1
+    severity: moderate
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: unintentional_weight_loss, status: present}
+    action: {notify: triage, priority_hint: priority}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: anaphylaxis_history_with_new_prescription
+    version: 1
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: drug_allergy, status: present}
+        - {concept: allergy_reaction_type, in: [breathing_difficulty, swelling, fainting]}
+    action: {notify: triage, priority_hint: priority}
+    clinical_source: "pending AIIA mentor review"
+    guidance: "Severe prior drug reaction; flag before any prescription is written."

@@ -1,0 +1,14 @@
+id: respiratory
+version: 1
+label: Review of systems — respiratory
+clinical_source: "standard systems review; pending AIIA mentor review"
+section: review_of_systems
+matches_concepts: []
+fields:
+  - concept: cough
+    required: true
+    priority: 10
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Do you have a cough these days?"
+      hi: "क्या आजकल आपको खाँसी है?"

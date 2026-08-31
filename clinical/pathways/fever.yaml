@@ -1,0 +1,108 @@
+id: fever
+version: 1
+label: Fever (Jwara)
+clinical_source: "standard febrile-illness history; pending AIIA mentor review"
+matches_concepts: [fever, jwara, pyrexia]
+review_of_systems: [respiratory, gi, genitourinary, skin]
+fields:
+  - concept: onset
+    required: true
+    priority: 10
+    answer: {type: single_choice, options: [sudden, gradual, unknown]}
+    prompts:
+      en: "Did the fever come on suddenly or build up gradually?"
+      hi: "बुखार अचानक आया था या धीरे-धीरे बढ़ा?"
+
+  - concept: duration
+    required: true
+    priority: 20
+    answer: {type: duration}
+    prompts:
+      en: "How many days have you had fever?"
+      hi: "कितने दिनों से बुखार है?"
+
+  - concept: severity
+    required: true
+    priority: 30
+    answer: {type: quantity, unit: celsius}
+    prompts:
+      en: "If you have measured it, what was the highest temperature?"
+      hi: "अगर आपने नापा है, तो सबसे ज़्यादा तापमान कितना था?"
+
+  - concept: timing_pattern
+    required: true
+    priority: 40
+    answer:
+      type: single_choice
+      options: [continuous, comes_and_goes, worse_evening, alternate_days, unknown]
+    prompts:
+      en: "Is the fever there all the time, or does it come and go?"
+      hi: "बुखार हर समय रहता है या आता-जाता है?"
+
+  - concept: associated_fever
+    required: false
+    priority: 45
+    answer:
+      type: multi_choice
+      options: [chills, rigors, sweating_on_defervescence, none, unknown]
+    prompts:
+      en: "Do you get chills or shivering with the fever?"
+      hi: "क्या बुखार के साथ ठंड या कँपकँपी लगती है?"
+
+  - concept: cough
+    required: true
+    priority: 50
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Do you have a cough?"
+      hi: "क्या आपको खाँसी है?"
+
+  - concept: loose_stools
+    required: true
+    priority: 60
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have your motions been loose?"
+      hi: "क्या पाखाना पतला हो रहा है?"
+
+  - concept: burning_micturition
+    required: true
+    priority: 70
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Is there burning when you pass urine?"
+      hi: "क्या पेशाब करते समय जलन होती है?"
+
+  - concept: rash
+    required: true
+    priority: 80
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you noticed any rash on your skin?"
+      hi: "क्या आपकी त्वचा पर कोई चकत्ते दिखे हैं?"
+
+  - concept: recent_travel
+    required: true
+    priority: 90
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you travelled out of the city in the last month?"
+      hi: "क्या आप पिछले महीने शहर से बाहर गए हैं?"
+
+  - concept: appetite_change
+    required: false
+    priority: 100
+    answer:
+      type: single_choice
+      options: [reduced, normal, increased, unknown]
+    prompts:
+      en: "How has your appetite been?"
+      hi: "आपकी भूख कैसी रही है?"
+
+  - concept: treatment_taken
+    required: true
+    priority: 110
+    answer: {type: free_text}
+    prompts:
+      en: "Have you taken anything for the fever?"
+      hi: "बुखार के लिए आपने कुछ लिया है?"

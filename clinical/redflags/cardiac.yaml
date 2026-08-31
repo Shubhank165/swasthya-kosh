@@ -1,0 +1,68 @@
+# Red-flag rules — cardiorespiratory.
+#
+# Every `label` is the same fixed wording. It says a human must look now; it does
+# not say what is wrong, and it is never addressed to the patient as a finding.
+# `clinical_source` names who approved the rule — an unsourced rule fails to load.
+#
+# These are tuned for recall, not precision. Over-alerting is tuned down with
+# clinicians once we have OPD data; a missed emergency is not recoverable.
+rules:
+  - id: acute_chest_pain_with_dyspnoea
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: chest_pain, status: present}
+        - {concept: onset, in: [sudden]}
+        - any:
+            - {concept: dyspnoea, status: present}
+            - {concept: diaphoresis, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+    guidance: "Triage to review before the patient returns to the waiting area."
+
+  - id: chest_pain_with_radiation
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: chest_pain, status: present}
+        - {concept: radiation, in: [to_left_arm, to_jaw, to_both_arms]}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: chest_pain_with_syncope
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: chest_pain, status: present}
+        - {concept: syncope, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: chest_pain_on_exertion_severe
+    version: 1
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: chest_pain, status: present}
+        - {concept: aggravating_factors, in: [exertion]}
+        - {concept: severity, gte: 7}
+    action: {notify: triage, priority_hint: priority}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: breathlessness_at_rest
+    version: 1
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: dyspnoea, status: present}
+        - {concept: syncope, status: present}
+    action: {notify: triage, priority_hint: priority}
+    clinical_source: "pending AIIA mentor review"

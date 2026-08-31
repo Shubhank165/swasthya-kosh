@@ -1,0 +1,95 @@
+# NAMASTE seed — National AYUSH Morbidity and Standardised Terminologies.
+#
+# A CURATED SEED, not a release. The loader in app/services/terminology.py can
+# ingest a full NAMASTE release into the same tables; this file exists so the
+# system runs end-to-end offline in CI and at a demo without shipping licensed
+# content into the repository.
+system: NAMASTE
+version: "seed-0.1"
+uri: "http://terminology.medikiosk.local/CodeSystem/namaste"
+source_note: >
+  Codes here are placeholders shaped like NAMASTE codes for development. They
+  MUST be replaced with the real release before any clinical use, and no code in
+  this file should be treated as authoritative.
+needs_clinical_review: true
+concepts:
+  - code: AY-JWR
+    display: Jwara
+    definition: Fever as described in Ayurvedic nosology
+    discipline: ayurveda
+  - code: AY-UDR-SHL
+    display: Udara Shula
+    definition: Pain in the abdomen
+    discipline: ayurveda
+  - code: AY-HRD-SHL
+    display: Hrid Shula
+    definition: Pain in the cardiac region
+    discipline: ayurveda
+  - code: AY-SHR-SHL
+    display: Shirah Shula
+    definition: Headache
+    discipline: ayurveda
+  - code: AY-SND-VAT
+    display: Sandhigata Vata
+    definition: Vata vitiation localised to the joints
+    discipline: ayurveda
+  - code: AY-MDH
+    display: Madhumeha
+    definition: A Prameha subtype characterised by sweet urine
+    discipline: ayurveda
+  - code: AY-RKT-VAT
+    display: Raktagata Vata
+    definition: Vata vitiation involving Rakta dhatu
+    discipline: ayurveda
+  - code: AY-TMK-SHW
+    display: Tamaka Shwasa
+    definition: A Shwasa subtype with paroxysmal breathlessness
+    discipline: ayurveda
+  - code: AY-RJY
+    display: Rajayakshma
+    definition: A wasting disorder of multiple dhatus
+    discipline: ayurveda
+  - code: AY-AGN
+    display: Agni
+    definition: Digestive and metabolic capacity
+    discipline: ayurveda
+  - code: AY-KST
+    display: Koshtha
+    definition: Bowel habit constitution
+    discipline: ayurveda
+  - code: AY-NDR
+    display: Nidra
+    definition: Sleep
+    discipline: ayurveda
+  - code: AY-MTR
+    display: Mutra
+    definition: Urine
+    discipline: ayurveda
+  - code: AY-SWD
+    display: Sweda
+    definition: Perspiration
+    discipline: ayurveda
+  - code: AY-BAL
+    display: Bala
+    definition: Strength
+    discipline: ayurveda
+  - code: AY-AHR
+    display: Ahara
+    definition: Dietary regimen
+    discipline: ayurveda
+  - code: AY-VHR
+    display: Vihara
+    definition: Lifestyle and daily regimen
+    discipline: ayurveda
+  - code: AY-RTU
+    display: Ritu
+    definition: Season, as it bears on symptom variation
+    discipline: ayurveda
+  - code: SD-SUR
+    display: Suram
+    definition: Fever (Siddha)
+    discipline: siddha
+  - code: UN-HUM
+    display: Humma
+    definition: Fever (Unani)
+    discipline: unani

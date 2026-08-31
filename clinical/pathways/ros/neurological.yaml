@@ -1,0 +1,21 @@
+id: neurological
+version: 1
+label: Review of systems — neurological
+clinical_source: "standard systems review; pending AIIA mentor review"
+section: review_of_systems
+matches_concepts: []
+fields:
+  - concept: dizziness
+    required: true
+    priority: 10
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you felt dizzy or unsteady?"
+      hi: "क्या आपको चक्कर या लड़खड़ाहट महसूस हुई है?"
+  - concept: visual_disturbance
+    required: false
+    priority: 20
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Any change in your eyesight?"
+      hi: "क्या आपकी नज़र में कोई बदलाव आया है?"

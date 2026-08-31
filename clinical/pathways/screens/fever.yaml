@@ -1,0 +1,58 @@
+id: fever
+version: 1
+label: Fever red-flag screen
+clinical_source: "sepsis and meningism screening questions; pending AIIA mentor review"
+section: red_flag_screen
+matches_concepts: []
+fields:
+  - concept: neck_stiffness
+    required: true
+    priority: 10
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Is your neck stiff, or does it hurt to bend your chin to your chest?"
+      hi: "क्या आपकी गर्दन अकड़ी है, या ठुड्डी को छाती से लगाने में दर्द होता है?"
+
+  - concept: altered_sensorium
+    required: true
+    priority: 20
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has the patient been unusually drowsy or confused?"
+      hi: "क्या मरीज़ असामान्य रूप से सुस्त या भ्रमित रहे हैं?"
+
+  - concept: bleeding_manifestation
+    required: true
+    priority: 30
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Any bleeding from the gums or nose, or red spots on the skin?"
+      hi: "क्या मसूड़ों या नाक से खून आया है, या त्वचा पर लाल धब्बे हैं?"
+
+  - concept: reduced_urine_output
+    required: true
+    priority: 40
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Are you passing much less urine than usual?"
+      hi: "क्या आप सामान्य से बहुत कम पेशाब कर रहे हैं?"
+
+  - concept: persistent_high_fever
+    required: true
+    priority: 50
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has the fever stayed high for more than a week?"
+      hi: "क्या एक हफ़्ते से ज़्यादा से बुखार तेज़ बना हुआ है?"
+
+  - concept: dyspnoea
+    required: true
+    priority: 60
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Are you finding it hard to breathe?"
+      hi: "क्या आपको साँस लेने में कठिनाई हो रही है?"

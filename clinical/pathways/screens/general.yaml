@@ -1,0 +1,52 @@
+# Default red-flag screen. Asked for every complaint that has no specific screen.
+# Every concept a red-flag rule reads must be asked by some screen, or the rule
+# can never fire; `tests/safety/test_redflag_screen_coverage.py` enforces that.
+id: general
+version: 1
+label: General red-flag screen
+clinical_source: "generic emergency-department screening questions; pending AIIA mentor review"
+section: red_flag_screen
+matches_concepts: []
+fields:
+  - concept: altered_sensorium
+    required: true
+    priority: 10
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has the patient been unusually drowsy or confused?"
+      hi: "क्या मरीज़ असामान्य रूप से सुस्त या भ्रमित रहे हैं?"
+
+  - concept: syncope
+    required: true
+    priority: 20
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you fainted or blacked out?"
+      hi: "क्या आप बेहोश हुए हैं या आँखों के आगे अँधेरा आया है?"
+
+  - concept: dyspnoea
+    required: true
+    priority: 30
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Are you finding it hard to breathe?"
+      hi: "क्या आपको साँस लेने में कठिनाई हो रही है?"
+
+  - concept: unintentional_weight_loss
+    required: true
+    priority: 40
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you lost weight without trying to?"
+      hi: "क्या बिना कोशिश किए आपका वज़न घटा है?"
+
+  - concept: bleeding_manifestation
+    required: true
+    priority: 50
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you had any unusual bleeding — from the gums, the nose, or spots under the skin?"
+      hi: "क्या आपको कोई असामान्य रक्तस्राव हुआ है — मसूड़ों, नाक से, या त्वचा पर धब्बे?"

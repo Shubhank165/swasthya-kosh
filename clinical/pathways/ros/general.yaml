@@ -1,0 +1,21 @@
+id: general
+version: 1
+label: Review of systems — general
+clinical_source: "standard systems review; pending AIIA mentor review"
+section: review_of_systems
+matches_concepts: []
+fields:
+  - concept: appetite_change
+    required: true
+    priority: 10
+    answer: {type: single_choice, options: [reduced, normal, increased, unknown]}
+    prompts:
+      en: "How has your appetite been lately?"
+      hi: "आजकल आपकी भूख कैसी रही है?"
+  - concept: unintentional_weight_loss
+    required: true
+    priority: 20
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you lost weight without trying to?"
+      hi: "क्या बिना कोशिश किए आपका वज़न घटा है?"

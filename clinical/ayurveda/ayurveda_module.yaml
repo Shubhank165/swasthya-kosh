@@ -1,0 +1,126 @@
+# Ayurveda module — patient-reported only.
+#
+# This is deliberately NOT a Prakriti assessment. Prakriti determination is a
+# clinical act performed by the Vaidya through observation and examination; a
+# kiosk cannot do it, and pretending otherwise would be exactly the kind of
+# overreach this system exists to avoid. What the kiosk collects here is what a
+# patient can accurately report about themselves — Agni, Koshtha, Nidra, Mutra,
+# Sweda, Bala, Ahara, Vihara — so the Vaidya starts the consultation with those
+# answers already in hand.
+id: ayurveda_module
+version: 1
+label: Ayurveda — patient-reported
+clinical_source: >
+  Concepts follow standard Ashtavidha/Dashavidha Pariksha vocabulary, restricted
+  to patient-reportable items. Wording pending AIIA mentor review.
+section: ayurveda
+matches_concepts: []
+fields:
+  - concept: agni_appetite
+    required: true
+    priority: 10
+    answer:
+      type: single_choice
+      options:
+        [regular_good, irregular, low_appetite, excessive_appetite, variable, unknown]
+    prompts:
+      en: "How is your appetite and digestion — regular, irregular, weak, or excessive?"
+      hi: "आपकी भूख और पाचन कैसा है — नियमित, अनियमित, कमज़ोर, या बहुत ज़्यादा?"
+
+  - concept: koshtha_bowel
+    required: true
+    priority: 20
+    answer:
+      type: single_choice
+      options: [regular_once_daily, hard_infrequent, loose_frequent, irregular, unknown]
+    prompts:
+      en: "How are your bowel movements — regular, hard and infrequent, or loose?"
+      hi: "आपका पाखाना कैसा रहता है — नियमित, सख़्त और कम, या पतला?"
+
+  - concept: nidra_sleep
+    required: true
+    priority: 30
+    answer:
+      type: single_choice
+      options: [sound, disturbed, difficulty_falling_asleep, excessive, unknown]
+    prompts:
+      en: "How is your sleep — sound, disturbed, hard to fall asleep, or excessive?"
+      hi: "आपकी नींद कैसी है — गहरी, बाधित, देर से आने वाली, या ज़्यादा?"
+
+  - concept: mutra_urine
+    required: true
+    priority: 40
+    answer:
+      type: single_choice
+      options: [normal, frequent, scanty, burning, night_frequency, unknown]
+    prompts:
+      en: "How is your urination — normal, frequent, scanty, or with burning?"
+      hi: "आपका पेशाब कैसा रहता है — सामान्य, बार-बार, कम, या जलन के साथ?"
+
+  - concept: sweda_perspiration
+    required: false
+    priority: 50
+    answer:
+      type: single_choice
+      options: [normal, excessive, very_little, night_sweats, unknown]
+    prompts:
+      en: "How much do you perspire — normally, a lot, or very little?"
+      hi: "आपको पसीना कितना आता है — सामान्य, बहुत ज़्यादा, या बहुत कम?"
+
+  - concept: bala_strength
+    required: true
+    priority: 60
+    answer:
+      type: single_choice
+      options: [good, moderate, easily_tired, very_weak, unknown]
+    prompts:
+      en: "How is your strength and stamina these days?"
+      hi: "आजकल आपकी ताक़त और सहनशक्ति कैसी है?"
+
+  - concept: ahara_pattern
+    required: true
+    priority: 70
+    answer:
+      type: multi_choice
+      options:
+        [
+          regular_timings,
+          irregular_timings,
+          frequent_outside_food,
+          mostly_home_cooked,
+          skips_meals,
+          heavy_at_night,
+          unknown,
+        ]
+    prompts:
+      en: "How would you describe your eating habits?"
+      hi: "आप अपने खान-पान की आदतों को कैसे बताएँगे?"
+
+  - concept: vihara_routine
+    required: false
+    priority: 80
+    answer:
+      type: multi_choice
+      options:
+        [
+          fixed_daily_routine,
+          irregular_routine,
+          night_shift_work,
+          daytime_sleep,
+          regular_exercise,
+          little_activity,
+          unknown,
+        ]
+    prompts:
+      en: "How would you describe your daily routine?"
+      hi: "आप अपनी दिनचर्या को कैसे बताएँगे?"
+
+  - concept: manas_stress
+    required: true
+    priority: 90
+    answer:
+      type: single_choice
+      options: [none, mild, moderate, severe, prefer_not_to_say]
+    prompts:
+      en: "How much stress or worry have you been under lately?"
+      hi: "आजकल आप कितना तनाव या चिंता महसूस कर रहे हैं?"

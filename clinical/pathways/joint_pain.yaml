@@ -1,0 +1,117 @@
+# Sandhigata Vata is among the highest-volume presentations in an Ayurveda OPD,
+# so this pathway carries more Ayurveda-relevant detail than the others.
+id: joint_pain
+version: 1
+label: Joint pain (Sandhigata Vata / Sandhi Shula)
+clinical_source: "standard arthralgia history with Vata-vitiation descriptors; pending AIIA mentor review"
+matches_concepts: [joint_pain, sandhigata_vata, sandhi_shula, arthralgia]
+review_of_systems: [musculoskeletal]
+fields:
+  - concept: onset
+    required: true
+    priority: 10
+    answer: {type: single_choice, options: [sudden, gradual, unknown]}
+    prompts:
+      en: "Did the joint pain start suddenly or come on slowly?"
+      hi: "जोड़ों का दर्द अचानक शुरू हुआ था या धीरे-धीरे?"
+
+  - concept: duration
+    required: true
+    priority: 20
+    answer: {type: duration}
+    prompts:
+      en: "How long have your joints been painful?"
+      hi: "जोड़ों में दर्द कब से है?"
+
+  - concept: site
+    required: true
+    priority: 30
+    answer:
+      type: multi_choice
+      options: [knee, hip, shoulder, ankle, wrist, fingers, lower_back, neck, multiple, unknown]
+    prompts:
+      en: "Which joints are affected?"
+      hi: "कौन से जोड़ प्रभावित हैं?"
+
+  - concept: severity
+    required: true
+    priority: 40
+    answer: {type: scale, min: 0, max: 10}
+    prompts:
+      en: "On a scale of nought to ten, how bad is the pain at its worst?"
+      hi: "शून्य से दस के बीच, सबसे ज़्यादा होने पर दर्द कितना रहता है?"
+
+  - concept: joint_swelling
+    required: true
+    priority: 50
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Is there any swelling in those joints?"
+      hi: "क्या उन जोड़ों में सूजन है?"
+
+  - concept: morning_stiffness
+    required: true
+    priority: 60
+    answer:
+      type: single_choice
+      options: [none, under_30_minutes, over_30_minutes, all_day, unknown]
+    prompts:
+      en: "Are your joints stiff when you wake up, and for how long?"
+      hi: "क्या सुबह उठने पर जोड़ अकड़े रहते हैं, और कितनी देर तक?"
+
+  - concept: timing_pattern
+    required: true
+    priority: 70
+    answer:
+      type: single_choice
+      options: [worse_morning, worse_evening, worse_at_night, worse_on_movement, worse_at_rest, unknown]
+    prompts:
+      en: "When is the pain at its worst?"
+      hi: "दर्द किस समय सबसे ज़्यादा रहता है?"
+
+  - concept: aggravating_factors
+    required: true
+    priority: 80
+    answer:
+      type: multi_choice
+      options: [cold_weather, rainy_weather, walking, climbing_stairs, sitting_long, unknown]
+    prompts:
+      en: "What makes the pain worse?"
+      hi: "किन बातों से दर्द बढ़ता है?"
+
+  - concept: relieving_factors
+    required: false
+    priority: 90
+    answer:
+      type: multi_choice
+      options: [warmth, oil_massage, rest, movement, medication, nothing, unknown]
+    prompts:
+      en: "What gives you relief?"
+      hi: "किससे आराम मिलता है?"
+
+  - concept: ritu_seasonal_variation
+    required: false
+    priority: 100
+    needs_clinical_review: true
+    answer:
+      type: single_choice
+      options: [worse_in_winter, worse_in_rains, worse_in_summer, no_variation, unknown]
+    prompts:
+      en: "Does the pain change with the season?"
+      hi: "क्या मौसम बदलने पर दर्द में फ़र्क़ पड़ता है?"
+
+  - concept: prior_episodes
+    required: true
+    priority: 110
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you had this kind of joint pain before?"
+      hi: "क्या पहले भी इस तरह का जोड़ों का दर्द हुआ है?"
+
+  - concept: treatment_taken
+    required: true
+    priority: 120
+    answer: {type: free_text}
+    prompts:
+      en: "What have you taken or done for it so far?"
+      hi: "अब तक इसके लिए आपने क्या लिया या किया है?"

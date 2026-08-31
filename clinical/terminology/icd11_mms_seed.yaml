@@ -1,0 +1,26 @@
+# ICD-11 Mortality and Morbidity Statistics seed — biomedical codes, used for the
+# dual coding every Condition carries where a mapping exists.
+system: ICD11-MMS
+version: "seed-0.1"
+uri: "http://id.who.int/icd/release/11/mms"
+concepts:
+  - code: MG26
+    display: Fever of other or unknown origin
+  - code: MD81
+    display: Abdominal pain
+  - code: MD30
+    display: Chest pain
+  - code: 8A80
+    display: Headache disorders
+  - code: FA20
+    display: Osteoarthritis
+  - code: 5A11
+    display: Type 2 diabetes mellitus
+  - code: BA00
+    display: Essential hypertension
+  - code: CA23
+    display: Asthma
+  - code: 1B10
+    display: Tuberculosis
+  - code: 5A00
+    display: Hypothyroidism

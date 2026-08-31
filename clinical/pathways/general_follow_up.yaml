@@ -1,0 +1,86 @@
+# The fallback pathway. Used for review visits and for any complaint that has no
+# dedicated pathway yet. It must never be empty: an unmatched complaint still
+# deserves a structured history rather than a free-text box.
+id: general_follow_up
+version: 1
+label: General consultation / follow-up
+clinical_source: "generic complaint history; pending AIIA mentor review"
+matches_concepts: [follow_up_visit, other, general]
+review_of_systems: [general]
+fields:
+  - concept: onset
+    required: true
+    priority: 10
+    answer: {type: single_choice, options: [sudden, gradual, unknown]}
+    prompts:
+      en: "Did this problem start suddenly or gradually?"
+      hi: "यह तकलीफ़ अचानक शुरू हुई थी या धीरे-धीरे?"
+
+  - concept: duration
+    required: true
+    priority: 20
+    answer: {type: duration}
+    prompts:
+      en: "How long has it been going on?"
+      hi: "यह कब से चल रहा है?"
+
+  - concept: severity
+    required: true
+    priority: 30
+    answer: {type: scale, min: 0, max: 10}
+    prompts:
+      en: "On a scale of nought to ten, how much does it trouble you?"
+      hi: "शून्य से दस के बीच, यह आपको कितना परेशान करता है?"
+
+  - concept: progression
+    required: true
+    priority: 40
+    answer:
+      type: single_choice
+      options: [improving, unchanged, worsening, fluctuating, unknown]
+    prompts:
+      en: "Since it started, has it got better, stayed the same, or got worse?"
+      hi: "शुरू होने के बाद से यह कम हुआ है, वैसा ही है, या बढ़ा है?"
+
+  - concept: aggravating_factors
+    required: false
+    priority: 50
+    answer: {type: free_text}
+    prompts:
+      en: "Is there anything that makes it worse?"
+      hi: "क्या कोई चीज़ इसे बढ़ाती है?"
+
+  - concept: relieving_factors
+    required: false
+    priority: 60
+    answer: {type: free_text}
+    prompts:
+      en: "Is there anything that helps?"
+      hi: "क्या किसी चीज़ से आराम मिलता है?"
+
+  - concept: treatment_taken
+    required: true
+    priority: 70
+    answer: {type: free_text}
+    prompts:
+      en: "What treatment have you had for it so far?"
+      hi: "अब तक इसका क्या इलाज हुआ है?"
+
+  - concept: medication_adherence
+    required: false
+    priority: 80
+    precondition: {concept: current_medications, status: present}
+    answer:
+      type: single_choice
+      options: [regularly, sometimes_missed, stopped, unknown]
+    prompts:
+      en: "Have you been able to continue the medicines you were given?"
+      hi: "जो दवाइयाँ दी गई थीं, क्या आप उन्हें जारी रख पाए हैं?"
+
+  - concept: prior_episodes
+    required: false
+    priority: 90
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has this happened before?"
+      hi: "क्या पहले भी ऐसा हुआ है?"

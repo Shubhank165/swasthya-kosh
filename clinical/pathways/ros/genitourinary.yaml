@@ -1,0 +1,14 @@
+id: genitourinary
+version: 1
+label: Review of systems — genitourinary
+clinical_source: "standard systems review; pending AIIA mentor review"
+section: review_of_systems
+matches_concepts: []
+fields:
+  - concept: burning_micturition
+    required: true
+    priority: 10
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Is there burning or difficulty when passing urine?"
+      hi: "क्या पेशाब करते समय जलन या कठिनाई होती है?"

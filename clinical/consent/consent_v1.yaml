@@ -1,0 +1,92 @@
+# Consent artefacts.
+#
+# The DPDP Act 2023 requires that we can produce, for any patient, exactly what
+# they agreed to, in which language, when, and who granted it. That means the
+# consent text is versioned content — not a string in a template — and the
+# artefact stored against an intake references this version immutably.
+#
+# Purpose codes are granted separately. `raw_audio_retention` is NOT part of the
+# base grant: recording a patient's voice and keeping it are different asks.
+version: 1
+effective_from: "2026-01-01"
+clinical_source: "drafted against DPDP Act 2023 notice requirements; pending institutional legal review"
+
+purposes:
+  - code: history_intake
+    required: true
+    label:
+      en: "Recording your health history for today's consultation"
+      hi: "आज के परामर्श के लिए आपकी स्वास्थ्य जानकारी दर्ज करना"
+    description:
+      en: >
+        We will record the answers you give and any papers you scan, so the
+        doctor has your history ready before you go in.
+      hi: >
+        आप जो उत्तर देंगे और जो कागज़ स्कैन करेंगे, हम उन्हें दर्ज करेंगे, ताकि
+        आपके अंदर जाने से पहले डॉक्टर के पास आपकी जानकारी तैयार हो।
+
+  - code: document_processing
+    required: false
+    label:
+      en: "Reading your previous prescriptions and reports"
+      hi: "आपके पिछले पर्चे और रिपोर्ट पढ़ना"
+    description:
+      en: >
+        We will read the papers you scan to pull out your past conditions and
+        medicines. The doctor checks everything we read before it is used.
+      hi: >
+        आप जो कागज़ स्कैन करेंगे, हम उनसे आपकी पुरानी बीमारियाँ और दवाइयाँ
+        निकालेंगे। हमने जो पढ़ा है, डॉक्टर उसे इस्तेमाल से पहले जाँचेंगे।
+
+  - code: raw_audio_retention
+    required: false
+    default_granted: false
+    label:
+      en: "Keeping a recording of your voice"
+      hi: "आपकी आवाज़ की रिकॉर्डिंग रखना"
+    description:
+      en: >
+        You can answer by speaking without us keeping the recording. If you agree
+        to this separately, we keep the audio so the doctor can listen back to
+        exactly what you said. You can say no and still use the kiosk normally.
+      hi: >
+        आप बोलकर उत्तर दे सकते हैं और हम रिकॉर्डिंग नहीं रखेंगे। अगर आप अलग से
+        सहमति दें, तो हम आवाज़ रखेंगे ताकि डॉक्टर आपकी बात दोबारा सुन सकें। आप
+        मना कर सकते हैं और फिर भी कियोस्क सामान्य रूप से उपयोग कर सकते हैं।
+
+  - code: hospital_record_linkage
+    required: false
+    label:
+      en: "Linking this history to your hospital record"
+      hi: "इस जानकारी को आपके अस्पताल रिकॉर्ड से जोड़ना"
+    description:
+      en: >
+        We will attach today's history to your file at this hospital so it is
+        there at your next visit.
+      hi: >
+        आज की जानकारी हम इस अस्पताल में आपकी फ़ाइल से जोड़ देंगे ताकि अगली बार
+        भी उपलब्ध रहे।
+
+notice:
+  en: >
+    This kiosk records your health history so the doctor has it ready. It does
+    not diagnose you and it does not give medical advice. A doctor reviews
+    everything before it is used. You may stop at any time, skip any question,
+    or ask a member of staff to help you instead. Refusing does not affect your
+    place in the queue or your treatment.
+  hi: >
+    यह कियोस्क आपकी स्वास्थ्य जानकारी दर्ज करता है ताकि डॉक्टर के पास पहले से
+    उपलब्ध हो। यह कोई रोग नहीं बताता और न ही कोई चिकित्सकीय सलाह देता है। उपयोग
+    से पहले डॉक्टर सब कुछ जाँचते हैं। आप कभी भी रोक सकते हैं, कोई भी प्रश्न छोड़
+    सकते हैं, या किसी कर्मचारी से मदद माँग सकते हैं। मना करने से आपकी क़तार में
+    जगह या इलाज पर कोई असर नहीं पड़ेगा।
+
+withdrawal:
+  en: >
+    You can ask us to delete what we recorded, at the registration desk, at any
+    time before or after your consultation.
+  hi: >
+    आप कभी भी — परामर्श से पहले या बाद में — पंजीकरण डेस्क पर कहकर दर्ज की गई
+    जानकारी हटवा सकते हैं।
+
+granting_parties: [self, parent_guardian, family_attendant, caregiver]

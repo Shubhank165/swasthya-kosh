@@ -1,0 +1,67 @@
+id: abdominal_pain
+version: 1
+label: Abdominal pain red-flag screen
+clinical_source: "acute abdomen screening questions; pending AIIA mentor review"
+section: red_flag_screen
+matches_concepts: []
+fields:
+  - concept: haematemesis
+    required: true
+    priority: 10
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you vomited blood, or anything that looked like coffee grounds?"
+      hi: "क्या आपको खून की उल्टी हुई है, या ऐसी उल्टी जो कॉफ़ी के दानों जैसी दिखी हो?"
+
+  - concept: melaena
+    required: true
+    priority: 20
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have your stools been black and tarry?"
+      hi: "क्या आपका पाखाना काला और लसदार रहा है?"
+
+  - concept: abdominal_rigidity
+    required: true
+    priority: 30
+    skippable: false
+    needs_clinical_review: true
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Is your stomach hard and painful to touch anywhere?"
+      hi: "क्या आपका पेट कहीं सख़्त है और छूने पर दर्द होता है?"
+
+  - concept: reduced_urine_output
+    required: true
+    priority: 40
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Are you passing much less urine than usual?"
+      hi: "क्या आप सामान्य से बहुत कम पेशाब कर रहे हैं?"
+
+  - concept: altered_sensorium
+    required: true
+    priority: 50
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has the patient been unusually drowsy or confused?"
+      hi: "क्या मरीज़ असामान्य रूप से सुस्त या भ्रमित रहे हैं?"
+
+  - concept: dyspnoea
+    required: true
+    priority: 60
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Are you finding it hard to breathe?"
+      hi: "क्या आपको साँस लेने में कठिनाई हो रही है?"
+
+  - concept: syncope
+    required: true
+    priority: 70
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you fainted or blacked out?"
+      hi: "क्या आप बेहोश हुए हैं या आँखों के आगे अँधेरा आया है?"

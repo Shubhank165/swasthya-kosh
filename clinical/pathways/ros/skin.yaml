@@ -1,0 +1,14 @@
+id: skin
+version: 1
+label: Review of systems — skin
+clinical_source: "standard systems review; pending AIIA mentor review"
+section: review_of_systems
+matches_concepts: []
+fields:
+  - concept: rash
+    required: true
+    priority: 10
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Any rash or itching on the skin?"
+      hi: "क्या त्वचा पर कोई चकत्ते या खुजली है?"

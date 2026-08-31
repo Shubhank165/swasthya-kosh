@@ -1,0 +1,122 @@
+id: chest_pain
+version: 1
+label: Chest pain (Hrid Shula)
+clinical_source: "SOCRATES pain history structure; red-flag limbs pending AIIA mentor review"
+matches_concepts: [chest_pain, hrid_shula, chest_discomfort]
+review_of_systems: [cardiovascular, respiratory]
+fields:
+  - concept: onset
+    required: true
+    priority: 10
+    answer: {type: single_choice, options: [sudden, gradual, unknown]}
+    prompts:
+      en: "Did the chest discomfort start suddenly or gradually?"
+      hi: "सीने की तकलीफ़ अचानक शुरू हुई थी या धीरे-धीरे?"
+
+  - concept: duration
+    required: true
+    priority: 20
+    answer: {type: duration}
+    prompts:
+      en: "How long has it been there?"
+      hi: "यह तकलीफ़ कब से है?"
+
+  - concept: site
+    required: true
+    priority: 30
+    answer:
+      type: single_choice
+      options: [centre, left_side, right_side, upper_abdomen, whole_chest, unknown]
+    prompts:
+      en: "Where in the chest do you feel it?"
+      hi: "सीने में यह कहाँ महसूस होता है?"
+
+  - concept: radiation
+    required: true
+    priority: 40
+    answer:
+      type: single_choice
+      options: [to_left_arm, to_jaw, to_back, to_both_arms, none, unknown]
+    prompts:
+      en: "Does it spread to your arm, jaw or back?"
+      hi: "क्या यह आपकी बाँह, जबड़े या पीठ तक फैलता है?"
+
+  - concept: severity
+    required: true
+    priority: 50
+    answer: {type: scale, min: 0, max: 10}
+    prompts:
+      en: "On a scale of nought to ten, how bad is it at its worst?"
+      hi: "शून्य से दस के बीच, सबसे ज़्यादा होने पर यह कितना रहता है?"
+
+  - concept: character
+    required: true
+    priority: 60
+    answer:
+      type: single_choice
+      options: [pressing, burning, sharp, tight_band, unknown]
+    prompts:
+      en: "What does it feel like?"
+      hi: "यह कैसा महसूस होता है?"
+
+  - concept: aggravating_factors
+    required: true
+    priority: 70
+    answer:
+      type: multi_choice
+      options: [exertion, rest, lying_down, deep_breath, after_food, emotional_stress, unknown]
+    prompts:
+      en: "What brings it on?"
+      hi: "यह किन बातों से शुरू होता है?"
+
+  - concept: relieving_factors
+    required: false
+    priority: 80
+    answer:
+      type: multi_choice
+      options: [rest, antacid, sitting_up, nothing, unknown]
+    prompts:
+      en: "Does anything make it settle?"
+      hi: "क्या किसी चीज़ से यह कम होता है?"
+
+  - concept: palpitations
+    required: true
+    priority: 90
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Do you feel your heart racing or thumping?"
+      hi: "क्या दिल तेज़ या ज़ोर से धड़कता महसूस होता है?"
+
+  - concept: relation_to_meals
+    required: false
+    priority: 100
+    answer:
+      type: single_choice
+      options: [worse_after_eating, better_after_eating, no_relation, unknown]
+    prompts:
+      en: "Is it related to eating?"
+      hi: "क्या इसका खाने से कोई संबंध है?"
+
+  - concept: leg_swelling
+    required: false
+    priority: 110
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have your feet or ankles been swelling?"
+      hi: "क्या आपके पैरों या टखनों में सूजन आती है?"
+
+  - concept: treatment_taken
+    required: true
+    priority: 120
+    answer: {type: free_text}
+    prompts:
+      en: "Have you taken anything for it so far?"
+      hi: "इसके लिए अब तक आपने कुछ लिया है?"
+
+  - concept: prior_episodes
+    required: true
+    priority: 130
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has this happened before?"
+      hi: "क्या पहले भी ऐसा हुआ है?"

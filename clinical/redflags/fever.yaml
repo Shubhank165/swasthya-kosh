@@ -1,0 +1,57 @@
+rules:
+  - id: fever_with_meningism
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: fever, status: present}
+        - any:
+            - {concept: neck_stiffness, status: present}
+            - {concept: altered_sensorium, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: fever_with_bleeding
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: fever, status: present}
+        - {concept: bleeding_manifestation, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: fever_with_reduced_urine_output
+    version: 1
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: fever, status: present}
+        - {concept: reduced_urine_output, status: present}
+    action: {notify: triage, priority_hint: priority}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: prolonged_high_fever
+    version: 1
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: fever, status: present}
+        - {concept: persistent_high_fever, status: present}
+    action: {notify: triage, priority_hint: priority}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: fever_with_breathlessness
+    version: 1
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: fever, status: present}
+        - {concept: dyspnoea, status: present}
+    action: {notify: triage, priority_hint: priority}
+    clinical_source: "pending AIIA mentor review"

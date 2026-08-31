@@ -1,0 +1,21 @@
+id: cardiovascular
+version: 1
+label: Review of systems — cardiovascular
+clinical_source: "standard systems review; pending AIIA mentor review"
+section: review_of_systems
+matches_concepts: []
+fields:
+  - concept: leg_swelling
+    required: true
+    priority: 10
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have your feet or ankles been swelling?"
+      hi: "क्या आपके पैरों या टखनों में सूजन आती है?"
+  - concept: palpitations
+    required: true
+    priority: 20
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Do you feel your heart racing at times?"
+      hi: "क्या कभी-कभी दिल तेज़ धड़कता महसूस होता है?"

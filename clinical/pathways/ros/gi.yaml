@@ -1,0 +1,28 @@
+id: gi
+version: 1
+label: Review of systems — gastrointestinal
+clinical_source: "standard systems review; pending AIIA mentor review"
+section: review_of_systems
+matches_concepts: []
+fields:
+  - concept: appetite_change
+    required: true
+    priority: 10
+    answer: {type: single_choice, options: [reduced, normal, increased, unknown]}
+    prompts:
+      en: "How has your appetite been lately?"
+      hi: "आजकल आपकी भूख कैसी रही है?"
+  - concept: associated_nausea
+    required: true
+    priority: 20
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you been feeling sick in the stomach?"
+      hi: "क्या आपका जी मिचलाता रहा है?"
+  - concept: constipation
+    required: false
+    priority: 30
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you been constipated?"
+      hi: "क्या कब्ज़ रहती है?"

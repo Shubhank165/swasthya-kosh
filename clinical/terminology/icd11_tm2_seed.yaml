@@ -1,0 +1,19 @@
+# ICD-11 Traditional Medicine Module 2 seed. Same caveat as the NAMASTE seed:
+# development placeholders, to be replaced by the licensed release.
+system: ICD11-TM2
+version: "seed-0.1"
+uri: "http://id.who.int/icd/release/11/tm2"
+needs_clinical_review: true
+concepts:
+  - code: SK40
+    display: Fever disorder (TM2)
+  - code: SK20
+    display: Sweet urine disorder (TM2)
+  - code: SL10
+    display: Wheezing disorder (TM2)
+  - code: SL30
+    display: Joint wind disorder (TM2)
+  - code: SK60
+    display: Head pain disorder (TM2)
+  - code: SK50
+    display: Abdominal pain disorder (TM2)

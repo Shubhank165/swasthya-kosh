@@ -1,0 +1,23 @@
+id: musculoskeletal
+version: 1
+label: Review of systems — musculoskeletal
+clinical_source: "standard systems review; pending AIIA mentor review"
+section: review_of_systems
+matches_concepts: []
+fields:
+  - concept: joint_swelling
+    required: true
+    priority: 10
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Is there swelling in any joint?"
+      hi: "क्या किसी जोड़ में सूजन है?"
+  - concept: morning_stiffness
+    required: false
+    priority: 20
+    answer:
+      type: single_choice
+      options: [none, under_30_minutes, over_30_minutes, all_day, unknown]
+    prompts:
+      en: "Are your joints stiff in the morning?"
+      hi: "क्या सुबह जोड़ अकड़े रहते हैं?"

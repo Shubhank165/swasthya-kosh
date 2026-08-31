@@ -1,0 +1,51 @@
+id: headache
+version: 1
+label: Headache red-flag screen
+clinical_source: "SNOOP4 headache red-flag criteria; pending AIIA mentor review"
+section: red_flag_screen
+matches_concepts: []
+fields:
+  - concept: thunderclap_onset
+    required: true
+    priority: 10
+    skippable: false
+    needs_clinical_review: true
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Was this the worst headache of your life, reaching its peak within about a minute?"
+      hi: "क्या यह आपके जीवन का सबसे तेज़ सिर दर्द था, जो लगभग एक मिनट में चरम पर पहुँच गया?"
+
+  - concept: neck_stiffness
+    required: true
+    priority: 20
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Is your neck stiff along with the headache?"
+      hi: "क्या सिर दर्द के साथ आपकी गर्दन अकड़ी हुई है?"
+
+  - concept: focal_weakness
+    required: true
+    priority: 30
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has one side of your body become weak, or your speech become unclear?"
+      hi: "क्या आपके शरीर का एक हिस्सा कमज़ोर हुआ है, या बोलने में लड़खड़ाहट आई है?"
+
+  - concept: altered_sensorium
+    required: true
+    priority: 40
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has the patient been unusually drowsy or confused?"
+      hi: "क्या मरीज़ असामान्य रूप से सुस्त या भ्रमित रहे हैं?"
+
+  - concept: associated_fever
+    required: true
+    priority: 50
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Do you have fever along with the headache?"
+      hi: "क्या सिर दर्द के साथ बुखार भी है?"

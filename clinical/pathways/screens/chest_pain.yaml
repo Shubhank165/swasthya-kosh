@@ -1,0 +1,49 @@
+id: chest_pain
+version: 1
+label: Chest pain red-flag screen
+clinical_source: "acute coronary and pulmonary embolism screening questions; pending AIIA mentor review"
+section: red_flag_screen
+matches_concepts: []
+fields:
+  - concept: dyspnoea
+    required: true
+    priority: 10
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Are you short of breath along with the chest discomfort?"
+      hi: "क्या सीने की तकलीफ़ के साथ साँस भी फूलती है?"
+
+  - concept: diaphoresis
+    required: true
+    priority: 20
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Did you break into a cold sweat with it?"
+      hi: "क्या इसके साथ ठंडा पसीना आया था?"
+
+  - concept: syncope
+    required: true
+    priority: 30
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you fainted or felt about to faint?"
+      hi: "क्या आप बेहोश हुए हैं या बेहोश होने जैसा लगा है?"
+
+  - concept: associated_vomiting
+    required: true
+    priority: 40
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Did you vomit or feel sick with it?"
+      hi: "क्या इसके साथ उल्टी हुई या जी मिचलाया?"
+
+  - concept: altered_sensorium
+    required: true
+    priority: 50
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has the patient been unusually drowsy or confused?"
+      hi: "क्या मरीज़ असामान्य रूप से सुस्त या भ्रमित रहे हैं?"

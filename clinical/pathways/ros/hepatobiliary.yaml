@@ -1,0 +1,14 @@
+id: hepatobiliary
+version: 1
+label: Review of systems — hepatobiliary
+clinical_source: "standard systems review; pending AIIA mentor review"
+section: review_of_systems
+matches_concepts: []
+fields:
+  - concept: jaundice
+    required: true
+    priority: 10
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have your eyes or skin looked yellow?"
+      hi: "क्या आपकी आँखें या त्वचा पीली दिखी हैं?"

@@ -1,0 +1,60 @@
+rules:
+  - id: gi_bleeding_suspected
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      any:
+        - {concept: haematemesis, status: present}
+        - {concept: melaena, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+    guidance: "Bleeding history reported by the patient; verify before the patient waits."
+
+  - id: acute_abdomen_with_rigidity
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: abdominal_pain, status: present}
+        - {concept: abdominal_rigidity, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+    needs_clinical_review: true
+
+  - id: severe_abdominal_pain_sudden_onset
+    version: 1
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: abdominal_pain, status: present}
+        - {concept: onset, in: [sudden]}
+        - {concept: severity, gte: 8}
+    action: {notify: triage, priority_hint: priority}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: abdominal_pain_with_persistent_vomiting
+    version: 1
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: abdominal_pain, status: present}
+        - {concept: associated_vomiting, status: present}
+        - {concept: reduced_urine_output, status: present}
+    action: {notify: triage, priority_hint: priority}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: abdominal_pain_in_pregnancy
+    version: 1
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: abdominal_pain, status: present}
+        - {concept: pregnancy, status: present}
+    action: {notify: triage, priority_hint: priority}
+    clinical_source: "pending AIIA mentor review"
+    guidance: "Route to Prasuti Tantra & Stri Roga on acknowledgement."

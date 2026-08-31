@@ -1,0 +1,47 @@
+# ConceptMap: NAMASTE <-> ICD-11 TM2 <-> ICD-11 MMS.
+#
+# Where no mapping exists there is no entry. The API returns nothing for those,
+# and nothing in the codebase may synthesise one — an invented mapping is worse
+# than an absent one, because it looks authoritative.
+#
+# `equivalence` uses FHIR ConceptMap vocabulary: equivalent | wider | narrower |
+# relatedto | inexact.
+id: namaste-tm2-mms
+version: "seed-0.1"
+needs_clinical_review: true
+mappings:
+  - namaste: AY-JWR
+    tm2: SK40
+    mms: MG26
+    equivalence: relatedto
+    note: "Jwara is broader than any single MMS fever code."
+  - namaste: AY-MDH
+    tm2: SK20
+    mms: 5A11
+    equivalence: inexact
+    note: "Madhumeha overlaps but is not coextensive with type 2 diabetes mellitus."
+  - namaste: AY-TMK-SHW
+    tm2: SL10
+    mms: CA23
+    equivalence: inexact
+  - namaste: AY-SND-VAT
+    tm2: SL30
+    mms: FA20
+    equivalence: inexact
+    note: "Sandhigata Vata is commonly correlated with osteoarthritis; the correlation is not identity."
+  - namaste: AY-SHR-SHL
+    tm2: SK60
+    mms: 8A80
+    equivalence: relatedto
+  - namaste: AY-UDR-SHL
+    tm2: SK50
+    mms: MD81
+    equivalence: relatedto
+  - namaste: AY-HRD-SHL
+    mms: MD30
+    equivalence: relatedto
+    note: "No TM2 counterpart identified in this seed; the field is intentionally absent."
+  - namaste: AY-RJY
+    mms: 1B10
+    equivalence: inexact
+    note: "Rajayakshma is a wasting syndrome, historically but not exclusively tubercular."

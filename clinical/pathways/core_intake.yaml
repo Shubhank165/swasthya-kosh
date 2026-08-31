@@ -1,0 +1,420 @@
+# Core intake — the sections asked for every patient regardless of complaint.
+#
+# The HPI section is deliberately absent: it is supplied by the matched complaint
+# pathway. Everything here runs in section order, and `priority` orders fields
+# within a section (lower first).
+id: core_intake
+version: 1
+label: Core intake
+clinical_source: "structured from standard OPD history-taking order; pending AIIA mentor review"
+matches_concepts: []
+fields:
+
+  # --- identity ---------------------------------------------------------------
+  - concept: preferred_language
+    section: identity
+    priority: 10
+    required: true
+    skippable: false
+    answer:
+      type: single_choice
+      options: [en, hi]
+    prompts:
+      en: "Which language would you like to continue in?"
+      hi: "आप किस भाषा में आगे बढ़ना चाहेंगे?"
+
+  - concept: reporter_role
+    section: identity
+    priority: 20
+    required: true
+    answer:
+      type: single_choice
+      options: [self, parent_guardian, family_attendant, caregiver, staff]
+    prompts:
+      en: "Are you answering for yourself, or for someone you have brought with you?"
+      hi: "क्या आप अपने बारे में बता रहे हैं, या किसी और के बारे में जिन्हें आप लाए हैं?"
+
+  - concept: age
+    section: identity
+    priority: 30
+    required: true
+    answer: {type: quantity, unit: years}
+    prompts:
+      en: "What is the patient's age in years?"
+      hi: "मरीज़ की उम्र कितने वर्ष है?"
+
+  - concept: sex
+    section: identity
+    priority: 40
+    required: true
+    answer:
+      type: single_choice
+      options: [female, male, other, prefer_not_to_say]
+    prompts:
+      en: "What is the patient's sex?"
+      hi: "मरीज़ का लिंग क्या है?"
+
+  # --- consent -----------------------------------------------------------------
+  - concept: consent_given
+    section: consent
+    priority: 10
+    required: true
+    skippable: false
+    answer:
+      type: single_choice
+      options: [granted, declined]
+    prompts:
+      en: "May we record your health history now so the doctor has it ready? You can stop at any time."
+      hi: "क्या हम अभी आपकी स्वास्थ्य जानकारी दर्ज कर सकते हैं ताकि डॉक्टर के पास पहले से हो? आप कभी भी रोक सकते हैं।"
+
+  # --- chief complaint ----------------------------------------------------------
+  - concept: chief_complaint
+    section: chief_complaint
+    priority: 10
+    required: true
+    skippable: false
+    answer:
+      type: single_choice
+      options:
+        [abdominal_pain, chest_pain, fever, headache, joint_pain, follow_up_visit, other]
+    prompts:
+      en: "What is the main problem that brought you here today?"
+      hi: "आज आप किस मुख्य तकलीफ़ के लिए आए हैं?"
+
+  - concept: complaint_duration
+    section: chief_complaint
+    priority: 20
+    required: true
+    answer: {type: duration}
+    prompts:
+      en: "How long have you had this problem?"
+      hi: "यह तकलीफ़ कब से है?"
+
+  # --- past medical --------------------------------------------------------------
+  - concept: known_diabetes
+    section: past_medical
+    priority: 10
+    required: true
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has a doctor ever told you that you have diabetes?"
+      hi: "क्या किसी डॉक्टर ने कभी बताया है कि आपको मधुमेह (शुगर) है?"
+
+  - concept: known_hypertension
+    section: past_medical
+    priority: 20
+    required: true
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has a doctor ever told you that you have high blood pressure?"
+      hi: "क्या किसी डॉक्टर ने कभी बताया है कि आपको उच्च रक्तचाप (बीपी) है?"
+
+  - concept: known_asthma
+    section: past_medical
+    priority: 30
+    required: true
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Do you have asthma or any long-standing breathing problem?"
+      hi: "क्या आपको दमा या साँस की कोई पुरानी तकलीफ़ है?"
+
+  - concept: known_thyroid_disorder
+    section: past_medical
+    priority: 40
+    required: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Do you have any thyroid problem?"
+      hi: "क्या आपको थायराइड की कोई समस्या है?"
+
+  - concept: known_cardiac_disease
+    section: past_medical
+    priority: 50
+    required: true
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you ever been treated for a heart problem?"
+      hi: "क्या आपका कभी दिल की बीमारी का इलाज हुआ है?"
+
+  - concept: known_tuberculosis
+    section: past_medical
+    priority: 60
+    required: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you ever been treated for tuberculosis?"
+      hi: "क्या आपका कभी टीबी का इलाज हुआ है?"
+
+  - concept: other_conditions
+    section: past_medical
+    priority: 70
+    required: false
+    answer: {type: free_text}
+    prompts:
+      en: "Is there any other condition a doctor has diagnosed you with?"
+      hi: "क्या कोई और बीमारी है जो डॉक्टर ने बताई हो?"
+
+  # --- past surgical ---------------------------------------------------------------
+  - concept: past_surgery
+    section: past_surgical
+    priority: 10
+    required: true
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you ever had an operation?"
+      hi: "क्या आपका कभी कोई ऑपरेशन हुआ है?"
+
+  - concept: past_surgery_year
+    section: past_surgical
+    priority: 20
+    required: false
+    precondition: {concept: past_surgery, status: present}
+    answer: {type: date}
+    prompts:
+      en: "Roughly which year was that operation?"
+      hi: "वह ऑपरेशन लगभग किस वर्ष हुआ था?"
+
+  - concept: past_hospitalisation
+    section: past_surgical
+    priority: 30
+    required: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you been admitted to a hospital in the last year?"
+      hi: "क्या आप पिछले एक साल में अस्पताल में भर्ती हुए हैं?"
+
+  # --- medications -------------------------------------------------------------------
+  - concept: current_medications
+    section: medications
+    priority: 10
+    required: true
+    answer: {type: free_text}
+    prompts:
+      en: "Which medicines are you taking at present? If you are not sure of the names, just say so."
+      hi: "आप इस समय कौन सी दवाइयाँ ले रहे हैं? नाम याद न हों तो वैसा ही बता दीजिए।"
+
+  - concept: ayurvedic_medications
+    section: medications
+    priority: 20
+    required: true
+    answer: {type: free_text}
+    prompts:
+      en: "Are you taking any Ayurvedic or other traditional medicines?"
+      hi: "क्या आप कोई आयुर्वेदिक या अन्य पारंपरिक दवा ले रहे हैं?"
+
+  - concept: self_medication
+    section: medications
+    priority: 30
+    required: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you taken any medicine for this problem without a prescription?"
+      hi: "क्या आपने इस तकलीफ़ के लिए बिना पर्चे की कोई दवा ली है?"
+
+  - concept: medication_adherence
+    section: medications
+    priority: 40
+    required: false
+    precondition: {concept: current_medications, status: present}
+    answer:
+      type: single_choice
+      options: [regularly, sometimes_missed, stopped, unknown]
+    prompts:
+      en: "Are you able to take those medicines regularly?"
+      hi: "क्या आप वे दवाइयाँ नियमित रूप से ले पाते हैं?"
+
+  # --- allergies -----------------------------------------------------------------------
+  - concept: drug_allergy
+    section: allergies
+    priority: 10
+    required: true
+    skippable: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has any medicine ever caused you a rash, swelling or breathing difficulty?"
+      hi: "क्या किसी दवा से आपको कभी चकत्ते, सूजन या साँस की तकलीफ़ हुई है?"
+
+  - concept: allergy_reaction_type
+    section: allergies
+    priority: 20
+    required: true
+    precondition: {concept: drug_allergy, status: present}
+    answer:
+      type: multi_choice
+      options: [rash, swelling, breathing_difficulty, vomiting, fainting, other, unknown]
+    prompts:
+      en: "What happened when you took it?"
+      hi: "वह दवा लेने पर क्या हुआ था?"
+
+  - concept: food_allergy
+    section: allergies
+    priority: 30
+    required: false
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Are you allergic to any food?"
+      hi: "क्या आपको किसी खाने से एलर्जी है?"
+
+  # --- family history --------------------------------------------------------------------
+  - concept: family_diabetes
+    section: family_history
+    priority: 10
+    required: true
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Does anyone in your immediate family have diabetes?"
+      hi: "क्या आपके परिवार में किसी को मधुमेह है?"
+
+  - concept: family_hypertension
+    section: family_history
+    priority: 20
+    required: true
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Does anyone in your immediate family have high blood pressure?"
+      hi: "क्या आपके परिवार में किसी को उच्च रक्तचाप है?"
+
+  - concept: family_cardiac
+    section: family_history
+    priority: 30
+    required: true
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Has anyone in your immediate family had a heart problem?"
+      hi: "क्या आपके परिवार में किसी को दिल की बीमारी हुई है?"
+
+  - concept: family_other
+    section: family_history
+    priority: 40
+    required: false
+    answer: {type: free_text}
+    prompts:
+      en: "Is there any other illness that runs in your family?"
+      hi: "क्या आपके परिवार में कोई और बीमारी चलती है?"
+
+  # --- personal history ---------------------------------------------------------------------
+  - concept: tobacco_use
+    section: personal_history
+    priority: 10
+    required: true
+    answer:
+      type: single_choice
+      options: [never, former, current_smoking, current_smokeless, both, unknown]
+    prompts:
+      en: "Do you use tobacco in any form — smoking, gutka or khaini?"
+      hi: "क्या आप किसी भी रूप में तंबाकू लेते हैं — बीड़ी, सिगरेट, गुटखा या खैनी?"
+
+  - concept: alcohol_use
+    section: personal_history
+    priority: 20
+    required: true
+    answer:
+      type: single_choice
+      options: [never, occasional, regular, former, unknown]
+    prompts:
+      en: "Do you drink alcohol?"
+      hi: "क्या आप शराब पीते हैं?"
+
+  - concept: diet_pattern
+    section: personal_history
+    priority: 30
+    required: true
+    answer:
+      type: single_choice
+      options: [vegetarian, non_vegetarian, eggetarian, vegan, unknown]
+    prompts:
+      en: "What is your usual diet?"
+      hi: "आपका सामान्य आहार कैसा है?"
+
+  - concept: sleep_pattern
+    section: personal_history
+    priority: 40
+    required: true
+    answer:
+      type: single_choice
+      options: [sound, disturbed, difficulty_falling_asleep, excessive, unknown]
+    prompts:
+      en: "How is your sleep these days?"
+      hi: "आजकल आपकी नींद कैसी रहती है?"
+
+  - concept: physical_activity
+    section: personal_history
+    priority: 50
+    required: false
+    answer:
+      type: single_choice
+      options: [sedentary, light, moderate, heavy, unknown]
+    prompts:
+      en: "How physically active is your day?"
+      hi: "आपका दिन कितना शारीरिक रूप से सक्रिय रहता है?"
+
+  - concept: occupation
+    section: personal_history
+    priority: 60
+    required: false
+    answer: {type: free_text}
+    prompts:
+      en: "What work do you do?"
+      hi: "आप क्या काम करते हैं?"
+
+  - concept: pregnancy
+    section: personal_history
+    priority: 70
+    required: true
+    precondition:
+      all:
+        - {concept: sex, in: [female]}
+        - {concept: age, gte: 12}
+        - {concept: age, lte: 55}
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Is there any chance that you are pregnant?"
+      hi: "क्या इस समय आपके गर्भवती होने की कोई संभावना है?"
+
+  - concept: menstrual_history
+    section: personal_history
+    priority: 80
+    required: false
+    needs_clinical_review: true
+    precondition:
+      all:
+        - {concept: sex, in: [female]}
+        - {concept: age, gte: 12}
+        - {concept: age, lte: 55}
+    answer:
+      type: single_choice
+      options: [regular, irregular, absent, menopausal, unknown]
+    prompts:
+      en: "Are your monthly cycles regular?"
+      hi: "क्या आपका मासिक चक्र नियमित रहता है?"
+
+  # --- documents ----------------------------------------------------------------------------
+  - concept: has_prior_documents
+    section: documents
+    priority: 10
+    required: true
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you brought any previous prescriptions or test reports?"
+      hi: "क्या आप पहले के कोई पर्चे या जाँच रिपोर्ट लाए हैं?"
+
+  - concept: document_upload
+    section: documents
+    priority: 20
+    required: false
+    precondition: {concept: has_prior_documents, status: present}
+    answer: {type: free_text}
+    prompts:
+      en: "Please place each paper on the scanner one at a time."
+      hi: "कृपया एक-एक करके हर कागज़ स्कैनर पर रखें।"
+
+  # --- confirmation ---------------------------------------------------------------------------
+  - concept: intake_confirmed
+    section: confirmation
+    priority: 10
+    required: true
+    skippable: false
+    answer: {type: confirmation, options: [correct, needs_correction]}
+    prompts:
+      en: "Here is what we have recorded. Is all of it correct?"
+      hi: "हमने जो दर्ज किया है वह यह है। क्या यह सब सही है?"

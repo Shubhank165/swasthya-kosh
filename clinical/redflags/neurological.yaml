@@ -1,0 +1,48 @@
+rules:
+  - id: thunderclap_headache
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: headache, status: present}
+        - {concept: thunderclap_onset, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+    needs_clinical_review: true
+
+  - id: headache_with_focal_deficit
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: headache, status: present}
+        - any:
+            - {concept: focal_weakness, status: present}
+            - {concept: altered_sensorium, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: headache_with_fever_and_neck_stiffness
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: headache, status: present}
+        - {concept: associated_fever, status: present}
+        - {concept: neck_stiffness, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+
+  - id: focal_weakness_any_presentation
+    version: 1
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {concept: focal_weakness, status: present}
+    action: {notify: triage, priority_hint: emergency}
+    clinical_source: "pending AIIA mentor review"
+    guidance: "Sudden one-sided weakness is time-critical regardless of the presenting complaint."

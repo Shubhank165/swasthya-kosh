@@ -1,0 +1,424 @@
+# Concept registry.
+#
+# One entry per clinical concept the intake can record. `section` places the
+# concept in the history; `synonyms` are matched exactly after normalisation
+# (lowercase, punctuation stripped) and carry the Hindi and transliterated forms
+# a patient actually says. `codes` are filled in only where a real mapping
+# exists — an absent code is correct, an invented one is a defect.
+#
+# Fields marked needs_clinical_review were authored by an engineer and are
+# listed in docs/CLINICAL_REVIEW_QUEUE.md for the AIIA mentor session.
+
+# --- identity, language, consent ---------------------------------------------
+patient_name:
+  display: Name
+  section: identity
+age:
+  display: Age
+  section: identity
+sex:
+  display: Sex
+  section: identity
+preferred_language:
+  display: Preferred language
+  section: identity
+reporter_role:
+  display: History given by
+  section: identity
+consent_given:
+  display: Consent to record history
+  section: consent
+
+# --- chief complaint ----------------------------------------------------------
+chief_complaint:
+  display: Chief complaint
+  section: chief_complaint
+  synonyms: ["main problem", "मुख्य समस्या", "kya takleef hai"]
+complaint_duration:
+  display: Duration of complaint
+  section: chief_complaint
+
+# --- presenting complaints (pathway anchors) ----------------------------------
+abdominal_pain:
+  display: Abdominal pain
+  section: chief_complaint
+  synonyms:
+    ["stomach ache", "pet dard", "पेट दर्द", "udara shula", "udara_shula", "tummy pain"]
+  codes: {ICD11-MMS: "MD81", NAMASTE: "AY-UDR-SHL"}
+chest_pain:
+  display: Chest pain
+  section: chief_complaint
+  synonyms:
+    ["seene mein dard", "सीने में दर्द", "seene mein jalan", "hrid shula", "chest discomfort"]
+  codes: {ICD11-MMS: "MD30", NAMASTE: "AY-HRD-SHL"}
+fever:
+  display: Fever
+  section: chief_complaint
+  synonyms: ["bukhar", "बुखार", "jwara", "temperature", "taap"]
+  codes: {ICD11-MMS: "MG26", NAMASTE: "AY-JWR", ICD11-TM2: "SK40"}
+headache:
+  display: Headache
+  section: chief_complaint
+  synonyms: ["sar dard", "सिर दर्द", "shirah shula", "sir mein dard"]
+  codes: {ICD11-MMS: "8A80", NAMASTE: "AY-SHR-SHL"}
+joint_pain:
+  display: Joint pain
+  section: chief_complaint
+  synonyms:
+    ["jodon mein dard", "जोड़ों में दर्द", "sandhigata vata", "sandhi shula", "arthralgia"]
+  codes: {ICD11-MMS: "FA20", NAMASTE: "AY-SND-VAT", ICD11-TM2: "SL30"}
+follow_up_visit:
+  display: Follow-up visit
+  section: chief_complaint
+  synonyms: ["follow up", "dobara dikhane aaya", "review visit"]
+
+# --- generic HPI attributes ----------------------------------------------------
+onset:
+  display: Onset
+  section: hpi
+duration:
+  display: Duration
+  section: hpi
+site:
+  display: Site
+  section: hpi
+radiation:
+  display: Radiation
+  section: hpi
+severity:
+  display: Severity
+  section: hpi
+character:
+  display: Character of pain
+  section: hpi
+progression:
+  display: Progression since onset
+  section: hpi
+aggravating_factors:
+  display: Aggravating factors
+  section: hpi
+relieving_factors:
+  display: Relieving factors
+  section: hpi
+relation_to_meals:
+  display: Relation to meals
+  section: hpi
+timing_pattern:
+  display: Timing pattern
+  section: hpi
+treatment_taken:
+  display: Treatment already taken
+  section: hpi
+prior_episodes:
+  display: Similar episodes before
+  section: hpi
+
+# --- associated symptoms -------------------------------------------------------
+associated_vomiting:
+  display: Vomiting
+  section: hpi
+  ros_group: gi
+associated_nausea:
+  display: Nausea
+  section: hpi
+  ros_group: gi
+associated_fever:
+  display: Fever with this complaint
+  section: hpi
+dyspnoea:
+  display: Breathlessness
+  section: red_flag_screen
+  synonyms: ["saans phoolna", "साँस फूलना", "shortness of breath", "breathlessness"]
+  ros_group: respiratory
+diaphoresis:
+  display: Sweating
+  section: red_flag_screen
+  synonyms: ["pasina aana", "पसीना आना", "cold sweat"]
+syncope:
+  display: Fainting or blackout
+  section: red_flag_screen
+  synonyms: ["behosh", "बेहोश", "chakkar aakar girna"]
+haematemesis:
+  display: Vomiting blood
+  section: red_flag_screen
+  synonyms: ["khoon ki ulti", "खून की उल्टी"]
+melaena:
+  display: Black stools
+  section: red_flag_screen
+  synonyms: ["kala pakhana", "काला पाखाना"]
+abdominal_rigidity:
+  display: Board-like abdominal stiffness
+  section: red_flag_screen
+  needs_clinical_review: true
+neck_stiffness:
+  display: Neck stiffness
+  section: red_flag_screen
+  synonyms: ["gardan akadna", "गर्दन अकड़ना"]
+photophobia:
+  display: Discomfort in bright light
+  section: red_flag_screen
+altered_sensorium:
+  display: Confusion or drowsiness
+  section: red_flag_screen
+  synonyms: ["behoshi", "bewajah bakna"]
+focal_weakness:
+  display: Sudden weakness of one side
+  section: red_flag_screen
+  synonyms: ["ek taraf kamzori", "एक तरफ कमजोरी"]
+thunderclap_onset:
+  display: Worst-ever headache reaching peak within a minute
+  section: red_flag_screen
+  needs_clinical_review: true
+unintentional_weight_loss:
+  display: Unintentional weight loss
+  section: red_flag_screen
+  synonyms: ["wajan kam hona", "वजन कम होना"]
+persistent_high_fever:
+  display: High fever persisting beyond a week
+  section: red_flag_screen
+bleeding_manifestation:
+  display: Bleeding from gums, nose or skin spots
+  section: red_flag_screen
+reduced_urine_output:
+  display: Passing much less urine
+  section: red_flag_screen
+joint_swelling:
+  display: Joint swelling
+  section: hpi
+  ros_group: musculoskeletal
+joint_redness_warmth:
+  display: Joint redness or warmth
+  section: red_flag_screen
+morning_stiffness:
+  display: Morning stiffness
+  section: hpi
+  ros_group: musculoskeletal
+inability_to_bear_weight:
+  display: Unable to put weight on the joint
+  section: red_flag_screen
+recent_travel:
+  display: Recent travel
+  section: hpi
+rash:
+  display: Rash
+  section: hpi
+  ros_group: skin
+cough:
+  display: Cough
+  section: hpi
+  ros_group: respiratory
+burning_micturition:
+  display: Burning on passing urine
+  section: hpi
+  ros_group: genitourinary
+loose_stools:
+  display: Loose stools
+  section: hpi
+  ros_group: gi
+constipation:
+  display: Constipation
+  section: hpi
+  ros_group: gi
+jaundice:
+  display: Yellow discolouration of eyes or skin
+  section: hpi
+  ros_group: hepatobiliary
+appetite_change:
+  display: Change in appetite
+  section: hpi
+  ros_group: gi
+palpitations:
+  display: Palpitations
+  section: hpi
+  ros_group: cardiovascular
+leg_swelling:
+  display: Swelling of the legs
+  section: hpi
+  ros_group: cardiovascular
+visual_disturbance:
+  display: Visual disturbance
+  section: hpi
+  ros_group: neurological
+dizziness:
+  display: Dizziness
+  section: hpi
+  ros_group: neurological
+
+# --- past medical / surgical ---------------------------------------------------
+known_diabetes:
+  display: Diabetes
+  section: past_medical
+  synonyms: ["sugar", "madhumeha", "मधुमेह", "diabetes mellitus"]
+  codes: {ICD11-MMS: "5A11", NAMASTE: "AY-MDH", ICD11-TM2: "SK20"}
+known_hypertension:
+  display: High blood pressure
+  section: past_medical
+  synonyms: ["bp", "high bp", "उच्च रक्तचाप", "raktagata vata"]
+  codes: {ICD11-MMS: "BA00", NAMASTE: "AY-RKT-VAT"}
+known_thyroid_disorder:
+  display: Thyroid disorder
+  section: past_medical
+  synonyms: ["thyroid", "थायराइड"]
+  codes: {ICD11-MMS: "5A00"}
+known_asthma:
+  display: Asthma
+  section: past_medical
+  synonyms: ["dama", "दमा", "tamaka shwasa"]
+  codes: {ICD11-MMS: "CA23", NAMASTE: "AY-TMK-SHW", ICD11-TM2: "SL10"}
+known_tuberculosis:
+  display: Tuberculosis
+  section: past_medical
+  synonyms: ["tb", "rajayakshma", "टीबी"]
+  codes: {ICD11-MMS: "1B10", NAMASTE: "AY-RJY"}
+known_cardiac_disease:
+  display: Heart disease
+  section: past_medical
+  synonyms: ["dil ki bimari", "heart problem"]
+other_conditions:
+  display: Other diagnosed conditions
+  section: past_medical
+past_surgery:
+  display: Past surgery
+  section: past_surgical
+  synonyms: ["operation", "ऑपरेशन", "surgery"]
+past_surgery_year:
+  display: Year of surgery
+  section: past_surgical
+past_hospitalisation:
+  display: Previous hospital admission
+  section: past_surgical
+
+# --- medications and allergies --------------------------------------------------
+current_medications:
+  display: Current medications
+  section: medications
+  synonyms: ["dawai", "दवाई", "tablets", "medicines"]
+ayurvedic_medications:
+  display: Ayurvedic medicines currently taken
+  section: medications
+  synonyms: ["ayurvedic dawai", "kadha", "churna"]
+self_medication:
+  display: Medicines taken without prescription
+  section: medications
+medication_adherence:
+  display: Taking medicines as prescribed
+  section: medications
+drug_allergy:
+  display: Drug allergy
+  section: allergies
+  synonyms: ["dawai se allergy", "दवा से एलर्जी", "reaction to medicine"]
+food_allergy:
+  display: Food allergy
+  section: allergies
+allergy_reaction_type:
+  display: Type of allergic reaction
+  section: allergies
+
+# --- family and personal history -------------------------------------------------
+family_diabetes:
+  display: Diabetes in the family
+  section: family_history
+family_hypertension:
+  display: High blood pressure in the family
+  section: family_history
+family_cardiac:
+  display: Heart disease in the family
+  section: family_history
+family_other:
+  display: Other conditions in the family
+  section: family_history
+tobacco_use:
+  display: Tobacco use
+  section: personal_history
+  synonyms: ["tambaku", "तंबाकू", "gutka", "smoking", "beedi"]
+alcohol_use:
+  display: Alcohol use
+  section: personal_history
+  synonyms: ["sharab", "शराब"]
+diet_pattern:
+  display: Diet
+  section: personal_history
+  synonyms: ["khana", "veg", "non veg", "aahara"]
+sleep_pattern:
+  display: Sleep
+  section: personal_history
+  synonyms: ["neend", "नींद", "nidra"]
+physical_activity:
+  display: Physical activity
+  section: personal_history
+occupation:
+  display: Occupation
+  section: personal_history
+pregnancy:
+  display: Currently pregnant
+  section: personal_history
+  synonyms: ["garbhavati", "गर्भवती", "pregnant"]
+menstrual_history:
+  display: Menstrual history
+  section: personal_history
+  needs_clinical_review: true
+
+# --- Ayurveda module (patient-reported only) --------------------------------------
+# These are patient-reported observations, not a Prakriti assessment. Prakriti
+# determination is a clinical act performed by the Vaidya; the kiosk only
+# collects what the patient can report about themselves.
+agni_appetite:
+  display: Appetite and digestion (Agni)
+  section: ayurveda
+  synonyms: ["bhookh", "भूख", "agni", "digestion"]
+  codes: {NAMASTE: "AY-AGN"}
+koshtha_bowel:
+  display: Bowel pattern (Koshtha)
+  section: ayurveda
+  synonyms: ["pakhana", "पाखाना", "koshtha", "motions"]
+  codes: {NAMASTE: "AY-KST"}
+nidra_sleep:
+  display: Sleep quality (Nidra)
+  section: ayurveda
+  synonyms: ["nidra", "निद्रा"]
+  codes: {NAMASTE: "AY-NDR"}
+mutra_urine:
+  display: Urine pattern (Mutra)
+  section: ayurveda
+  synonyms: ["mutra", "peshab", "पेशाब"]
+  codes: {NAMASTE: "AY-MTR"}
+sweda_perspiration:
+  display: Perspiration (Sweda)
+  section: ayurveda
+  synonyms: ["sweda", "pasina"]
+  codes: {NAMASTE: "AY-SWD"}
+bala_strength:
+  display: Strength and stamina (Bala)
+  section: ayurveda
+  synonyms: ["bala", "taakat", "ताकत"]
+  codes: {NAMASTE: "AY-BAL"}
+ahara_pattern:
+  display: Dietary habits (Ahara)
+  section: ayurveda
+  synonyms: ["ahara", "aahar", "khan paan"]
+  codes: {NAMASTE: "AY-AHR"}
+vihara_routine:
+  display: Daily routine (Vihara)
+  section: ayurveda
+  synonyms: ["vihara", "dinacharya", "daily routine"]
+  codes: {NAMASTE: "AY-VHR"}
+ritu_seasonal_variation:
+  display: Seasonal variation of symptoms (Ritu)
+  section: ayurveda
+  needs_clinical_review: true
+  codes: {NAMASTE: "AY-RTU"}
+manas_stress:
+  display: Stress and mental state (patient-reported)
+  section: ayurveda
+  synonyms: ["tanav", "तनाव", "stress", "chinta"]
+
+# --- documents and confirmation ----------------------------------------------------
+has_prior_documents:
+  display: Brought previous prescriptions or reports
+  section: documents
+document_upload:
+  display: Documents uploaded
+  section: documents
+intake_confirmed:
+  display: Patient reviewed and confirmed the recorded history
+  section: confirmation
