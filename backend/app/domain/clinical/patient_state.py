@@ -61,6 +61,11 @@ class PatientIntakeState:
     active_ros_groups: tuple[str, ...] = field(default_factory=tuple)
     ayurveda_enabled: bool = True
     documents: tuple[DocumentRecord, ...] = field(default_factory=tuple)
+    #: Facts read off documents or prior records for a concept the patient has
+    #: already answered. They are deliberately kept out of the live view — a scan
+    #: must never overwrite what the patient said — but they stay on the record
+    #: as the other half of a contradiction.
+    record_facts: tuple[ClinicalFact, ...] = field(default_factory=tuple)
     #: Concepts the patient explicitly declined to answer. Distinct from UNKNOWN.
     declined: frozenset[str] = field(default_factory=frozenset)
     consent_artefact_id: str | None = None
@@ -95,6 +100,21 @@ class PatientIntakeState:
             )
         return replace(self, facts=(*self.facts, fact), revision=self.revision + 1)
 
+    def apply_record(self, fact: ClinicalFact) -> PatientIntakeState:
+        """Apply a fact read off a document or a prior record.
+
+        If the concept is untouched, the fact enters the live view — that is what
+        lets the state machine ask "our record shows diabetes, is that still
+        correct?" instead of asking cold. If the patient has already answered the
+        concept, the fact is parked in `record_facts` instead: it is preserved as
+        conflict evidence, and it does not displace what the patient said.
+        """
+        if self.fact_for(fact.concept.concept_id) is None:
+            return self.apply(fact)
+        return replace(
+            self, record_facts=(*self.record_facts, fact), revision=self.revision + 1
+        )
+
     def apply_all(self, facts: Iterable[ClinicalFact]) -> PatientIntakeState:
         """Apply facts in order. Later facts may supersede earlier ones in the
         same batch, which is what a multi-fact extraction from one utterance does."""
@@ -121,14 +141,18 @@ class PatientIntakeState:
 
     def by_id(self, fact_id: FactId) -> ClinicalFact | None:
         """Any revision, live or superseded, by id. Powers the evidence endpoint."""
-        for fact in self.facts:
+        for fact in (*self.facts, *self.record_facts):
             if fact.fact_id == fact_id:
                 return fact
         return None
 
+    def all_facts(self) -> tuple[ClinicalFact, ...]:
+        """Every fact on the record, live view and parallel record channel alike."""
+        return (*self.facts, *self.record_facts)
+
     def history_of(self, concept_id: str) -> tuple[ClinicalFact, ...]:
         """Every revision recorded for a concept, oldest first."""
-        return tuple(f for f in self.facts if f.concept.concept_id == concept_id)
+        return tuple(f for f in self.all_facts() if f.concept.concept_id == concept_id)
 
     def status_of(self, concept_id: str) -> FactStatus:
         """Status of a concept. A concept never touched is NOT_ASKED, not UNKNOWN."""

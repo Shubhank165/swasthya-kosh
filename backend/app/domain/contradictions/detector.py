@@ -185,8 +185,9 @@ def detect(
     Both sides are read from the fact log rather than the live view, because the
     live view keeps only one fact per concept and a conflict needs both.
     """
-    superseded = {f.supersedes for f in state.facts if f.supersedes is not None}
-    live = [f for f in state.facts if f.fact_id not in superseded]
+    everything = state.all_facts()
+    superseded = {f.supersedes for f in everything if f.supersedes is not None}
+    live = [f for f in everything if f.fact_id not in superseded]
 
     today_by_concept: dict[str, ClinicalFact] = {}
     record_by_concept: dict[str, list[ClinicalFact]] = {}
