@@ -56,3 +56,14 @@ fields:
     prompts:
       en: "Are you finding it hard to breathe?"
       hi: "क्या आपको साँस लेने में कठिनाई हो रही है?"
+
+  # Prolonged fever with unintentional weight loss is a combination that needs a
+  # clinician's eye, so the fever screen asks it rather than leaving it to a
+  # review-of-systems group this pathway does not activate.
+  - concept: unintentional_weight_loss
+    required: true
+    priority: 70
+    answer: {type: yes_no_unknown}
+    prompts:
+      en: "Have you lost weight without trying to?"
+      hi: "क्या बिना कोशिश किए आपका वज़न घटा है?"

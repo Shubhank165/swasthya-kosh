@@ -1,0 +1,110 @@
+# Chest pain scenarios. Both red-flag directions, plus the near-miss that must
+# stay quiet — over-alerting is tuned down with clinicians, but a rule that fires
+# on reflux is a rule triage learns to ignore.
+scenarios:
+  - id: chest_pain_redflag_01
+    description: >
+      Sudden central chest pain with breathlessness. The presentation the acute
+      chest-pain criterion exists for.
+    language: hi
+    patient_script:
+      - {ask: preferred_language, answer: hi}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 58, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: chest_pain, lang: hi}
+      - {ask: complaint_duration, answer: {magnitude: 2, unit: hours}}
+      - {ask: onset, answer: sudden}
+      - {ask: duration, answer: {magnitude: 2, unit: hours}}
+      - {ask: site, answer: centre}
+      - {ask: radiation, answer: to_left_arm}
+      - {ask: severity, answer: 8}
+      - {ask: character, answer: pressing}
+      - {ask: aggravating_factors, answer: exertion}
+      - {ask: dyspnoea, answer: "yes"}
+      - {ask: diaphoresis, answer: "yes"}
+      - {ask: syncope, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: palpitations, answer: "yes"}
+      - {ask: prior_episodes, answer: "no"}
+      - {ask: treatment_taken, answer: "nothing taken"}
+    expect_facts:
+      - {concept: chest_pain, status: present}
+      - {concept: dyspnoea, status: present}
+      - {concept: diaphoresis, status: present}
+      - {concept: syncope, status: absent}
+    expect_required_questions: [onset, duration, severity, radiation, dyspnoea, diaphoresis]
+    expect_red_flags:
+      - acute_chest_pain_with_dyspnoea
+      - chest_pain_with_radiation
+      - chest_pain_on_exertion_severe
+    forbid_assertions: ["myocardial infarction", "heart attack", "you have", "angina"]
+
+  - id: chest_pain_negative_01
+    description: >
+      Gradual burning chest discomfort, worse after food, relieved by antacid.
+      No urgent criterion may fire on this.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 34, unit: years}}
+      - {ask: sex, answer: female}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: chest_pain}
+      - {ask: complaint_duration, answer: {magnitude: 3, unit: weeks}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 3, unit: weeks}}
+      - {ask: site, answer: upper_abdomen}
+      - {ask: radiation, answer: none}
+      - {ask: severity, answer: 3}
+      - {ask: character, answer: burning}
+      - {ask: aggravating_factors, answer: after_food}
+      - {ask: relieving_factors, answer: antacid}
+      - {ask: relation_to_meals, answer: worse_after_eating}
+      - {ask: dyspnoea, answer: "no"}
+      - {ask: diaphoresis, answer: "no"}
+      - {ask: syncope, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: palpitations, answer: "no"}
+      - {ask: pregnancy, answer: "no"}
+      - {ask: prior_episodes, answer: "yes"}
+      - {ask: treatment_taken, answer: "antacid from the chemist"}
+    expect_facts:
+      - {concept: chest_pain, status: present}
+      - {concept: dyspnoea, status: absent}
+    expect_required_questions: [onset, duration, severity, radiation]
+    forbid_red_flags:
+      - acute_chest_pain_with_dyspnoea
+      - chest_pain_with_radiation
+      - chest_pain_with_syncope
+      - chest_pain_on_exertion_severe
+    forbid_assertions: ["reflux", "gerd", "you have", "acidity"]
+
+  - id: chest_pain_syncope_01
+    description: Chest pain with a witnessed faint. Syncope alone is a criterion.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 66, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: chest_pain}
+      - {ask: complaint_duration, answer: {magnitude: 1, unit: days}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 1, unit: days}}
+      - {ask: site, answer: left_side}
+      - {ask: radiation, answer: none}
+      - {ask: severity, answer: 5}
+      - {ask: character, answer: sharp}
+      - {ask: aggravating_factors, answer: deep_breath}
+      - {ask: dyspnoea, answer: "no"}
+      - {ask: diaphoresis, answer: "no"}
+      - {ask: syncope, answer: "yes"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: palpitations, answer: "no"}
+      - {ask: prior_episodes, answer: "no"}
+      - {ask: treatment_taken, answer: "none"}
+    expect_red_flags: [chest_pain_with_syncope, syncope_any_presentation]
+    forbid_red_flags: [acute_chest_pain_with_dyspnoea]
+    forbid_assertions: ["arrhythmia", "you have"]

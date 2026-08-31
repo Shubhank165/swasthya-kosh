@@ -186,18 +186,28 @@ def detect(
     live view keeps only one fact per concept and a conflict needs both.
     """
     everything = state.all_facts()
-    superseded = {f.supersedes for f in everything if f.supersedes is not None}
-    live = [f for f in everything if f.fact_id not in superseded]
+    superseded_by: dict[str, ClinicalFact] = {}
+    for fact in everything:
+        if fact.supersedes is not None:
+            superseded_by[str(fact.supersedes)] = fact
 
     today_by_concept: dict[str, ClinicalFact] = {}
     record_by_concept: dict[str, list[ClinicalFact]] = {}
-    for fact in live:
+    for fact in everything:
         concept_id = fact.concept.concept_id
         if not is_watched(concept_id, prefixes=watched_prefixes, concepts=watched_concepts):
             continue
-        if fact.source_type in _TODAY_SOURCES:
+        successor = superseded_by.get(str(fact.fact_id))
+        if fact.source_type in _TODAY_SOURCES and successor is None:
+            # Only the live revision of what the patient says today.
             today_by_concept[concept_id] = fact
-        elif fact.source_type in _RECORD_SOURCES:
+        elif fact.source_type in _RECORD_SOURCES and (
+            # A record fact counts as evidence unless a *later record* replaced
+            # it. When the patient corrects it, the correction supersedes it —
+            # and that correction is precisely the conflict worth reporting, so
+            # the superseded record fact must not disappear with it.
+            successor is None or successor.source_type not in _RECORD_SOURCES
+        ):
             record_by_concept.setdefault(concept_id, []).append(fact)
 
     found: list[Contradiction] = []

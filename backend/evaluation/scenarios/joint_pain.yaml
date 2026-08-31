@@ -1,0 +1,82 @@
+scenarios:
+  - id: joint_pain_septic_01
+    description: >
+      One hot, red, exquisitely tender knee with fever and inability to bear
+      weight. The septic-arthritis criterion.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 55, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: joint_pain}
+      - {ask: complaint_duration, answer: {magnitude: 2, unit: days}}
+      - {ask: onset, answer: sudden}
+      - {ask: duration, answer: {magnitude: 2, unit: days}}
+      - {ask: site, answer: [knee]}
+      - {ask: severity, answer: 9}
+      - {ask: joint_swelling, answer: "yes"}
+      - {ask: morning_stiffness, answer: under_30_minutes}
+      - {ask: timing_pattern, answer: worse_on_movement}
+      - {ask: aggravating_factors, answer: [walking]}
+      - {ask: joint_redness_warmth, answer: "yes"}
+      - {ask: associated_fever, answer: "yes"}
+      - {ask: inability_to_bear_weight, answer: "yes"}
+      - {ask: unintentional_weight_loss, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: prior_episodes, answer: "no"}
+      - {ask: treatment_taken, answer: "hot fomentation"}
+    expect_facts:
+      - {concept: joint_pain, status: present}
+      - {concept: joint_redness_warmth, status: present}
+    expect_required_questions: [onset, duration, site, severity, joint_swelling, joint_redness_warmth]
+    expect_red_flags: [septic_arthritis_screen]
+    forbid_assertions: ["septic arthritis", "gout", "you have"]
+
+  - id: sandhigata_vata_01
+    description: >
+      Classical Sandhigata Vata presentation — gradual knee pain, worse in cold
+      and rain, relieved by warmth and oil massage. The commonest Ayurveda OPD
+      case, and nothing urgent about it.
+    language: hi
+    patient_script:
+      - {ask: preferred_language, answer: hi}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 63, unit: years}}
+      - {ask: sex, answer: female}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: joint_pain, lang: hi}
+      - {ask: complaint_duration, answer: {magnitude: 4, unit: years}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 4, unit: years}}
+      - {ask: site, answer: [knee]}
+      - {ask: severity, answer: 6}
+      - {ask: joint_swelling, answer: "yes"}
+      - {ask: morning_stiffness, answer: under_30_minutes}
+      - {ask: timing_pattern, answer: worse_on_movement}
+      - {ask: aggravating_factors, answer: [cold_weather, climbing_stairs]}
+      - {ask: relieving_factors, answer: [warmth, oil_massage]}
+      - {ask: ritu_seasonal_variation, answer: worse_in_winter}
+      - {ask: joint_redness_warmth, answer: "no"}
+      - {ask: associated_fever, answer: "no"}
+      - {ask: inability_to_bear_weight, answer: "no"}
+      - {ask: unintentional_weight_loss, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: prior_episodes, answer: "yes"}
+      - {ask: treatment_taken, answer: "Ayurvedic oil and painkillers"}
+      - {ask: agni_appetite, answer: irregular}
+      - {ask: koshtha_bowel, answer: hard_infrequent}
+      - {ask: nidra_sleep, answer: disturbed}
+      - {ask: mutra_urine, answer: normal}
+      - {ask: bala_strength, answer: easily_tired}
+      - {ask: ahara_pattern, answer: [irregular_timings]}
+      - {ask: manas_stress, answer: mild}
+    expect_facts:
+      - {concept: joint_pain, status: present}
+      - {concept: agni_appetite, status: present}
+      - {concept: koshtha_bowel, status: present}
+    expect_required_questions:
+      [onset, duration, site, severity, joint_swelling, morning_stiffness, agni_appetite, nidra_sleep]
+    forbid_red_flags: [septic_arthritis_screen]
+    forbid_assertions:
+      ["osteoarthritis", "vata dosha imbalance", "you have", "we recommend", "panchakarma"]

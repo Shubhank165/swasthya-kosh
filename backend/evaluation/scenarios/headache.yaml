@@ -1,0 +1,96 @@
+scenarios:
+  - id: headache_thunderclap_01
+    description: Worst-ever headache peaking within a minute. Thunderclap criterion.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 41, unit: years}}
+      - {ask: sex, answer: female}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: headache}
+      - {ask: complaint_duration, answer: {magnitude: 6, unit: hours}}
+      - {ask: onset, answer: sudden}
+      - {ask: duration, answer: {magnitude: 6, unit: hours}}
+      - {ask: site, answer: back_of_head}
+      - {ask: severity, answer: 10}
+      - {ask: timing_pattern, answer: constant}
+      - {ask: associated_vomiting, answer: "yes"}
+      - {ask: photophobia, answer: "yes"}
+      - {ask: visual_disturbance, answer: "no"}
+      - {ask: thunderclap_onset, answer: "yes"}
+      - {ask: neck_stiffness, answer: "yes"}
+      - {ask: focal_weakness, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: associated_fever, answer: "no"}
+      - {ask: prior_episodes, answer: "no"}
+      - {ask: pregnancy, answer: "no"}
+      - {ask: treatment_taken, answer: "nothing"}
+    expect_facts:
+      - {concept: headache, status: present}
+      - {concept: thunderclap_onset, status: present}
+    expect_required_questions: [onset, duration, severity, thunderclap_onset, neck_stiffness]
+    expect_red_flags: [thunderclap_headache]
+    forbid_assertions: ["subarachnoid", "haemorrhage", "aneurysm", "you have"]
+
+  - id: headache_focal_deficit_01
+    description: Headache with sudden one-sided weakness. Time-critical.
+    patient_script:
+      - {ask: preferred_language, answer: hi}
+      - {ask: reporter_role, answer: family_attendant}
+      - {ask: age, answer: {magnitude: 68, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: headache, lang: hi}
+      - {ask: complaint_duration, answer: {magnitude: 3, unit: hours}}
+      - {ask: onset, answer: sudden}
+      - {ask: duration, answer: {magnitude: 3, unit: hours}}
+      - {ask: site, answer: one_side}
+      - {ask: severity, answer: 7}
+      - {ask: timing_pattern, answer: constant}
+      - {ask: associated_vomiting, answer: "no"}
+      - {ask: photophobia, answer: "no"}
+      - {ask: visual_disturbance, answer: "yes"}
+      - {ask: thunderclap_onset, answer: "no"}
+      - {ask: neck_stiffness, answer: "no"}
+      - {ask: focal_weakness, answer: "yes"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: associated_fever, answer: "no"}
+      - {ask: prior_episodes, answer: "no"}
+      - {ask: treatment_taken, answer: "none"}
+    reporter: family_attendant
+    expect_red_flags: [headache_with_focal_deficit, focal_weakness_any_presentation]
+    forbid_assertions: ["stroke", "cva", "you have"]
+
+  - id: headache_negative_01
+    description: Long-standing band-like headache with screen use. Nothing urgent.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 29, unit: years}}
+      - {ask: sex, answer: female}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: headache}
+      - {ask: complaint_duration, answer: {magnitude: 8, unit: months}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 8, unit: months}}
+      - {ask: site, answer: both_sides}
+      - {ask: severity, answer: 4}
+      - {ask: character, answer: band_like}
+      - {ask: timing_pattern, answer: worse_evening}
+      - {ask: associated_vomiting, answer: "no"}
+      - {ask: photophobia, answer: "no"}
+      - {ask: visual_disturbance, answer: "no"}
+      - {ask: aggravating_factors, answer: screen_use}
+      - {ask: thunderclap_onset, answer: "no"}
+      - {ask: neck_stiffness, answer: "no"}
+      - {ask: focal_weakness, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: associated_fever, answer: "no"}
+      - {ask: prior_episodes, answer: "yes"}
+      - {ask: pregnancy, answer: "no"}
+      - {ask: treatment_taken, answer: "over the counter painkillers"}
+    forbid_red_flags:
+      - thunderclap_headache
+      - headache_with_focal_deficit
+      - headache_with_fever_and_neck_stiffness
+    forbid_assertions: ["tension headache", "migraine", "you have"]

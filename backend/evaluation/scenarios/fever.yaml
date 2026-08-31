@@ -1,0 +1,132 @@
+scenarios:
+  - id: fever_meningism_01
+    description: High fever with neck stiffness and drowsiness. Meningism criterion.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: family_attendant}
+      - {ask: age, answer: {magnitude: 19, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: fever}
+      - {ask: complaint_duration, answer: {magnitude: 3, unit: days}}
+      - {ask: onset, answer: sudden}
+      - {ask: duration, answer: {magnitude: 3, unit: days}}
+      - {ask: severity, answer: {magnitude: 40, unit: celsius}}
+      - {ask: timing_pattern, answer: continuous}
+      - {ask: cough, answer: "no"}
+      - {ask: loose_stools, answer: "no"}
+      - {ask: burning_micturition, answer: "no"}
+      - {ask: rash, answer: "no"}
+      - {ask: recent_travel, answer: "no"}
+      - {ask: neck_stiffness, answer: "yes"}
+      - {ask: altered_sensorium, answer: "yes"}
+      - {ask: bleeding_manifestation, answer: "no"}
+      - {ask: reduced_urine_output, answer: "no"}
+      - {ask: persistent_high_fever, answer: "no"}
+      - {ask: dyspnoea, answer: "no"}
+      - {ask: treatment_taken, answer: "paracetamol"}
+    reporter: family_attendant
+    expect_facts:
+      - {concept: fever, status: present}
+      - {concept: neck_stiffness, status: present}
+      - {concept: altered_sensorium, status: present}
+    expect_required_questions: [onset, duration, timing_pattern, neck_stiffness, altered_sensorium]
+    expect_red_flags: [fever_with_meningism, altered_sensorium_any_presentation]
+    forbid_assertions: ["meningitis", "encephalitis", "you have"]
+
+  - id: fever_with_bleeding_01
+    description: Fever with gum bleeding and skin spots.
+    patient_script:
+      - {ask: preferred_language, answer: hi}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 30, unit: years}}
+      - {ask: sex, answer: female}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: fever, lang: hi}
+      - {ask: complaint_duration, answer: {magnitude: 5, unit: days}}
+      - {ask: onset, answer: sudden}
+      - {ask: duration, answer: {magnitude: 5, unit: days}}
+      - {ask: severity, answer: {magnitude: 39, unit: celsius}}
+      - {ask: timing_pattern, answer: continuous}
+      - {ask: cough, answer: "no"}
+      - {ask: loose_stools, answer: "no"}
+      - {ask: burning_micturition, answer: "no"}
+      - {ask: rash, answer: "yes"}
+      - {ask: recent_travel, answer: "no"}
+      - {ask: neck_stiffness, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: bleeding_manifestation, answer: "yes"}
+      - {ask: reduced_urine_output, answer: "no"}
+      - {ask: persistent_high_fever, answer: "no"}
+      - {ask: dyspnoea, answer: "no"}
+      - {ask: pregnancy, answer: "no"}
+      - {ask: treatment_taken, answer: "paracetamol"}
+    expect_red_flags: [fever_with_bleeding]
+    forbid_assertions: ["dengue", "platelet", "you have"]
+
+  - id: fever_negative_01
+    description: Two days of fever with cough and cold. Nothing urgent.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 24, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: fever}
+      - {ask: complaint_duration, answer: {magnitude: 2, unit: days}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 2, unit: days}}
+      - {ask: severity, answer: {magnitude: 38, unit: celsius}}
+      - {ask: timing_pattern, answer: worse_evening}
+      - {ask: cough, answer: "yes"}
+      - {ask: loose_stools, answer: "no"}
+      - {ask: burning_micturition, answer: "no"}
+      - {ask: rash, answer: "no"}
+      - {ask: recent_travel, answer: "no"}
+      - {ask: neck_stiffness, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: bleeding_manifestation, answer: "no"}
+      - {ask: reduced_urine_output, answer: "no"}
+      - {ask: persistent_high_fever, answer: "no"}
+      - {ask: dyspnoea, answer: "no"}
+      - {ask: treatment_taken, answer: "steam inhalation"}
+    forbid_red_flags:
+      - fever_with_meningism
+      - fever_with_bleeding
+      - fever_with_reduced_urine_output
+      - prolonged_high_fever
+      - fever_with_breathlessness
+    forbid_assertions: ["influenza", "viral fever", "you have", "antibiotic"]
+
+  - id: fever_prolonged_01
+    description: Fever persisting beyond a week with weight loss.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 44, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: fever}
+      - {ask: complaint_duration, answer: {magnitude: 3, unit: weeks}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 3, unit: weeks}}
+      - {ask: severity, answer: {magnitude: 39, unit: celsius}}
+      - {ask: timing_pattern, answer: worse_evening}
+      - {ask: cough, answer: "yes"}
+      - {ask: loose_stools, answer: "no"}
+      - {ask: burning_micturition, answer: "no"}
+      - {ask: rash, answer: "no"}
+      - {ask: recent_travel, answer: "no"}
+      - {ask: appetite_change, answer: reduced}
+      - {ask: neck_stiffness, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: bleeding_manifestation, answer: "no"}
+      - {ask: reduced_urine_output, answer: "no"}
+      - {ask: persistent_high_fever, answer: "yes"}
+      - {ask: unintentional_weight_loss, answer: "yes"}
+      - {ask: dyspnoea, answer: "no"}
+      - {ask: treatment_taken, answer: "paracetamol on and off"}
+    expect_red_flags: [prolonged_high_fever, unexplained_weight_loss]
+    # "Denies Tuberculosis" is a legitimate past-medical line, so the disease
+    # name alone is not forbidden here — the assertion is.
+    forbid_assertions: ["you have", "suggestive of", "we recommend", "rule out"]

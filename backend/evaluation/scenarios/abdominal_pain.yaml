@@ -1,0 +1,129 @@
+scenarios:
+  - id: abdominal_pain_redflag_01
+    description: Sudden severe abdominal pain with guarding. Acute abdomen criterion.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 27, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: abdominal_pain}
+      - {ask: complaint_duration, answer: {magnitude: 8, unit: hours}}
+      - {ask: onset, answer: sudden}
+      - {ask: duration, answer: {magnitude: 8, unit: hours}}
+      - {ask: site, answer: lower}
+      - {ask: severity, answer: 9}
+      - {ask: relation_to_meals, answer: no_relation}
+      - {ask: associated_vomiting, answer: "yes"}
+      - {ask: loose_stools, answer: "no"}
+      - {ask: abdominal_rigidity, answer: "yes"}
+      - {ask: haematemesis, answer: "no"}
+      - {ask: melaena, answer: "no"}
+      - {ask: reduced_urine_output, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: dyspnoea, answer: "no"}
+      - {ask: syncope, answer: "no"}
+      - {ask: treatment_taken, answer: "nothing"}
+    expect_facts:
+      - {concept: abdominal_pain, status: present}
+      - {concept: abdominal_rigidity, status: present}
+    expect_required_questions: [onset, duration, site, severity, relation_to_meals, associated_vomiting]
+    expect_red_flags: [acute_abdomen_with_rigidity, severe_abdominal_pain_sudden_onset]
+    forbid_assertions: ["appendicitis", "perforation", "you have"]
+
+  - id: abdominal_pain_gi_bleed_01
+    description: Epigastric pain with coffee-ground vomiting and black stools.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 52, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: abdominal_pain}
+      - {ask: complaint_duration, answer: {magnitude: 4, unit: days}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 4, unit: days}}
+      - {ask: site, answer: upper}
+      - {ask: severity, answer: 6}
+      - {ask: relation_to_meals, answer: worse_when_empty}
+      - {ask: associated_vomiting, answer: "yes"}
+      - {ask: loose_stools, answer: "no"}
+      - {ask: haematemesis, answer: "yes"}
+      - {ask: melaena, answer: "yes"}
+      - {ask: abdominal_rigidity, answer: "no"}
+      - {ask: reduced_urine_output, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: dyspnoea, answer: "no"}
+      - {ask: syncope, answer: "no"}
+      - {ask: treatment_taken, answer: "painkillers for back pain for months"}
+    expect_red_flags: [gi_bleeding_suspected]
+    forbid_assertions: ["ulcer", "you have", "nsaid-induced"]
+
+  - id: abdominal_pain_negative_01
+    description: Mild recurrent cramping relieved by passing stool. Nothing urgent.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 31, unit: years}}
+      - {ask: sex, answer: female}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: abdominal_pain}
+      - {ask: complaint_duration, answer: {magnitude: 6, unit: months}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 6, unit: months}}
+      - {ask: site, answer: whole_abdomen}
+      - {ask: severity, answer: 3}
+      - {ask: character, answer: cramping}
+      - {ask: relation_to_meals, answer: worse_after_eating}
+      - {ask: associated_vomiting, answer: "no"}
+      - {ask: loose_stools, answer: "yes"}
+      - {ask: constipation, answer: "yes"}
+      - {ask: haematemesis, answer: "no"}
+      - {ask: melaena, answer: "no"}
+      - {ask: abdominal_rigidity, answer: "no"}
+      - {ask: reduced_urine_output, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: dyspnoea, answer: "no"}
+      - {ask: syncope, answer: "no"}
+      - {ask: pregnancy, answer: "no"}
+      - {ask: treatment_taken, answer: "home remedies"}
+    forbid_red_flags:
+      - acute_abdomen_with_rigidity
+      - gi_bleeding_suspected
+      - severe_abdominal_pain_sudden_onset
+    forbid_assertions: ["irritable bowel", "ibs", "you have"]
+
+  - id: abdominal_pain_pregnancy_01
+    description: >
+      Abdominal pain in a woman of childbearing age who reports she may be
+      pregnant. Routes to Prasuti Tantra on acknowledgement.
+    patient_script:
+      - {ask: preferred_language, answer: hi}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 26, unit: years}}
+      - {ask: sex, answer: female}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: abdominal_pain, lang: hi}
+      - {ask: complaint_duration, answer: {magnitude: 1, unit: days}}
+      - {ask: onset, answer: sudden}
+      - {ask: duration, answer: {magnitude: 1, unit: days}}
+      - {ask: site, answer: lower}
+      - {ask: severity, answer: 6}
+      - {ask: relation_to_meals, answer: no_relation}
+      - {ask: associated_vomiting, answer: "yes"}
+      - {ask: loose_stools, answer: "no"}
+      - {ask: burning_micturition, answer: "no"}
+      - {ask: pregnancy, answer: "yes"}
+      - {ask: haematemesis, answer: "no"}
+      - {ask: melaena, answer: "no"}
+      - {ask: abdominal_rigidity, answer: "no"}
+      - {ask: reduced_urine_output, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: dyspnoea, answer: "no"}
+      - {ask: syncope, answer: "no"}
+      - {ask: treatment_taken, answer: "none"}
+    expect_facts:
+      - {concept: pregnancy, status: present}
+    expect_required_questions: [pregnancy]
+    expect_red_flags: [abdominal_pain_in_pregnancy]
+    forbid_assertions: ["ectopic", "miscarriage", "you have"]

@@ -154,16 +154,25 @@ def active_pathway(state: PatientIntakeState, content: ContentSet) -> Pathway | 
     return content.complaint_pathways.match_or_fallback(coded or complaint.concept.concept_id)
 
 
-def needs_confirmation(state: PatientIntakeState, concept_id: str) -> bool:
-    """True when a prior-record fact exists that the patient has not re-affirmed.
+#: Sources that are not the patient speaking today. A fact from one of these is
+#: put back to the patient for confirmation rather than treated as answered.
+_NEEDS_PATIENT_CONFIRMATION: frozenset[SourceType] = frozenset(
+    {SourceType.PRIOR_RECORD, SourceType.DOCUMENT}
+)
 
-    Such a concept is not "answered" for asking purposes: we ask
-    "our record shows X — is that still correct?" rather than an open question.
+
+def needs_confirmation(state: PatientIntakeState, concept_id: str) -> bool:
+    """True when a record- or document-sourced fact awaits the patient's word.
+
+    Such a concept is not "answered" for asking purposes: we ask "our record
+    shows X — is that still correct?" rather than an open question. A line an OCR
+    pass read off a two-year-old discharge summary is exactly the kind of thing a
+    patient needs the chance to correct.
     """
     fact = state.fact_for(concept_id)
     if fact is None:
         return False
-    return fact.source_type is SourceType.PRIOR_RECORD and not fact.patient_confirmed
+    return fact.source_type in _NEEDS_PATIENT_CONFIRMATION and not fact.patient_confirmed
 
 
 def is_owed(state: PatientIntakeState, planned: PlannedField) -> bool:
@@ -179,15 +188,38 @@ def is_owed(state: PatientIntakeState, planned: PlannedField) -> bool:
     )
 
 
+def precondition_is_decidable(state: PatientIntakeState, planned: PlannedField) -> bool:
+    """True when every concept the precondition reads has been settled.
+
+    An undecided precondition is not a failing one. Pregnancy is gated on sex and
+    age; at the start of an intake neither has been asked, so the gate evaluates
+    false — and marking the field NOT_APPLICABLE there would permanently rule out
+    a question for a patient who turns out to be a pregnant woman.
+
+    "Not applicable" means we know it does not apply. Until the inputs are in, we
+    do not know, and the field simply waits.
+    """
+    precondition = planned.field.precondition
+    if precondition is None:
+        return True
+    return all(state.is_settled(concept) for concept in precondition.concepts())
+
+
 def inapplicable_fields(
     state: PatientIntakeState, plan: Sequence[PlannedField]
 ) -> tuple[PlannedField, ...]:
-    """Owed fields whose precondition currently fails.
+    """Owed fields that are decidably not applicable.
 
-    The engine records these as NOT_APPLICABLE rather than leaving them dangling,
-    so coverage reports a real denominator.
+    Recorded as NOT_APPLICABLE rather than left dangling, so coverage reports a
+    real denominator and the report can say *why* a question was never put.
     """
-    return tuple(p for p in plan if is_owed(state, p) and not p.field.applies_to(state))
+    return tuple(
+        p
+        for p in plan
+        if is_owed(state, p)
+        and precondition_is_decidable(state, p)
+        and not p.field.applies_to(state)
+    )
 
 
 def outstanding_required(

@@ -1,0 +1,151 @@
+# Scenarios covering the behaviours that are not about a single complaint:
+# contradictions, attendant-reported history, abandonment, declining, and the
+# fallback pathway.
+scenarios:
+  - id: contradiction_prior_record_01
+    description: >
+      A patient denies diabetes; a scanned discharge summary says otherwise. The
+      conflict must be surfaced with both sides and left unresolved.
+    prior_facts:
+      - concept: known_diabetes
+        status: present
+        value: Type 2 Diabetes Mellitus
+        source: document
+        confidence: 0.94
+        document_id: Discharge_summary_2.jpg
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 61, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: follow_up_visit}
+      - {ask: complaint_duration, answer: {magnitude: 2, unit: months}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 2, unit: months}}
+      - {ask: severity, answer: 4}
+      - {ask: progression, answer: unchanged}
+      - {ask: known_diabetes, answer: "no"}
+      - {ask: treatment_taken, answer: "regular medicines"}
+    expect_facts:
+      - {concept: known_diabetes, status: absent}
+    expect_contradictions: [known_diabetes]
+    forbid_assertions: ["you have", "the patient is diabetic", "non-compliant"]
+
+  - id: attendant_reported_01
+    description: >
+      A son answering for his mother. The record must show that this history is
+      attendant-reported rather than first-hand.
+    reporter: family_attendant
+    language: hi
+    patient_script:
+      - {ask: preferred_language, answer: hi}
+      - {ask: reporter_role, answer: family_attendant}
+      - {ask: age, answer: {magnitude: 78, unit: years}}
+      - {ask: sex, answer: female}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: fever, lang: hi}
+      - {ask: complaint_duration, answer: {magnitude: 4, unit: days}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 4, unit: days}}
+      - {ask: severity, answer: {magnitude: 38, unit: celsius}}
+      - {ask: timing_pattern, answer: worse_evening}
+      - {ask: cough, answer: "yes"}
+      - {ask: loose_stools, answer: "no"}
+      - {ask: burning_micturition, answer: unknown}
+      - {ask: rash, answer: "no"}
+      - {ask: recent_travel, answer: "no"}
+      - {ask: neck_stiffness, answer: "no"}
+      - {ask: altered_sensorium, answer: "no"}
+      - {ask: bleeding_manifestation, answer: "no"}
+      - {ask: reduced_urine_output, answer: "no"}
+      - {ask: persistent_high_fever, answer: "no"}
+      - {ask: dyspnoea, answer: "no"}
+      - {ask: treatment_taken, answer: "paracetamol"}
+    expect_facts:
+      - {concept: fever, status: present}
+      # The attendant genuinely did not know. That is UNKNOWN, not a denial.
+      - {concept: burning_micturition, status: unknown}
+    forbid_assertions: ["you have", "the patient denies"]
+
+  - id: abandonment_01
+    description: >
+      A patient called into the consulting room part-way through. The record must
+      keep what was captured and say plainly what is missing.
+    abandon_after: 6
+    expect_complete: false
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 35, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: fever}
+    expect_facts:
+      - {concept: fever, status: present}
+    forbid_assertions: ["you have", "no significant history"]
+
+  - id: declined_questions_01
+    description: >
+      A patient who declines the personal-history questions. A refusal is a
+      settled outcome recorded as a refusal — not a gap the kiosk loops on.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 47, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: follow_up_visit}
+      - {ask: complaint_duration, answer: {magnitude: 1, unit: months}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 1, unit: months}}
+      - {ask: severity, answer: 3}
+      - {ask: progression, answer: improving}
+      - {ask: treatment_taken, answer: "as prescribed"}
+      - {ask: tobacco_use, declined: true}
+      - {ask: alcohol_use, declined: true}
+    forbid_assertions: ["you have", "denies tobacco", "non-smoker"]
+
+  - id: unmatched_complaint_fallback_01
+    description: >
+      A complaint with no dedicated pathway. The fallback must still take a
+      structured history rather than dropping to a free-text box.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 39, unit: years}}
+      - {ask: sex, answer: female}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: other}
+      - {ask: complaint_duration, answer: {magnitude: 3, unit: weeks}}
+      - {ask: onset, answer: gradual}
+      - {ask: duration, answer: {magnitude: 3, unit: weeks}}
+      - {ask: severity, answer: 5}
+      - {ask: progression, answer: worsening}
+      - {ask: treatment_taken, answer: "nothing yet"}
+      - {ask: pregnancy, answer: "no"}
+    expect_required_questions: [onset, duration, severity, progression]
+    forbid_assertions: ["you have", "we recommend"]
+
+  - id: hedged_duration_01
+    description: >
+      A patient who is unsure how long the problem has lasted. "About two weeks"
+      must stay approximate through the whole pipeline.
+    patient_script:
+      - {ask: preferred_language, answer: en}
+      - {ask: reporter_role, answer: self}
+      - {ask: age, answer: {magnitude: 50, unit: years}}
+      - {ask: sex, answer: male}
+      - {ask: consent_given, answer: granted}
+      - {ask: chief_complaint, answer: follow_up_visit}
+      - {ask: complaint_duration, answer: {magnitude: 2, unit: weeks}}
+      - {ask: onset, answer: unknown}
+      - {ask: duration, answer: {magnitude: 2, unit: weeks}}
+      - {ask: severity, answer: 4}
+      - {ask: progression, answer: unknown}
+      - {ask: treatment_taken, answer: "cannot remember the name"}
+    expect_facts:
+      - {concept: onset, status: unknown}
+      - {concept: progression, status: unknown}
+      - {concept: duration, status: present, value: 2 weeks}
+    forbid_assertions: ["you have", "we recommend"]
