@@ -10,7 +10,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, status
 
-from app.api.deps import ConsentRepoDep, IntakeServiceDep, PrincipalDep
+from app.api.deps import (
+    ConsentRepoDep,
+    IdempotencyDep,
+    IntakeServiceDep,
+    PrincipalDep,
+    idempotent,
+)
 from app.models.clinical import ConsentArtefact
 from app.schemas.intake import ConsentOut, ConsentRequest
 
@@ -37,6 +43,7 @@ async def record_consent(
     body: ConsentRequest,
     service: IntakeServiceDep,
     consent: ConsentRepoDep,
+    guard: IdempotencyDep,
     _: PrincipalDep,
 ) -> ConsentOut:
     """Record what the patient agreed to.
@@ -44,16 +51,20 @@ async def record_consent(
     Refusing the base intake purpose is a valid outcome: the patient sees the
     doctor without a kiosk history, and their place in the queue is untouched.
     """
-    artefact_id = await service.record_consent(
-        body.intake_id,
-        language=body.language,
-        granted_purposes=body.granted_purposes,
-        refused_purposes=body.refused_purposes,
-        granting_party=body.granting_party.value,
-        granting_party_name=body.granting_party_name,
-        audio_asset_id=body.audio_asset_id,
-    )
-    return _out(await consent.require(artefact_id))
+
+    async def produce() -> ConsentOut:
+        artefact_id = await service.record_consent(
+            body.intake_id,
+            language=body.language,
+            granted_purposes=body.granted_purposes,
+            refused_purposes=body.refused_purposes,
+            granting_party=body.granting_party.value,
+            granting_party_name=body.granting_party_name,
+            audio_asset_id=body.audio_asset_id,
+        )
+        return _out(await consent.require(artefact_id))
+
+    return await idempotent(guard, ConsentOut, produce)
 
 
 @router.get("/{consent_id}", response_model=ConsentOut)

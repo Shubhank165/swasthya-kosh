@@ -457,7 +457,28 @@ which is the claim actually being made.
   architectural over-decoration, and the strongest version is the one whose
   clinical logic is obviously correct.
 
-## 25. Known gaps
+## 25. Idempotency is applied per endpoint, not by middleware
+
+Each mutating route wraps its work in `idempotent(guard, Model, produce)`.
+
+**Why not middleware.** One middleware would have covered every route including
+future ones, and it was the first design. It has to buffer the request body to
+fingerprint it — which means buffering a multipart scan upload into memory, on
+the one endpoint where the payload is a photograph of a prescription. The
+per-endpoint helper is four lines a route and leaves the upload alone.
+
+**How the requirement is held.** `tests/api/test_brief_completeness.py` walks the
+generated OpenAPI schema and fails on any POST/PATCH/PUT that does not accept the
+header. A route added later without a guard breaks the build.
+
+**`call_next` is a special case.** A retry after a dropped response must not call
+a *second* patient while the first is walking to the room, so it is guarded — but
+a `None` result is deliberately not remembered, because "nothing to call" now
+does not mean nothing to call in five minutes.
+
+---
+
+## 26. Known gaps
 
 - **Authentication is a header stand-in.** `X-User-Id` / `X-User-Role` fail
   closed on an unknown role and the role checks are real, but real
@@ -468,6 +489,9 @@ which is the claim actually being made.
   worker would call.
 - **`PubSubBus` raises `NotImplementedError`.** The protocol and wiring exist so
   the swap is a config change; nothing pretends to work.
+- **The FHIR bundle is served but not pushed.** `GET /intakes/{id}/fhir` returns
+  a dual-coded R4 Bundle; delivering it to a hospital HMIS is `HISAdapter` work
+  and needs a real endpoint to integrate against.
 - **Terminology seeds are placeholders.** Flagged in
   `docs/CLINICAL_REVIEW_QUEUE.md` and in the files themselves.
 - **32 content items await clinician review**, listed in

@@ -7,7 +7,7 @@ trip per turn even on a poor LAN.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
@@ -22,6 +22,7 @@ from app.api.deps import (
     PrincipalDep,
     Role,
     SettingsDep,
+    idempotent,
     require_roles,
 )
 from app.api.serialisers import (
@@ -83,19 +84,24 @@ async def update_intake(
     intake_id: str,
     body: UpdateIntakeRequest,
     service: IntakeServiceDep,
+    guard: IdempotencyDep,
     _: PrincipalDep,
 ) -> IntakeSnapshotOut:
     """Session metadata only. Clinical facts are never written through here —
     they go through `/answers`, which is the one path that builds provenance."""
-    return snapshot_out(
-        await service.update_metadata(
-            intake_id,
-            language=body.language,
-            reporter=body.reporter,
-            ayurveda_enabled=body.ayurveda_enabled,
-            patient_id=body.patient_id,
+
+    async def produce() -> IntakeSnapshotOut:
+        return snapshot_out(
+            await service.update_metadata(
+                intake_id,
+                language=body.language,
+                reporter=body.reporter,
+                ayurveda_enabled=body.ayurveda_enabled,
+                patient_id=body.patient_id,
+            )
         )
-    )
+
+    return await idempotent(guard, IntakeSnapshotOut, produce)
 
 
 @router.post("/{intake_id}/answers", response_model=IntakeSnapshotOut)
@@ -235,6 +241,22 @@ async def report(intake_id: str, service: IntakeServiceDep, _: PrincipalDep) -> 
     return report_out(await service.summary(intake_id))
 
 
+@router.get("/{intake_id}/fhir", response_model=dict)
+async def fhir_bundle(
+    intake_id: str,
+    service: IntakeServiceDep,
+    principal: Annotated[Principal, Depends(require_roles(Role.PHYSICIAN, Role.STAFF))],
+) -> dict[str, Any]:
+    """The intake as a FHIR R4 Bundle.
+
+    Every `Condition` carries dual codes — NAMASTE alongside ICD-11 — wherever a
+    mapping exists, and only the codes that exist where one does not. Nothing a
+    machine derived is asserted as confirmed: an unverified fact maps to
+    `verificationStatus: provisional` or `unconfirmed`.
+    """
+    return await service.fhir_bundle(intake_id)
+
+
 @router.get("/{intake_id}/facts/{fact_id}/evidence", response_model=EvidenceOut)
 async def evidence(
     intake_id: str, fact_id: str, service: IntakeServiceDep, _: PrincipalDep
@@ -252,13 +274,19 @@ async def physician_verify(
     intake_id: str,
     body: PhysicianVerifyRequest,
     service: IntakeServiceDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.PHYSICIAN))],
 ) -> IntakeSnapshotOut:
     """Physician sign-off. Physician-only, enforced by `require_roles`."""
-    snapshot = await service.physician_verify(
-        intake_id, physician_id=UserId(body.physician_id), concepts=body.concepts
-    )
-    return snapshot_out(snapshot)
+
+    async def produce() -> IntakeSnapshotOut:
+        return snapshot_out(
+            await service.physician_verify(
+                intake_id, physician_id=UserId(body.physician_id), concepts=body.concepts
+            )
+        )
+
+    return await idempotent(guard, IntakeSnapshotOut, produce)
 
 
 alerts_router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -268,6 +296,7 @@ alerts_router = APIRouter(prefix="/alerts", tags=["alerts"])
 async def acknowledge_alert(
     alert_id: str,
     service: IntakeServiceDep,
+    guard: IdempotencyDep,
     principal: Annotated[
         Principal, Depends(require_roles(Role.TRIAGE, Role.PHYSICIAN, Role.STAFF))
     ],
@@ -277,10 +306,16 @@ async def acknowledge_alert(
     This is the only thing that permits `POST /tickets/{id}/escalate`, and it
     records who did it. Nothing automatic can reach this endpoint.
     """
-    alert = await service.acknowledge_alert(alert_id, user_id=UserId(principal.user_id))
-    return Acknowledgement(
-        ok=True, message=f"alert {alert.rule_id} acknowledged by {principal.user_id}"
-    )
+
+    async def produce() -> Acknowledgement:
+        alert = await service.acknowledge_alert(
+            alert_id, user_id=UserId(principal.user_id)
+        )
+        return Acknowledgement(
+            ok=True, message=f"alert {alert.rule_id} acknowledged by {principal.user_id}"
+        )
+
+    return await idempotent(guard, Acknowledgement, produce)
 
 
 @alerts_router.post("/{alert_id}/dismiss", response_model=Acknowledgement)
@@ -288,9 +323,14 @@ async def dismiss_alert(
     alert_id: str,
     reason: Annotated[str, Query(min_length=1)],
     service: IntakeServiceDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.TRIAGE, Role.PHYSICIAN))],
 ) -> Acknowledgement:
-    alert = await service.dismiss_alert(
-        alert_id, user_id=UserId(principal.user_id), reason=reason
-    )
-    return Acknowledgement(ok=True, message=f"alert {alert.rule_id} dismissed")
+
+    async def produce() -> Acknowledgement:
+        alert = await service.dismiss_alert(
+            alert_id, user_id=UserId(principal.user_id), reason=reason
+        )
+        return Acknowledgement(ok=True, message=f"alert {alert.rule_id} dismissed")
+
+    return await idempotent(guard, Acknowledgement, produce)

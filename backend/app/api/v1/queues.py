@@ -13,12 +13,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import (
+    IdempotencyDep,
     Principal,
     PrincipalDep,
     QueueRepoDep,
     QueueServiceDep,
     Role,
     SettingsDep,
+    idempotent,
     require_roles,
 )
 from app.api.serialisers import instance_out, queue_out, ticket_out
@@ -74,8 +76,18 @@ async def list_queues(
     repo: QueueRepoDep,
     _: PrincipalDep,
     department: Annotated[str | None, Query()] = None,
+    service_date: Annotated[date | None, Query(alias="date")] = None,
 ) -> list[QueueOut]:
-    return [queue_out(q) for q in await repo.list_queues(department_code=department)]
+    """Queues, optionally narrowed to a department and to a given date.
+
+    The date filter honours each queue's schedule: a Tuesday/Thursday Netra
+    clinic does not appear on a Monday, so a display asking "what is running
+    today?" gets an answer it can render without further filtering.
+    """
+    queues = await repo.list_queues(department_code=department)
+    if service_date is not None:
+        queues = tuple(q for q in queues if q.runs_on(service_date))
+    return [queue_out(q) for q in queues]
 
 
 @router.get("/{queue_id}/instance", response_model=QueueInstanceOut)
@@ -106,17 +118,23 @@ async def open_instance(
     body: OpenInstanceRequest,
     service: QueueServiceDep,
     settings: SettingsDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> QueueInstanceOut:
     require_shadow_mode_guard(settings, "open queue instance")
-    instance = await service.open_instance(
-        queue_id,
-        service_date=body.service_date or settings.today(),
-        session=body.session,
-        practitioner_id=body.practitioner_id,
-        service_point=body.service_point,
-    )
-    return instance_out(instance)
+
+    async def produce() -> QueueInstanceOut:
+        return instance_out(
+            await service.open_instance(
+                queue_id,
+                service_date=body.service_date or settings.today(),
+                session=body.session,
+                practitioner_id=body.practitioner_id,
+                service_point=body.service_point,
+            )
+        )
+
+    return await idempotent(guard, QueueInstanceOut, produce)
 
 
 @router.post("/{queue_id}/tickets", response_model=TicketOut, status_code=status.HTTP_201_CREATED)
@@ -126,6 +144,7 @@ async def issue_ticket(
     service: QueueServiceDep,
     repo: QueueRepoDep,
     settings: SettingsDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> TicketOut:
     """Issue a token.
@@ -135,24 +154,29 @@ async def issue_ticket(
     a red flag never reaches this endpoint.
     """
     require_shadow_mode_guard(settings, "issue ticket")
-    view = await service.issue(
-        queue_id,
-        instance_id=body.instance_id,
-        attributes=PatientAttributes(
-            age_years=body.age_years,
-            is_pregnant=body.is_pregnant,
-            is_differently_abled=body.is_differently_abled,
-            has_appointment=body.has_appointment,
-            is_staff_referred_emergency=body.is_staff_referred_emergency,
-        ),
-        patient_id=body.patient_id,
-        intake_id=body.intake_id,
-        appointment_slot_time=body.appointment_slot_time,
-        override_priority=body.override_priority,
-    )
-    return ticket_out(
-        view, intake_state=await _intake_state_for(repo, str(view.ticket.ticket_id))
-    )
+
+    async def produce() -> TicketOut:
+        view = await service.issue(
+            queue_id,
+            instance_id=body.instance_id,
+            attributes=PatientAttributes(
+                age_years=body.age_years,
+                is_pregnant=body.is_pregnant,
+                is_differently_abled=body.is_differently_abled,
+                has_appointment=body.has_appointment,
+                is_staff_referred_emergency=body.is_staff_referred_emergency,
+            ),
+            patient_id=body.patient_id,
+            intake_id=body.intake_id,
+            appointment_slot_time=body.appointment_slot_time,
+            override_priority=body.override_priority,
+        )
+        return ticket_out(
+            view, intake_state=await _intake_state_for(repo, str(view.ticket.ticket_id))
+        )
+
+    # A retried registration must not hand the same patient a second token.
+    return await idempotent(guard, TicketOut, produce)
 
 
 @router.get("/{queue_id}/dashboard", response_model=DashboardOut)
@@ -179,6 +203,7 @@ async def call_next(
     service: QueueServiceDep,
     repo: QueueRepoDep,
     settings: SettingsDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN))],
     practitioner_id: Annotated[str | None, Query()] = None,
     service_point: Annotated[str | None, Query()] = None,
@@ -189,14 +214,24 @@ async def call_next(
     practitioners calling simultaneously on a pooled queue get different tokens.
     """
     require_shadow_mode_guard(settings, "call next")
+    replay = await guard.stored()
+    if replay is not None:
+        # A retry after a dropped response must not call a *second* patient
+        # while the first is already walking to the room.
+        return TicketOut.model_validate(replay.response_body)
+
     view = await service.call_next(
         instance_id, practitioner_id=practitioner_id, service_point=service_point
     )
     if view is None:
+        # Deliberately not remembered: "nothing to call" now does not mean
+        # nothing to call in five minutes.
         return None
-    return ticket_out(
+    out = ticket_out(
         view, intake_state=await _intake_state_for(repo, str(view.ticket.ticket_id))
     )
+    await guard.remember(out.model_dump(mode="json"))
+    return out
 
 
 @instances_router.post("/{instance_id}/pause", response_model=QueueInstanceOut)
@@ -204,29 +239,41 @@ async def pause_instance(
     instance_id: str,
     body: PauseRequest,
     service: QueueServiceDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> QueueInstanceOut:
-    return instance_out(await service.pause(instance_id, reason=body.reason))
+    async def produce() -> QueueInstanceOut:
+        return instance_out(await service.pause(instance_id, reason=body.reason))
+
+    return await idempotent(guard, QueueInstanceOut, produce)
 
 
 @instances_router.post("/{instance_id}/resume", response_model=QueueInstanceOut)
 async def resume_instance(
     instance_id: str,
     service: QueueServiceDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> QueueInstanceOut:
-    return instance_out(await service.resume(instance_id))
+    async def produce() -> QueueInstanceOut:
+        return instance_out(await service.resume(instance_id))
+
+    return await idempotent(guard, QueueInstanceOut, produce)
 
 
 @instances_router.post("/{instance_id}/close", response_model=QueueInstanceOut)
 async def close_instance(
     instance_id: str,
     service: QueueServiceDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> QueueInstanceOut:
     """Close the session. Unserved tickets are disposed of by configured policy —
     carried forward, cancelled or reassigned — never silently dropped."""
-    return instance_out(await service.close_instance(instance_id))
+    async def produce() -> QueueInstanceOut:
+        return instance_out(await service.close_instance(instance_id))
+
+    return await idempotent(guard, QueueInstanceOut, produce)
 
 
 @instances_router.get("/{instance_id}/dashboard", response_model=DashboardOut)
@@ -254,6 +301,7 @@ async def call_ticket(
     ticket_id: str,
     service: QueueServiceDep,
     repo: QueueRepoDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN))],
 ) -> TicketOut:
     """Call the next patient on the instance this ticket belongs to.
@@ -261,11 +309,16 @@ async def call_ticket(
     Deliberately not "call this exact ticket": jumping a specific patient ahead
     of the order is an escalation, and escalation requires an acknowledged alert.
     """
-    ticket = await repo.require_ticket(ticket_id)
-    view = await service.call_next(str(ticket.instance_id))
-    if view is None:
-        raise NotFoundError("nothing callable on that instance")
-    return ticket_out(view, intake_state=await _intake_state_for(repo, str(view.ticket.ticket_id)))
+    async def produce() -> TicketOut:
+        ticket = await repo.require_ticket(ticket_id)
+        view = await service.call_next(str(ticket.instance_id))
+        if view is None:
+            raise NotFoundError("nothing callable on that instance")
+        return ticket_out(
+            view, intake_state=await _intake_state_for(repo, str(view.ticket.ticket_id))
+        )
+
+    return await idempotent(guard, TicketOut, produce)
 
 
 @tickets_router.post("/{ticket_id}/recall", response_model=TicketOut)
@@ -273,11 +326,17 @@ async def recall_ticket(
     ticket_id: str,
     service: QueueServiceDep,
     repo: QueueRepoDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN))],
 ) -> TicketOut:
     """Re-insert a called-but-absent patient, or mark NO_SHOW once recalls run out."""
-    view = await service.recall(ticket_id)
-    return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
+    async def produce() -> TicketOut:
+        view = await service.recall(ticket_id)
+        return ticket_out(
+            view, intake_state=await _intake_state_for(repo, ticket_id)
+        )
+
+    return await idempotent(guard, TicketOut, produce)
 
 
 @tickets_router.post("/{ticket_id}/start", response_model=TicketOut)
@@ -285,10 +344,16 @@ async def start_ticket(
     ticket_id: str,
     service: QueueServiceDep,
     repo: QueueRepoDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.PHYSICIAN, Role.STAFF, Role.ADMIN))],
 ) -> TicketOut:
-    view = await service.start_consultation(ticket_id)
-    return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
+    async def produce() -> TicketOut:
+        view = await service.start_consultation(ticket_id)
+        return ticket_out(
+            view, intake_state=await _intake_state_for(repo, ticket_id)
+        )
+
+    return await idempotent(guard, TicketOut, produce)
 
 
 @tickets_router.post("/{ticket_id}/complete", response_model=TicketOut)
@@ -296,10 +361,16 @@ async def complete_ticket(
     ticket_id: str,
     service: QueueServiceDep,
     repo: QueueRepoDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.PHYSICIAN, Role.STAFF, Role.ADMIN))],
 ) -> TicketOut:
-    view = await service.complete(ticket_id)
-    return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
+    async def produce() -> TicketOut:
+        view = await service.complete(ticket_id)
+        return ticket_out(
+            view, intake_state=await _intake_state_for(repo, ticket_id)
+        )
+
+    return await idempotent(guard, TicketOut, produce)
 
 
 @tickets_router.post("/{ticket_id}/defer", response_model=TicketOut)
@@ -308,11 +379,17 @@ async def defer_ticket(
     body: DeferRequest,
     service: QueueServiceDep,
     repo: QueueRepoDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN))],
 ) -> TicketOut:
     """Defer for a test or a payment. Priority and accrued wait are preserved."""
-    view = await service.defer(ticket_id, reason=body.reason)
-    return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
+    async def produce() -> TicketOut:
+        view = await service.defer(ticket_id, reason=body.reason)
+        return ticket_out(
+            view, intake_state=await _intake_state_for(repo, ticket_id)
+        )
+
+    return await idempotent(guard, TicketOut, produce)
 
 
 @tickets_router.post("/{ticket_id}/no-show", response_model=TicketOut)
@@ -320,10 +397,16 @@ async def no_show_ticket(
     ticket_id: str,
     service: QueueServiceDep,
     repo: QueueRepoDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> TicketOut:
-    view = await service.no_show(ticket_id)
-    return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
+    async def produce() -> TicketOut:
+        view = await service.no_show(ticket_id)
+        return ticket_out(
+            view, intake_state=await _intake_state_for(repo, ticket_id)
+        )
+
+    return await idempotent(guard, TicketOut, produce)
 
 
 @tickets_router.post("/{ticket_id}/cancel", response_model=TicketOut)
@@ -332,10 +415,16 @@ async def cancel_ticket(
     body: CancelRequest,
     service: QueueServiceDep,
     repo: QueueRepoDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.ADMIN))],
 ) -> TicketOut:
-    view = await service.cancel(ticket_id, reason=body.reason)
-    return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
+    async def produce() -> TicketOut:
+        view = await service.cancel(ticket_id, reason=body.reason)
+        return ticket_out(
+            view, intake_state=await _intake_state_for(repo, ticket_id)
+        )
+
+    return await idempotent(guard, TicketOut, produce)
 
 
 @tickets_router.post("/{ticket_id}/transfer", response_model=TicketOut)
@@ -344,17 +433,21 @@ async def transfer_ticket(
     body: TransferRequest,
     service: QueueServiceDep,
     repo: QueueRepoDep,
+    guard: IdempotencyDep,
     principal: Annotated[Principal, Depends(require_roles(Role.STAFF, Role.PHYSICIAN, Role.ADMIN))],
 ) -> TicketOut:
     """Move a patient to another queue. The intake goes with them and is not re-run."""
-    view = await service.transfer(
-        ticket_id,
-        target_queue_id=body.target_queue_id,
-        target_instance_id=body.target_instance_id,
-    )
-    return ticket_out(
-        view, intake_state=await _intake_state_for(repo, str(view.ticket.ticket_id))
-    )
+    async def produce() -> TicketOut:
+        view = await service.transfer(
+            ticket_id,
+            target_queue_id=body.target_queue_id,
+            target_instance_id=body.target_instance_id,
+        )
+        return ticket_out(
+            view, intake_state=await _intake_state_for(repo, str(view.ticket.ticket_id))
+        )
+
+    return await idempotent(guard, TicketOut, produce)
 
 
 @tickets_router.post("/{ticket_id}/escalate", response_model=TicketOut)
@@ -363,6 +456,7 @@ async def escalate_ticket(
     body: EscalateRequest,
     service: QueueServiceDep,
     repo: QueueRepoDep,
+    guard: IdempotencyDep,
     principal: Annotated[
         Principal, Depends(require_roles(Role.TRIAGE, Role.PHYSICIAN, Role.ADMIN))
     ],
@@ -372,10 +466,13 @@ async def escalate_ticket(
     Rejected with 403 if the alert has not been acknowledged by a human. This is
     the mechanical guarantee behind "a red flag never auto-escalates a patient".
     """
-    view = await service.escalate(
-        ticket_id,
-        alert_id=body.alert_id,
-        acting_user_id=body.acting_user_id,
-        reason=body.reason,
-    )
-    return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
+    async def produce() -> TicketOut:
+        view = await service.escalate(
+            ticket_id,
+            alert_id=body.alert_id,
+            acting_user_id=body.acting_user_id,
+            reason=body.reason,
+        )
+        return ticket_out(view, intake_state=await _intake_state_for(repo, ticket_id))
+
+    return await idempotent(guard, TicketOut, produce)

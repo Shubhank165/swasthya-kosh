@@ -8,13 +8,14 @@ swapping it changes this file and nothing else.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Any
 
 from fastapi import Depends, Header, Request
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import Clock, SystemClock
@@ -151,6 +152,8 @@ async def get_intake_service(
         settings=settings,
         clock=clock,
         ids=ids,
+        reports=ReportRepository(session),
+        terminology=TerminologyService(TerminologyRepository(session)),
     )
 
 
@@ -265,3 +268,22 @@ async def idempotency_guard(
 
 
 IdempotencyDep = Annotated[IdempotencyGuard, Depends(idempotency_guard)]
+
+async def idempotent[ModelT: BaseModel](
+    guard: IdempotencyGuard,
+    model: type[ModelT],
+    produce: Callable[[], Awaitable[ModelT]],
+) -> ModelT:
+    """Run `produce` once per `Idempotency-Key`, replaying the stored response.
+
+    Without a key it simply runs. With one, a retry returns the original
+    response rather than performing the action twice — which is what stops a
+    kiosk that lost the LAN from issuing a second token or writing a second
+    consent artefact.
+    """
+    replay = await guard.stored()
+    if replay is not None:
+        return model.model_validate(replay.response_body)
+    result = await produce()
+    await guard.remember(result.model_dump(mode="json"))
+    return result

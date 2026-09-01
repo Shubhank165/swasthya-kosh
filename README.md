@@ -27,7 +27,7 @@ above that package changes when they do.
 | API | FastAPI, `/api/v1`, plus two WebSocket channels |
 | Providers | Protocols for STT, TTS, extraction, OCR, HIS, FHIR, ABDM — mocks only |
 | Evaluation | 22-scenario replay harness reporting clinical-safety metrics |
-| Tests | 457 tests; 94% coverage on the domain |
+| Tests | 474 tests; 94% coverage on the domain |
 
 ## Quick start
 
@@ -62,7 +62,7 @@ Open <http://localhost:8000/docs>.
 ```bash
 cd backend
 
-uv run pytest                       # 457 tests
+uv run pytest                       # 474 tests
 uv run pytest --cov=app.domain      # domain coverage (94%)
 uv run ruff check app tests evaluation scripts
 uv run mypy --strict app/domain
@@ -163,13 +163,14 @@ GET    /api/v1/intakes/{id}/coverage
 POST   /api/v1/intakes/{id}/documents               upload a scan
 POST   /api/v1/intakes/{id}/confirm                 patient confirmation loop
 GET    /api/v1/intakes/{id}/report
+GET    /api/v1/intakes/{id}/fhir                    FHIR R4 Bundle, dual-coded
 GET    /api/v1/intakes/{id}/facts/{fact_id}/evidence
 
 POST   /api/v1/consent                              record a consent artefact
 GET    /api/v1/consent/{id}
 
 GET    /api/v1/departments
-GET    /api/v1/queues                               ?department=
+GET    /api/v1/queues                               ?department= &date=
 GET    /api/v1/queues/{id}/instance                 ?date= &session=
 POST   /api/v1/queues/{id}/tickets                  issue
 POST   /api/v1/tickets/{id}/{call|recall|start|complete|defer|transfer|no-show|cancel|escalate}
@@ -185,9 +186,11 @@ WS     /ws/dashboard?department=                    queue + intake + alert fanou
 WS     /ws/intakes/{id}                             live intake state for the kiosk
 ```
 
-Every mutating endpoint accepts an `Idempotency-Key`, and every intake carries a
-monotonic `revision` — a kiosk that lost the LAN and retries neither duplicates
-nor clobbers.
+Every mutating endpoint accepts an `Idempotency-Key` (enforced by a test that
+walks the OpenAPI schema), and every intake carries a monotonic `revision` — a
+kiosk that lost the LAN and retries neither duplicates nor clobbers. The one
+exemption is the multipart document upload, where the document id already makes
+a replay harmless.
 
 ## Configuration
 

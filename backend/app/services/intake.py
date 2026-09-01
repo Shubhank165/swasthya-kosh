@@ -14,6 +14,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 
+from app.adapters.fhir.mapper import DeterministicFHIRMapper
 from app.core.clock import Clock, SystemClock
 from app.core.config import Settings, get_settings
 from app.core.content import ClinicalContent
@@ -45,9 +46,10 @@ from app.domain.summary.builder import ClinicalSummary, build
 from app.events.bus import EventBus
 from app.events.schemas import Event, EventName
 from app.repositories.alerts import AlertRepository
-from app.repositories.consent import ConsentRepository
+from app.repositories.consent import ConsentRepository, ReportRepository
 from app.repositories.intakes import IntakeRepository
 from app.services.answers import SubmittedAnswer, build_fact, is_decline, not_applicable_fact
+from app.services.terminology import TerminologyService
 
 logger = get_logger(__name__)
 
@@ -82,12 +84,16 @@ class IntakeService:
         settings: Settings | None = None,
         clock: Clock | None = None,
         ids: IdFactory | None = None,
+        reports: ReportRepository | None = None,
+        terminology: TerminologyService | None = None,
     ) -> None:
         self._intakes = intakes
         self._alerts = alerts
         self._consent = consent
         self._content = content
         self._bus = bus
+        self._reports = reports
+        self._terminology = terminology
         self._settings = settings or get_settings()
         self._clock = clock or SystemClock()
         self._ids = ids or UuidIdFactory()
@@ -519,6 +525,10 @@ class IntakeService:
                 )
             )
         await self._intakes.save(state, now=now)
+        if self._reports is not None and await self._reports.for_intake(intake_id):
+            await self._reports.mark_verified(
+                intake_id, physician_id=str(physician_id), verified_at=now
+            )
         await self._bus.publish(
             Event(
                 name=EventName.REPORT_PHYSICIAN_VERIFIED,
@@ -677,16 +687,76 @@ class IntakeService:
 
     # --- reporting -------------------------------------------------------------
 
-    async def summary(self, intake_id: str) -> ClinicalSummary:
+    async def summary(self, intake_id: str, *, persist: bool = True) -> ClinicalSummary:
+        """Build the physician report, and record that it was generated.
+
+        Persisting it is what makes `report.ready` meaningful and gives the
+        physician-verification step something to attach to. The facts behind the
+        report are versioned in `clinical_facts`, so storing the rendered view is
+        a convenience rather than a second source of truth.
+        """
         state = await self._intakes.require(intake_id)
         alerts = await self._alerts.list_for_intake(intake_id)
         coverage = compute(state, self._machine.plan(state))
-        return build(
-            state,
-            coverage=coverage,
-            conflicts=detect(state),
-            alerts=alerts,
-        )
+        summary = build(state, coverage=coverage, conflicts=detect(state), alerts=alerts)
+
+        if persist and self._reports is not None:
+            now = self._clock.now()
+            existing = await self._reports.for_intake(intake_id)
+            await self._reports.upsert(
+                report_id=self._ids.new_id("report"),
+                intake_id=intake_id,
+                intake_revision=state.revision,
+                coverage_percentage=coverage.percentage,
+                body=report_body(summary),
+                generated_at=now,
+                service_date=self._settings.today(self._clock),
+            )
+            # Only on first generation, and only once the history is usable —
+            # a dashboard should not be told a report is ready five times while
+            # the patient is still answering.
+            if existing is None and state.state in {IntakeState.READY, IntakeState.SYNCED}:
+                await self._bus.publish(
+                    Event(
+                        name=EventName.REPORT_READY,
+                        occurred_at=now,
+                        intake_id=intake_id,
+                        payload={"coverage_percentage": coverage.percentage},
+                    )
+                )
+        return summary
+
+    async def fhir_bundle(self, intake_id: str) -> dict[str, Any]:
+        """The intake as a FHIR R4 Bundle.
+
+        Every `Condition` carries dual codes wherever a mapping exists, and only
+        the codes that exist where one does not.
+        """
+        state = await self._intakes.require(intake_id)
+        mappings = await self._concept_codes()
+        return DeterministicFHIRMapper(mappings).to_bundle(state)
+
+    async def _concept_codes(self) -> dict[str, dict[str, str]]:
+        """`{concept_id: {system: code}}` for the FHIR mapper.
+
+        Built from the concept registry's own `codes` blocks, then widened with
+        the ConceptMap so a concept coded only in NAMASTE picks up its ICD-11
+        counterparts. Where nothing maps, nothing is added.
+        """
+        out: dict[str, dict[str, str]] = {}
+        for concept in self._content.concepts:
+            if concept.codes:
+                out[concept.concept_id] = dict(concept.codes)
+        if self._terminology is None:
+            return out
+        for concept_id, codes in out.items():
+            namaste = codes.get("NAMASTE")
+            if namaste is None:
+                continue
+            for system, code in (await self._terminology.dual_codes("NAMASTE", namaste)).items():
+                codes.setdefault(system, code)
+            out[concept_id] = codes
+        return out
 
     async def evidence_for(self, intake_id: str, fact_id: str) -> dict[str, Any]:
         """Provenance for one fact, including its supersession chain.
@@ -795,6 +865,38 @@ class IntakeService:
             newly_raised=newly_raised,
             contradictions=detect(state),
         )
+
+
+def report_body(summary: ClinicalSummary) -> dict[str, Any]:
+    """Structural form of a report, for storage and for the API.
+
+    Stores the structure rather than the rendered text: the text is derived from
+    it, and keeping only one of the two means they cannot drift.
+    """
+    return {
+        "intake_id": summary.intake_id,
+        "coverage_percentage": summary.coverage_percentage,
+        "physician_verified": summary.physician_verified,
+        "sections": [
+            {
+                "section": section.section.value,
+                "title": section.title,
+                "lines": [
+                    {
+                        "text": line.text,
+                        "fact_ids": [str(f) for f in line.fact_ids],
+                        "original_expression": line.original_expression,
+                        "original_language": line.original_language,
+                    }
+                    for line in section.lines
+                ],
+            }
+            for section in summary.sections
+        ],
+        "unresolved": [line.text for line in summary.unresolved],
+        "conflicts": [c.concept for c in summary.conflicts],
+        "alerts": [a.rule_id for a in summary.alerts],
+    }
 
 
 def _source_ref_payload(ref: Any) -> dict[str, Any]:
