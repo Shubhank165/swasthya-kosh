@@ -1,4 +1,10 @@
-"""Database engine and session management."""
+"""Database engine and session management.
+
+Importing this package installs the tenant guard (`app.db.tenancy`). That is
+deliberate: there is no way to obtain a session in this codebase without the
+guard being live, so a repository cannot accidentally run unscoped by forgetting
+a setup call.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +19,9 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.core.config import Settings, get_settings
+from app.db import tenancy
+
+tenancy.install()
 
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None

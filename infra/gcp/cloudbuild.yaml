@@ -1,0 +1,21 @@
+# Build the one image. Context is the repository root, because the image needs
+# both `backend/` and `clinical/` — the clinical content ships inside the image
+# so a deployed build and the pathways it runs cannot drift apart.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file=infra/docker/Dockerfile
+      - --tag=${_IMAGE}:${_TAG}
+      - --tag=${_IMAGE}:latest
+      # The previous `latest` warms the layer cache; on the very first build
+      # there is nothing to pull, which is why this step is allowed to fail.
+      - --cache-from=${_IMAGE}:latest
+      - .
+images:
+  - ${_IMAGE}:${_TAG}
+  - ${_IMAGE}:latest
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+timeout: 1200s

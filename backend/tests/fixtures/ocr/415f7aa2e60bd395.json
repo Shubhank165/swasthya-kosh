@@ -1,0 +1,40 @@
+{
+  "kind": "discharge_summary",
+  "page_count": 1,
+  "overall_confidence": 0.91,
+  "document_date": "2026-06-02",
+  "page_text": [
+    "Discharge Summary\nFinal diagnosis: Type 2 diabetes mellitus\nProcedure: Laparoscopic cholecystectomy\n"
+  ],
+  "items": [
+    {
+      "item_id": "item_dx1",
+      "kind": "diagnosis",
+      "raw_text": "Final diagnosis: Type 2 diabetes mellitus",
+      "page": 1,
+      "bbox": {
+        "x": 0.08,
+        "y": 0.22,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.93,
+      "label": "known diabetes"
+    },
+    {
+      "item_id": "item_px1",
+      "kind": "procedure",
+      "raw_text": "Procedure: Laparoscopic cholecystectomy",
+      "page": 1,
+      "bbox": {
+        "x": 0.08,
+        "y": 0.28,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.9,
+      "label": "cholecystectomy"
+    }
+  ],
+  "_fixture_name": "discharge_summary"
+}

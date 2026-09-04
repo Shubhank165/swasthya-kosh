@@ -1,7 +1,7 @@
 [project]
 name = "medikiosk-backend"
-version = "0.1.0"
-description = "MediKiosk — Ayurveda-first pre-consultation clinical intake backend core"
+version = "0.2.0"
+description = "MediKiosk — clinical intake backend: kiosk ingest, document OCR, physician report"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
@@ -19,6 +19,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Cloud providers. Not installed locally, not needed for the laptop demo path:
+# `docker compose up` runs mock OCR, mock ABHA and local object storage.
+gcp = [
+    "google-cloud-storage>=2.18",
+    "google-cloud-pubsub>=2.23",
+    "google-cloud-secret-manager>=2.20",
+    "google-genai>=0.3",
+]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
@@ -41,35 +49,73 @@ packages = ["app"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-exclude = ["alembic/versions"]
+# `stale/` is code that no longer runs. It is kept, not maintained.
+exclude = ["alembic/versions", "stale"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "N", "ASYNC", "RUF"]
-ignore = ["B008", "RUF012"]
+ignore = [
+    "B008",
+    "RUF012",
+    # The ambiguous-unicode rules flag Devanagari digits and en dashes. Both are
+    # load-bearing here: the redaction patterns must match ०-९ because the OCR
+    # benchmark corpus printed Aadhaar numbers in Devanagari, and clinical
+    # ranges are conventionally printed with an en dash. Renaming either to
+    # satisfy a linter would break the thing it names.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# N818 wants every exception name to end in `Error`. These names are read in
+# logs and in API error payloads by people who are not Python programmers, and
+# `MissingTenantFilter` says what happened where `MissingTenantFilterError` says
+# it slightly worse. `UnsupportedSchemaVersion` is additionally named in the
+# implementation brief §4.2 and in the published error vocabulary.
+"app/normalize/registry.py" = ["N818"]
+"app/db/tenancy.py" = ["N818"]
+"app/repositories/documents.py" = ["N818"]
+"app/adapters/ocr/gemini.py" = ["N818"]
+"app/adapters/abha/providers.py" = ["N818"]
 
 [tool.mypy]
 python_version = "3.12"
 warn_unused_configs = true
-plugins = []
+exclude = ["^stale/", "^alembic/versions/"]
+plugins = ["pydantic.mypy"]
 
+# The record, the normalizers and the report builder are the parts a schema
+# change touches, and the parts where a silent `None` is a clinical error.
+# They are checked strictly; the I/O layers are not.
 [[tool.mypy.overrides]]
-module = "app.domain.*"
+module = ["app.domain.*", "app.normalize.*", "app.contracts.*"]
 strict = true
 disallow_any_generics = true
 warn_return_any = true
 
 [[tool.mypy.overrides]]
-module = ["yaml", "yaml.*"]
+module = ["yaml", "yaml.*", "google.*", "google.cloud.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+norecursedirs = ["stale", ".venv", "node_modules"]
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "network: requires outbound network access; deselect with -m 'not network'",
+]
 
 [tool.coverage.run]
-source = ["app/domain"]
+source = ["app"]
 branch = true
+omit = ["stale/*", "app/adapters/ocr/gemini.py", "app/adapters/llm/vertex.py"]
 
 [tool.coverage.report]
-exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "\\.\\.\\.", "raise NotImplementedError"]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "\\.\\.\\.",
+    "raise NotImplementedError",
+]

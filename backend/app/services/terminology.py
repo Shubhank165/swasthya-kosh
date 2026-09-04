@@ -124,37 +124,35 @@ class TerminologyService:
         version = rows[0].version if rows else "seed"
         return code_system_resource(
             system,
-            version,
             [
                 {"code": r.code, "display": r.display, "definition": r.definition}
                 for r in rows
             ],
+            version=version,
         )
 
     async def concept_map(self) -> dict[str, Any]:
-        """The ConceptMap as a FHIR resource, grouped by source/target system."""
+        """The ConceptMap as a FHIR resource.
+
+        The rows go to the mapper as they are stored. Grouping by source and
+        target system is the mapper's job — doing it here as well meant two
+        implementations of the same shape, and the one here was calling the
+        other with the wrong arguments.
+        """
         rows = await self._repository.all_mappings()
-        grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
-        for row in rows:
-            grouped.setdefault((row.source_system, row.target_system), []).append(
-                {
-                    "code": row.source_code,
-                    "target": [
-                        {
-                            "code": row.target_code,
-                            "equivalence": row.equivalence,
-                            **({"comment": row.note} if row.note else {}),
-                        }
-                    ],
-                }
-            )
         return concept_map_resource(
-            "namaste-tm2-mms",
-            "seed-0.1",
             [
-                {"source": source, "target": target, "element": elements}
-                for (source, target), elements in sorted(grouped.items())
+                {
+                    "source_system": row.source_system,
+                    "source_code": row.source_code,
+                    "target_system": row.target_system,
+                    "target_code": row.target_code,
+                    "equivalence": row.equivalence,
+                    "note": row.note,
+                }
+                for row in rows
             ],
+            name="namaste-tm2-mms",
         )
 
     async def value_set(self, system: str) -> dict[str, Any]:

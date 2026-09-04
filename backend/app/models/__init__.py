@@ -1,45 +1,45 @@
 """ORM models.
 
 Imported for their side effect of registering with `Base.metadata`, which is what
-Alembic autogenerate reads.
+Alembic autogenerate reads and what the tenancy test enumerates.
 """
 
 from app.models.base import Base
 from app.models.clinical import (
+    TENANT_COLUMN,
+    TENANT_EXEMPT_TABLES,
     AuditLogEntry,
     ClinicalFactRecord,
     ConsentArtefact,
+    DocumentItemRecord,
     DocumentRecordRow,
+    HospitalRecord,
     IdempotencyKeyRecord,
+    IngestRawRecord,
     IntakeRecord,
     PatientRecord,
-    RedFlagAlertRecord,
+    RedFlagEventRecord,
     ReportRecord,
     TerminologyConcept,
     TerminologyMapping,
 )
-from app.models.queue import (
-    DepartmentRecord,
-    QueueInstanceRecord,
-    QueueRecord,
-    TicketRecord,
-)
 
 __all__ = [
+    "TENANT_COLUMN",
+    "TENANT_EXEMPT_TABLES",
     "AuditLogEntry",
     "Base",
     "ClinicalFactRecord",
     "ConsentArtefact",
-    "DepartmentRecord",
+    "DocumentItemRecord",
     "DocumentRecordRow",
+    "HospitalRecord",
     "IdempotencyKeyRecord",
+    "IngestRawRecord",
     "IntakeRecord",
     "PatientRecord",
-    "QueueInstanceRecord",
-    "QueueRecord",
-    "RedFlagAlertRecord",
+    "RedFlagEventRecord",
     "ReportRecord",
     "TerminologyConcept",
     "TerminologyMapping",
-    "TicketRecord",
 ]

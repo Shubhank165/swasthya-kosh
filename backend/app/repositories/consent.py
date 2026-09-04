@@ -1,17 +1,19 @@
-"""Consent, document, audit, report and idempotency repositories.
+"""Consent, audit, report, raw-payload and idempotency repositories.
 
-Consent artefacts and audit entries are insert-only. A withdrawal writes a new
-artefact that supersedes the old one; nothing edits an existing consent row,
-because the point of the artefact is to prove what was shown at the time.
+Consent artefacts, audit entries and raw payloads are insert-only. A withdrawal
+writes a new artefact that supersedes the old one; nothing edits an existing
+consent row, because the point of the artefact is to prove what was shown at the
+time, and a row that can be edited proves nothing.
 """
 
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
@@ -19,8 +21,9 @@ from app.core.idempotency import IdempotencyRecord
 from app.models.clinical import (
     AuditLogEntry,
     ConsentArtefact,
-    DocumentRecordRow,
     IdempotencyKeyRecord,
+    IngestRawRecord,
+    IntakeRecord,
     ReportRecord,
 )
 
@@ -38,6 +41,7 @@ class ConsentRepository:
         self,
         *,
         artefact_id: str,
+        hospital_id: str,
         intake_id: str | None,
         patient_id: str | None,
         consent_version: str,
@@ -53,6 +57,7 @@ class ConsentRepository:
     ) -> ConsentArtefact:
         row = ConsentArtefact(
             id=artefact_id,
+            hospital_id=hospital_id,
             intake_id=intake_id,
             patient_id=patient_id,
             consent_version=consent_version,
@@ -71,108 +76,58 @@ class ConsentRepository:
         await self._session.flush()
         return row
 
-    async def get(self, artefact_id: str) -> ConsentArtefact | None:
-        return await self._session.get(ConsentArtefact, artefact_id)
+    async def get(self, *, hospital_id: str, artefact_id: str) -> ConsentArtefact | None:
+        result = await self._session.execute(
+            select(ConsentArtefact).where(
+                ConsentArtefact.hospital_id == hospital_id,
+                ConsentArtefact.id == artefact_id,
+            )
+        )
+        return result.scalar_one_or_none()
 
-    async def require(self, artefact_id: str) -> ConsentArtefact:
-        row = await self.get(artefact_id)
+    async def require(self, *, hospital_id: str, artefact_id: str) -> ConsentArtefact:
+        row = await self.get(hospital_id=hospital_id, artefact_id=artefact_id)
         if row is None:
             raise NotFoundError(
-                f"consent artefact {artefact_id} not found", details={"consent_id": artefact_id}
+                f"consent artefact {artefact_id} not found",
+                details={"consent_id": artefact_id},
             )
         return row
 
-    async def for_intake(self, intake_id: str) -> ConsentArtefact | None:
+    async def for_intake(
+        self, *, hospital_id: str, intake_id: str
+    ) -> ConsentArtefact | None:
         result = await self._session.execute(
             select(ConsentArtefact)
-            .where(ConsentArtefact.intake_id == intake_id)
-            .where(ConsentArtefact.withdrawn_at.is_(None))
+            .where(
+                ConsentArtefact.hospital_id == hospital_id,
+                ConsentArtefact.intake_id == intake_id,
+                ConsentArtefact.withdrawn_at.is_(None),
+            )
             .order_by(ConsentArtefact.granted_at.desc())
         )
         return result.scalars().first()
 
-    async def has_purpose(self, intake_id: str, purpose: str) -> bool:
+    async def has_purpose(self, *, hospital_id: str, intake_id: str, purpose: str) -> bool:
         """Whether a purpose was actually granted for this intake.
 
-        Used to gate raw audio retention, which is off unless the patient said
-        yes to that specific purpose — not merely to the intake as a whole.
+        Used to gate anything the patient must opt into specifically, rather
+        than treating consent to the intake as consent to everything.
         """
-        artefact = await self.for_intake(intake_id)
+        artefact = await self.for_intake(hospital_id=hospital_id, intake_id=intake_id)
         return artefact is not None and purpose in (artefact.granted_purposes or [])
 
 
-class DocumentRepository:
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
-
-    async def add(
-        self,
-        *,
-        document_id: str,
-        intake_id: str,
-        kind: str,
-        content_type: str,
-        storage_key: str,
-        byte_size: int,
-        uploaded_at: datetime,
-    ) -> DocumentRecordRow:
-        row = DocumentRecordRow(
-            id=document_id,
-            intake_id=intake_id,
-            kind=kind,
-            content_type=content_type,
-            storage_key=storage_key,
-            byte_size=byte_size,
-            uploaded_at=uploaded_at,
-        )
-        self._session.add(row)
-        await self._session.flush()
-        return row
-
-    async def mark_processed(
-        self,
-        document_id: str,
-        *,
-        processed_at: datetime,
-        page_count: int,
-        overall_confidence: float,
-        low_confidence: bool,
-        kind: str | None = None,
-    ) -> DocumentRecordRow:
-        row = await self._session.get(DocumentRecordRow, document_id)
-        if row is None:
-            raise NotFoundError(f"document {document_id} not found")
-        row.processed = True
-        row.processed_at = processed_at
-        row.page_count = page_count
-        row.overall_confidence = overall_confidence
-        row.low_confidence = low_confidence
-        if kind is not None:
-            row.kind = kind
-        await self._session.flush()
-        return row
-
-    async def get(self, document_id: str) -> DocumentRecordRow | None:
-        return await self._session.get(DocumentRecordRow, document_id)
-
-    async def for_intake(self, intake_id: str) -> tuple[DocumentRecordRow, ...]:
-        result = await self._session.execute(
-            select(DocumentRecordRow)
-            .where(DocumentRecordRow.intake_id == intake_id)
-            .order_by(DocumentRecordRow.uploaded_at)
-        )
-        return tuple(result.scalars().all())
-
-
 class AuditRepository:
-    """Append-only audit log. Insert is the only operation offered."""
+    """Append-only audit log."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def record(
+    async def write(
         self,
         *,
+        hospital_id: str,
         occurred_at: datetime,
         actor_id: str,
         actor_role: str,
@@ -183,33 +138,42 @@ class AuditRepository:
         after: dict[str, Any] | None = None,
         reason: str | None = None,
         request_id: str | None = None,
-    ) -> None:
-        self._session.add(
-            AuditLogEntry(
-                occurred_at=occurred_at,
-                actor_id=actor_id,
-                actor_role=actor_role,
-                action=action,
-                entity_type=entity_type,
-                entity_id=entity_id,
-                before=before,
-                after=after,
-                reason=reason,
-                request_id=request_id,
-            )
+    ) -> AuditLogEntry:
+        row = AuditLogEntry(
+            hospital_id=hospital_id,
+            occurred_at=occurred_at,
+            actor_id=actor_id,
+            actor_role=actor_role,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            before=before,
+            after=after,
+            reason=reason,
+            request_id=request_id,
         )
+        self._session.add(row)
         await self._session.flush()
+        return row
 
-    async def for_entity(self, entity_type: str, entity_id: str) -> tuple[AuditLogEntry, ...]:
+    async def for_entity(
+        self, *, hospital_id: str, entity_id: str, limit: int = 100
+    ) -> Sequence[AuditLogEntry]:
         result = await self._session.execute(
             select(AuditLogEntry)
-            .where(AuditLogEntry.entity_type == entity_type, AuditLogEntry.entity_id == entity_id)
-            .order_by(AuditLogEntry.occurred_at)
+            .where(
+                AuditLogEntry.hospital_id == hospital_id,
+                AuditLogEntry.entity_id == entity_id,
+            )
+            .order_by(AuditLogEntry.occurred_at.desc())
+            .limit(limit)
         )
-        return tuple(result.scalars().all())
+        return list(result.scalars())
 
 
 class ReportRepository:
+    """Generated reports and their verification state."""
+
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
@@ -217,68 +181,201 @@ class ReportRepository:
         self,
         *,
         report_id: str,
+        hospital_id: str,
         intake_id: str,
-        intake_revision: int,
-        coverage_percentage: float,
+        language: str,
+        template_version: str,
         body: dict[str, Any],
         generated_at: datetime,
         service_date: date | None = None,
     ) -> ReportRecord:
-        """Store the latest report for an intake.
+        """Store a report, replacing an earlier one for the same language.
 
-        One report row per intake, regenerated as the history grows. The facts
-        behind it are versioned in `clinical_facts`, so nothing is lost by
-        overwriting the rendered view.
+        Regenerating is normal: a document arrives after ingest and the report
+        changes. Physician verification is preserved across a regeneration
+        rather than reset — the physician verified *facts*, and the facts they
+        verified are still there.
         """
-        existing = await self._session.execute(
-            select(ReportRecord).where(ReportRecord.intake_id == intake_id)
+        existing = await self.get(
+            hospital_id=hospital_id, intake_id=intake_id, language=language
         )
-        row = existing.scalars().first()
-        if row is None:
-            row = ReportRecord(
-                id=report_id,
-                intake_id=intake_id,
-                intake_revision=intake_revision,
-                coverage_percentage=coverage_percentage,
-                body=body,
-                generated_at=generated_at,
-                service_date=service_date,
-            )
-            self._session.add(row)
-        else:
-            row.intake_revision = intake_revision
-            row.coverage_percentage = coverage_percentage
-            row.body = body
-            row.generated_at = generated_at
+        if existing is not None:
+            existing.body = body
+            existing.template_version = template_version
+            existing.generated_at = generated_at
+            existing.service_date = service_date
+            await self._session.flush()
+            return existing
+        row = ReportRecord(
+            id=report_id,
+            hospital_id=hospital_id,
+            intake_id=intake_id,
+            language=language,
+            template_version=template_version,
+            body=body,
+            generated_at=generated_at,
+            service_date=service_date,
+        )
+        self._session.add(row)
         await self._session.flush()
         return row
 
-    async def for_intake(self, intake_id: str) -> ReportRecord | None:
+    async def get(
+        self, *, hospital_id: str, intake_id: str, language: str
+    ) -> ReportRecord | None:
         result = await self._session.execute(
-            select(ReportRecord).where(ReportRecord.intake_id == intake_id)
+            select(ReportRecord).where(
+                ReportRecord.hospital_id == hospital_id,
+                ReportRecord.intake_id == intake_id,
+                ReportRecord.language == language,
+            )
         )
-        return result.scalars().first()
+        return result.scalar_one_or_none()
 
     async def mark_verified(
-        self, intake_id: str, *, physician_id: str, verified_at: datetime
+        self, *, hospital_id: str, intake_id: str, language: str, actor_id: str, at: datetime
     ) -> ReportRecord:
-        row = await self.for_intake(intake_id)
+        row = await self.get(
+            hospital_id=hospital_id, intake_id=intake_id, language=language
+        )
         if row is None:
-            raise NotFoundError(f"no report for intake {intake_id}")
-        row.physician_verified_by = physician_id
-        row.physician_verified_at = verified_at
+            raise NotFoundError(f"no {language} report for intake {intake_id}")
+        row.physician_verified_by = actor_id
+        row.physician_verified_at = at
         await self._session.flush()
         return row
 
 
-class SqlIdempotencyStore:
-    """Postgres-backed idempotency store. What production runs."""
+class IngestRawRepository:
+    """Payloads that could not be normalised.
+
+    **Never discard input.** A payload the parser could not handle is still
+    seven minutes of a patient's answers, and the row keeps it whole so a human
+    or a later normalizer can recover the intake.
+    """
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
+    async def store(
+        self,
+        *,
+        record_id: str,
+        hospital_id: str,
+        claimed_intake_id: str | None,
+        schema_version: str | None,
+        reason: str,
+        error_detail: dict[str, Any],
+        payload: dict[str, Any],
+        payload_fingerprint: str,
+        repair_attempted: bool,
+        received_at: datetime,
+    ) -> IngestRawRecord:
+        row = IngestRawRecord(
+            id=record_id,
+            hospital_id=hospital_id,
+            claimed_intake_id=claimed_intake_id,
+            schema_version=schema_version,
+            reason=reason,
+            error_detail=error_detail,
+            payload=payload,
+            payload_fingerprint=payload_fingerprint,
+            repair_attempted=repair_attempted,
+            received_at=received_at,
+        )
+        self._session.add(row)
+        await self._session.flush()
+        return row
+
+    async def pending(
+        self, *, hospital_id: str, limit: int = 100
+    ) -> Sequence[IngestRawRecord]:
+        result = await self._session.execute(
+            select(IngestRawRecord)
+            .where(
+                IngestRawRecord.hospital_id == hospital_id,
+                IngestRawRecord.resolved_at.is_(None),
+            )
+            .order_by(IngestRawRecord.received_at)
+            .limit(limit)
+        )
+        return list(result.scalars())
+
+    async def by_fingerprint(
+        self, *, hospital_id: str, fingerprint: str
+    ) -> IngestRawRecord | None:
+        result = await self._session.execute(
+            select(IngestRawRecord).where(
+                IngestRawRecord.hospital_id == hospital_id,
+                IngestRawRecord.payload_fingerprint == fingerprint,
+            )
+        )
+        return result.scalars().first()
+
+
+class MetricsRepository:
+    """Counters worth stating out loud.
+
+    `repair_rate` is the one that matters: it should fall as the Jetson's
+    extractor improves, and a number that moves in the right direction over a
+    fortnight is a better argument than any slide.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def repair_rate(self, *, hospital_id: str) -> dict[str, float | int]:
+        total_result = await self._session.execute(
+            select(func.count(IntakeRecord.id)).where(
+                IntakeRecord.hospital_id == hospital_id
+            )
+        )
+        total = total_result.scalar()
+        repaired_result = await self._session.execute(
+            select(func.count(IntakeRecord.id)).where(
+                IntakeRecord.hospital_id == hospital_id,
+                IntakeRecord.repaired.is_(True),
+            )
+        )
+        manual_result = await self._session.execute(
+            select(func.count(IntakeRecord.id)).where(
+                IntakeRecord.hospital_id == hospital_id,
+                IntakeRecord.needs_manual_review.is_(True),
+            )
+        )
+        repaired = int(repaired_result.scalar() or 0)
+        manual = int(manual_result.scalar() or 0)
+        total_int = int(total or 0)
+        return {
+            "intakes": total_int,
+            "repaired": repaired,
+            "needs_manual_review": manual,
+            "repair_rate": round(repaired / total_int, 4) if total_int else 0.0,
+        }
+
+
+class SqlIdempotencyStore:
+    """Postgres-backed idempotency records.
+
+    Scoped to a hospital like everything else. A key is client-supplied, so
+    without the scope one hospital's kiosk could — accidentally or otherwise —
+    replay into another's namespace and be handed a response about a patient it
+    has no business knowing exists.
+    """
+
+    def __init__(self, session: AsyncSession, *, hospital_id: str) -> None:
+        self._session = session
+        self._hospital_id = hospital_id
+
     async def get(self, key: str, endpoint: str) -> IdempotencyRecord | None:
-        row = await self._session.get(IdempotencyKeyRecord, (key, endpoint))
+        result = await self._session.execute(
+            select(IdempotencyKeyRecord).where(
+                IdempotencyKeyRecord.hospital_id == self._hospital_id,
+                IdempotencyKeyRecord.key == key,
+                IdempotencyKeyRecord.endpoint == endpoint,
+            )
+        )
+        row = result.scalar_one_or_none()
         if row is None:
             return None
         return IdempotencyRecord(
@@ -295,6 +392,7 @@ class SqlIdempotencyStore:
             IdempotencyKeyRecord(
                 key=record.key,
                 endpoint=record.endpoint,
+                hospital_id=self._hospital_id,
                 request_fingerprint=record.request_fingerprint,
                 response_body=record.response_body,
                 status_code=record.status_code,

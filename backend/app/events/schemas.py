@@ -15,41 +15,34 @@ from typing import Any
 
 
 class EventName(StrEnum):
-    """The complete published event vocabulary."""
+    """The complete published event vocabulary.
 
-    INTAKE_STARTED = "intake.started"
+    Note the tense. `intake.received` and `intake.redflag.received` — not
+    `started`, not `raised`. The backend does not start intakes and does not
+    raise red flags; the Jetson does both, and these events record their
+    arrival. The name is the clearest place to say which side owns the decision.
+    """
+
+    INTAKE_RECEIVED = "intake.received"
     INTAKE_UPDATED = "intake.updated"
-    INTAKE_READY = "intake.ready"
-    INTAKE_CONFIRMED = "intake.confirmed"
-    INTAKE_ABANDONED = "intake.abandoned"
+    INTAKE_NEEDS_REVIEW = "intake.needs_review"
+    INTAKE_SEEN = "intake.seen"
 
-    REDFLAG_RAISED = "intake.redflag.raised"
+    #: A criterion that fired on the device, arriving here.
+    REDFLAG_RECEIVED = "intake.redflag.received"
     REDFLAG_ACKNOWLEDGED = "intake.redflag.acknowledged"
-    REDFLAG_DISMISSED = "intake.redflag.dismissed"
 
     DOCUMENT_UPLOADED = "document.uploaded"
     DOCUMENT_PROCESSED = "document.processed"
     DOCUMENT_LOW_CONFIDENCE = "document.low_confidence"
+    DOCUMENT_REJECTED = "document.rejected"
 
-    TICKET_ISSUED = "queue.ticket.issued"
-    TICKET_CALLED = "queue.ticket.called"
-    TICKET_RECALLED = "queue.ticket.recalled"
-    TICKET_STARTED = "queue.ticket.started"
-    TICKET_COMPLETED = "queue.ticket.completed"
-    TICKET_NO_SHOW = "queue.ticket.no_show"
-    TICKET_DEFERRED = "queue.ticket.deferred"
-    TICKET_TRANSFERRED = "queue.ticket.transferred"
-    TICKET_ESCALATED = "queue.ticket.escalated"
-    TICKET_CANCELLED = "queue.ticket.cancelled"
-    TICKET_OVERTAKEN = "queue.ticket.overtaken"
-
-    INSTANCE_OPENED = "queue.instance.opened"
-    INSTANCE_PAUSED = "queue.instance.paused"
-    INSTANCE_RESUMED = "queue.instance.resumed"
-    INSTANCE_CLOSED = "queue.instance.closed"
+    CONTRADICTION_DETECTED = "intake.contradiction.detected"
 
     REPORT_READY = "report.ready"
     REPORT_PHYSICIAN_VERIFIED = "report.physician_verified"
+
+    CONSENT_RECORDED = "consent.recorded"
 
 
 #: Payload keys that may never appear on an event. Enforced by `Event.__post_init__`
@@ -90,9 +83,7 @@ class Event:
     #: Fan-out key: the dashboard subscribes by department.
     department_code: str | None = None
     intake_id: str | None = None
-    ticket_id: str | None = None
-    queue_id: str | None = None
-    instance_id: str | None = None
+    report_id: str | None = None
     alert_id: str | None = None
     document_id: str | None = None
     actor_id: str | None = None
@@ -115,9 +106,7 @@ class Event:
         for key, value in (
             ("department_code", self.department_code),
             ("intake_id", self.intake_id),
-            ("ticket_id", self.ticket_id),
-            ("queue_id", self.queue_id),
-            ("instance_id", self.instance_id),
+            ("report_id", self.report_id),
             ("alert_id", self.alert_id),
             ("document_id", self.document_id),
             ("actor_id", self.actor_id),

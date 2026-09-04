@@ -1,157 +1,81 @@
 """Provider protocols.
 
-Every place a cloud model could later plug in is defined here as a Protocol, and
-implemented in this build only by deterministic mocks. That is the point of the
-whole exercise: when Vertex AI, Sarvam or an OCR service arrives, nothing above
-the adapters package changes, and the offline path keeps working.
+Every place a cloud service could plug in is a Protocol here, implemented in
+this build by a deterministic mock and by one real adapter that is config-gated.
+When Vertex credentials arrive, or a hospital insists nothing leaves the
+building, the change is an environment variable — nothing above `app/adapters/`
+knows which implementation is live.
 
-Note what is NOT a protocol. There is no `NextQuestionProvider`, no
-`CompletenessJudge`, no `RedFlagClassifier`. Those decisions belong to the
-deterministic engine, permanently.
+Note what is deliberately **not** a protocol. There is no `NextQuestionProvider`,
+no `RedFlagClassifier`, no `ReportWriter`. Question selection and red-flag
+evaluation live on the Jetson, permanently; the report is a template,
+permanently. A protocol here would be an invitation to wire a model into a path
+that must not have one.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
-from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from app.domain.clinical.fact import ClinicalFact
-from app.domain.clinical.patient_state import PatientIntakeState
-from app.domain.statemachine.engine import Step
-
-
-@dataclass(frozen=True, slots=True)
-class TranscriptSegment:
-    """One recognised span of speech."""
-
-    segment_id: str
-    text: str
-    language: str
-    start_ms: int
-    end_ms: int
-    confidence: float
-    is_final: bool = True
-
-
-@dataclass(frozen=True, slots=True)
-class AudioChunk:
-    """A slice of PCM audio on its way to or from a provider."""
-
-    data: bytes
-    sample_rate_hz: int = 16_000
-    sequence: int = 0
-
-
-@dataclass(frozen=True, slots=True)
-class DocumentPage:
-    """One page of an uploaded document."""
-
-    page: int
-    text: str
-    confidence: float
-
-
-@dataclass(frozen=True, slots=True)
-class DocumentExtraction:
-    """What an OCR provider read off a document.
-
-    `facts` are candidates only. They enter the record as unverified,
-    document-sourced facts with the bounding box that produced them, and they
-    stay `physician_verified = False` until a physician acts.
-    """
-
-    document_id: str
-    pages: tuple[DocumentPage, ...]
-    facts: tuple[ClinicalFact, ...] = field(default_factory=tuple)
-    overall_confidence: float = 0.0
-    #: True when the provider itself is unsure. Surfaces on the report as an
-    #: explicit "verify against the original" line rather than being hidden.
-    low_confidence: bool = False
-    document_kind: str = "other"
-
-
-@dataclass(frozen=True, slots=True)
-class EncounterRef:
-    """An encounter owned by a hospital HMIS, in SHADOW mode."""
-
-    encounter_id: str
-    patient_id: str
-    department_code: str
-    token_number: str | None = None
-    scheduled_at: str | None = None
-
-
-class STTProvider(Protocol):
-    """Speech to text."""
-
-    async def transcribe_stream(
-        self, audio: AsyncIterator[AudioChunk], *, language: str
-    ) -> AsyncIterator[TranscriptSegment]: ...
-
-
-class TTSProvider(Protocol):
-    """Text to speech. Receives a question string the state machine authored."""
-
-    async def synthesize_stream(
-        self, text: str, *, language: str
-    ) -> AsyncIterator[AudioChunk]: ...
-
-
-class ClinicalExtractor(Protocol):
-    """Turns an utterance into candidate facts.
-
-    It is given the current state so it can attach facts to the concept that was
-    actually asked. It may not choose what to ask next, and its output is
-    candidate facts — never the record itself.
-    """
-
-    async def extract(
-        self, utterance: TranscriptSegment, state: PatientIntakeState, *, step: Step | None = None
-    ) -> Sequence[ClinicalFact]: ...
-
-
-class QuestionRenderer(Protocol):
-    """Turns a `Step` into the words a patient hears.
-
-    A generative renderer may vary phrasing and register. It receives the step
-    already chosen; it cannot change the concept, the order or the answer shape.
-    """
-
-    async def render(self, step: Step, *, language: str) -> str: ...
+from app.domain.documents.extraction import DocumentExtraction
+from app.domain.record import DocumentKind
 
 
 class OCRProvider(Protocol):
-    """Reads an uploaded prescription or report."""
+    """Reads an uploaded prescription, report or discharge summary.
 
-    async def process(
-        self, document_id: str, content: bytes, *, content_type: str
+    `hint` is what the uploader claimed the document is. The provider may
+    disagree — the classification it returns is what counts.
+    """
+
+    name: str
+
+    async def read(
+        self, image: bytes, *, document_id: str, hint: DocumentKind | None = None
     ) -> DocumentExtraction: ...
 
 
-class HISAdapter(Protocol):
-    """Hospital information system integration, used in SHADOW mode."""
+class RepairProvider(Protocol):
+    """Restructures a malformed kiosk payload into the target schema.
 
-    async def resolve_encounter(self, identifier: str) -> EncounterRef | None: ...
+    **The only place a language model touches clinical input.** It restructures;
+    it does not extract, infer or interpret. See `app/services/repair.py` for the
+    instruction it is given and the re-validation it is subject to.
+    """
 
-    async def push_intake_summary(self, intake_id: str, summary: dict[str, Any]) -> bool: ...
+    name: str
 
-    async def subscribe_queue_events(self) -> AsyncIterator[dict[str, Any]]: ...
-
-
-class FHIRMapper(Protocol):
-    """Maps an intake to a FHIR R4 Bundle."""
-
-    def to_bundle(self, state: PatientIntakeState) -> dict[str, Any]: ...
+    async def repair(
+        self, payload: dict[str, Any], *, schema: dict[str, Any], errors: list[dict[str, Any]]
+    ) -> dict[str, Any] | None: ...
 
 
-class ABDMAdapter(Protocol):
-    """ABHA identity and consent linkage.
+class ABHAProvider(Protocol):
+    """ABHA identity verification.
 
     ABHA is an identity and consent-linking mechanism, not a database of the
     patient's history, and it is never required for basic intake.
     """
 
-    async def verify_abha(self, abha_address: str) -> dict[str, Any] | None: ...
+    name: str
 
-    async def link_care_context(self, abha_address: str, intake_id: str) -> bool: ...
+    async def verify(self, abha_address: str) -> dict[str, Any] | None: ...
+
+
+class ObjectStore(Protocol):
+    """Where document images live.
+
+    Never public. Reads go through a signed URL with a short expiry, because a
+    document link that outlives the consultation is a document link that ends up
+    in a WhatsApp group.
+    """
+
+    name: str
+
+    async def put(self, key: str, data: bytes, *, content_type: str) -> str: ...
+
+    async def get(self, key: str) -> bytes: ...
+
+    async def signed_url(self, key: str, *, ttl_seconds: int) -> str: ...
+
+    async def delete(self, key: str) -> None: ...

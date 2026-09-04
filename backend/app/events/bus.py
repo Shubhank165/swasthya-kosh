@@ -1,9 +1,17 @@
 """Event bus.
 
-One protocol, two implementations. `InProcessBus` is what tests and a single-node
-on-prem deployment run; `PubSubBus` is the cloud shape and is where NATS would
-slot in for a hospital that wants a broker. Nothing above this module knows
-which is in use.
+One protocol, one implementation: synchronous fan-out within a process, which
+is what drives the dashboard sockets and the demo timeline.
+
+There used to be a `PubSubBus` here that raised `NotImplementedError` from every
+method, and an `EVENT_BUS` setting that selected it. Both are gone. Cross-
+instance fan-out needs a broker-backed bus that nothing in this build
+implements, and a config switch that appears to offer it is worse than not
+offering it — somebody sets `EVENT_BUS=pubsub`, sees no error at startup, and
+believes a second API instance is receiving events.
+
+What genuinely does span instances is the OCR work queue, which is a different
+problem with a real implementation: see `app.adapters.queue.dispatch`.
 """
 
 from __future__ import annotations
@@ -74,34 +82,6 @@ class InProcessBus:
 
     def clear(self) -> None:
         self._published.clear()
-
-
-class PubSubBus:
-    """Cloud fan-out.
-
-    Deliberately unimplemented in this build: the protocol and the wiring exist
-    so the swap is a config change, but there is no cloud dependency to break in
-    CI and nothing here pretends to work.
-    """
-
-    def __init__(self, topic: str) -> None:
-        self._topic = topic
-        self._local = InProcessBus()
-
-    def subscribe(
-        self, handler: Handler, *, names: Sequence[EventName] | None = None
-    ) -> None:
-        self._local.subscribe(handler, names=names)
-
-    async def publish(self, event: Event) -> None:
-        raise NotImplementedError(
-            "PubSubBus is a placeholder for the cloud profile; this build runs InProcessBus"
-        )
-
-    async def publish_all(self, events: Sequence[Event]) -> None:
-        raise NotImplementedError(
-            "PubSubBus is a placeholder for the cloud profile; this build runs InProcessBus"
-        )
 
 
 _bus: InProcessBus | None = None

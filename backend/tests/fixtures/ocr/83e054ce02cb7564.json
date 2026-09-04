@@ -1,0 +1,118 @@
+{
+  "kind": "prescription",
+  "page_count": 1,
+  "overall_confidence": 0.94,
+  "document_date": "2026-08-14",
+  "issuing_facility": "All India Institute of Ayurveda OPD",
+  "page_text": [
+    "All India Institute of Ayurveda OPD\nDate: 14/08/2026\nRx\n1. Tab. Metformin 500 mg BD x 30 days\n2. Tab. Amlodipine 5 mg OD x 30 days\n3. Tab. Ecosprin 75 mg OD x 30 days\n4. Tab. Clopidogrel 75 mg OD x 30 days\n5. Cap. Omeprazole 20 mg OD x 14 days\n"
+  ],
+  "items": [
+    {
+      "item_id": "item_rx1",
+      "kind": "medicine",
+      "raw_text": "Tab. Metformin 500 mg BD x 30 days",
+      "page": 1,
+      "bbox": {
+        "x": 0.1,
+        "y": 0.32,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.96,
+      "medicine": {
+        "name": "Metformin",
+        "dose_magnitude": 500,
+        "dose_unit": "mg",
+        "frequency": "BD",
+        "duration": "30 days",
+        "ingredient_key": "metformin"
+      }
+    },
+    {
+      "item_id": "item_rx2",
+      "kind": "medicine",
+      "raw_text": "Tab. Amlodipine 5 mg OD x 30 days",
+      "page": 1,
+      "bbox": {
+        "x": 0.1,
+        "y": 0.38,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.95,
+      "medicine": {
+        "name": "Amlodipine",
+        "dose_magnitude": 5,
+        "dose_unit": "mg",
+        "frequency": "OD",
+        "duration": "30 days",
+        "ingredient_key": "amlodipine"
+      }
+    },
+    {
+      "item_id": "item_rx3",
+      "kind": "medicine",
+      "raw_text": "Tab. Ecosprin 75 mg OD x 30 days",
+      "page": 1,
+      "bbox": {
+        "x": 0.1,
+        "y": 0.44,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.93,
+      "medicine": {
+        "name": "Ecosprin",
+        "dose_magnitude": 75,
+        "dose_unit": "mg",
+        "frequency": "OD",
+        "duration": "30 days",
+        "ingredient_key": "aspirin"
+      }
+    },
+    {
+      "item_id": "item_rx4",
+      "kind": "medicine",
+      "raw_text": "Tab. Clopidogrel 75 mg OD x 30 days",
+      "page": 1,
+      "bbox": {
+        "x": 0.1,
+        "y": 0.5,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.94,
+      "medicine": {
+        "name": "Clopidogrel",
+        "dose_magnitude": 75,
+        "dose_unit": "mg",
+        "frequency": "OD",
+        "duration": "30 days",
+        "ingredient_key": "clopidogrel"
+      }
+    },
+    {
+      "item_id": "item_rx5",
+      "kind": "medicine",
+      "raw_text": "Cap. Omeprazole 20 mg OD x 14 days",
+      "page": 1,
+      "bbox": {
+        "x": 0.1,
+        "y": 0.56,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.92,
+      "medicine": {
+        "name": "Omeprazole",
+        "dose_magnitude": 20,
+        "dose_unit": "mg",
+        "frequency": "OD",
+        "duration": "14 days",
+        "ingredient_key": "omeprazole"
+      }
+    }
+  ],
+  "_fixture_name": "prescription_clean"
+}

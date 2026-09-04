@@ -1,0 +1,44 @@
+{
+  "kind": "prescription",
+  "page_count": 1,
+  "overall_confidence": 0.88,
+  "page_text": [
+    "Patient: [name]\nAadhaar: 4321 8765 2109\nMobile: 9876543210\nRx: Tab. Metformin 500 mg BD\n"
+  ],
+  "items": [
+    {
+      "item_id": "item_leak1",
+      "kind": "other",
+      "raw_text": "Aadhaar: 4321 8765 2109  Mobile: 9876543210",
+      "page": 1,
+      "bbox": {
+        "x": 0.08,
+        "y": 0.12,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.88
+    },
+    {
+      "item_id": "item_leak2",
+      "kind": "medicine",
+      "raw_text": "Tab. Metformin 500 mg BD",
+      "page": 1,
+      "bbox": {
+        "x": 0.08,
+        "y": 0.3,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.94,
+      "medicine": {
+        "name": "Metformin",
+        "dose_magnitude": 500,
+        "dose_unit": "mg",
+        "frequency": "BD",
+        "ingredient_key": "metformin"
+      }
+    }
+  ],
+  "_fixture_name": "contains_aadhaar"
+}

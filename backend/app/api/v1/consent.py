@@ -1,24 +1,22 @@
-"""Consent endpoints.
+"""Consent — §9.
 
-The artefact is the deliverable here, not the boolean. DPDP Act 2023 requires we
-can produce what was shown, in which language, when, and who granted it — so the
-response carries the notice hash and the exact purpose codes, and there is no
-endpoint that edits an artefact once written.
+Consent is stored as a record you could produce in an audit: the exact text
+shown, the language it was shown in, the audio actually played, the purposes
+granted, when, and by whom. Not a boolean.
+
+The DPDP Act 2023 requires we can produce this. A boolean would not survive a
+single question from a regulator, and it would not survive one from a patient
+either.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, status
 
-from app.api.deps import (
-    ConsentRepoDep,
-    IdempotencyDep,
-    IntakeServiceDep,
-    PrincipalDep,
-    idempotent,
-)
+from app.api.auth import RequireKioskOrStaff, RequireStaff
+from app.api.deps import ClockDep, ConsentRepoDep, IdsDep
 from app.models.clinical import ConsentArtefact
-from app.schemas.intake import ConsentOut, ConsentRequest
+from app.schemas.api import ConsentOut, ConsentRequest
 
 router = APIRouter(prefix="/consent", tags=["consent"])
 
@@ -33,54 +31,60 @@ def _out(row: ConsentArtefact) -> ConsentOut:
         granted_purposes=list(row.granted_purposes or []),
         refused_purposes=list(row.refused_purposes or []),
         granting_party=row.granting_party,
-        granted_at=row.granted_at.isoformat(),
-        withdrawn_at=row.withdrawn_at.isoformat() if row.withdrawn_at else None,
+        granted_at=row.granted_at,
+        withdrawn_at=row.withdrawn_at,
     )
 
 
-@router.post("", response_model=ConsentOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ConsentOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Record a consent artefact",
+)
 async def record_consent(
-    body: ConsentRequest,
-    service: IntakeServiceDep,
-    consent: ConsentRepoDep,
-    guard: IdempotencyDep,
-    _: PrincipalDep,
+    principal: RequireKioskOrStaff,
+    repository: ConsentRepoDep,
+    clock: ClockDep,
+    ids: IdsDep,
+    request: ConsentRequest,
 ) -> ConsentOut:
-    """Record what the patient agreed to.
+    """Store what the patient actually agreed to.
 
-    Refusing the base intake purpose is a valid outcome: the patient sees the
-    doctor without a kiosk history, and their place in the queue is untouched.
+    Immutable. A withdrawal or a re-take writes a new artefact that supersedes
+    this one; nothing edits a row here, because a row that can be edited proves
+    nothing about what was shown at the time.
     """
+    row = await repository.record(
+        artefact_id=ids.new_id("consent"),
+        hospital_id=principal.hospital_id,
+        intake_id=request.intake_id,
+        patient_id=request.patient_id,
+        consent_version=request.consent_version,
+        language=request.language,
+        notice_text=request.notice_text,
+        granted_purposes=request.granted_purposes,
+        refused_purposes=request.refused_purposes,
+        granting_party=request.granting_party,
+        granting_party_name=request.granting_party_name,
+        audio_asset_id=request.audio_asset_id,
+        granted_at=clock.now(),
+    )
+    return _out(row)
 
-    async def produce() -> ConsentOut:
-        artefact_id = await service.record_consent(
-            body.intake_id,
-            language=body.language,
-            granted_purposes=body.granted_purposes,
-            refused_purposes=body.refused_purposes,
-            granting_party=body.granting_party.value,
-            granting_party_name=body.granting_party_name,
-            audio_asset_id=body.audio_asset_id,
-        )
-        return _out(await consent.require(artefact_id))
 
-    return await idempotent(guard, ConsentOut, produce)
-
-
-@router.get("/{consent_id}", response_model=ConsentOut)
+@router.get(
+    "/{consent_id}",
+    response_model=ConsentOut,
+    summary="Retrieve a consent artefact",
+)
 async def get_consent(
-    consent_id: str, consent: ConsentRepoDep, _: PrincipalDep
+    consent_id: str,
+    principal: RequireStaff,
+    repository: ConsentRepoDep,
 ) -> ConsentOut:
-    return _out(await consent.require(consent_id))
-
-
-@router.get("/intake/{intake_id}/audio-retention", response_model=dict[str, bool])
-async def audio_retention(
-    intake_id: str, service: IntakeServiceDep, _: PrincipalDep
-) -> dict[str, bool]:
-    """Whether raw audio may be kept for this intake.
-
-    Two independent gates: the facility setting and the patient's own grant of
-    the `raw_audio_retention` purpose. Both must say yes.
-    """
-    return {"permitted": await service.audio_retention_permitted(intake_id)}
+    return _out(
+        await repository.require(
+            hospital_id=principal.hospital_id, artefact_id=consent_id
+        )
+    )

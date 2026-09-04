@@ -1,0 +1,146 @@
+# हिन्दी report wording.
+#
+# Written as Hindi, not translated from the English file at runtime. The two
+# files are reviewed separately and are allowed to differ in phrasing where
+# clinical Hindi differs from clinical English.
+#
+# `not_established` is the line that matters most. It must read as "यह जानकारी
+# प्राप्त नहीं हुई" — the information was not obtained — and must never read as
+# "नहीं" or "अनुपस्थित", which would turn an unasked question into a denial in a
+# document a physician acts on.
+#
+# STATUS: engineer-authored Hindi. Pending review by a Hindi-speaking clinician
+# at AIIA before any deployment carrying real patients. Recorded in
+# docs/DECISIONS.md.
+
+strings:
+  header_disclaimer: >-
+    प्रारंभिक परामर्श-पूर्व विवरण — रोगी द्वारा बताया गया, चिकित्सक द्वारा
+    सत्यापित नहीं। इस दस्तावेज़ में कोई निदान नहीं है और कोई चिकित्सकीय सलाह
+    नहीं है।
+
+  footer_disclaimer: >-
+    MediKiosk द्वारा रोगी के उत्तरों और अपलोड किए गए दस्तावेज़ों से तैयार।
+    उपयोग से पहले प्रत्येक पंक्ति का चिकित्सक द्वारा सत्यापन आवश्यक है।
+
+  unresolved_title: "अप्राप्त जानकारी"
+  conflicts_title: "जानकारी में विरोधाभास"
+  safety_title: "सुरक्षा"
+  interactions_title: "औषधि समीक्षा"
+
+  nothing_recorded: "कुछ दर्ज नहीं।"
+  nothing_outstanding: "कुछ शेष नहीं।"
+  no_conflicts: "आज के उत्तरों और पूर्व अभिलेखों के बीच कोई विरोधाभास नहीं मिला।"
+  no_alerts: "उपकरण पर कोई तत्काल समीक्षा मानदंड सक्रिय नहीं हुआ।"
+  no_interactions: "सूचीबद्ध औषधियों में कोई प्रमाणित पारस्परिक क्रिया नहीं मिली।"
+
+  not_established: "{field} — जानकारी प्राप्त नहीं हुई"
+  declined_to_answer: "{field} — रोगी ने उत्तर देने से मना किया"
+  not_applicable: "{field} — लागू नहीं"
+
+  denies: "{field} से इनकार"
+  patient_said: "रोगी ने कहा: \"{text}\""
+
+  repaired_marker: "अमान्य इनपुट से पुनर्गठित — सत्यापित करें"
+  verify_marker: "कम विश्वसनीयता से पढ़ा गया — मूल दस्तावेज़ से मिलाएँ"
+  approximate_marker: "अनुमानित"
+  uncertain_marker: "अनिश्चित"
+  unverified_marker: "असत्यापित"
+  attendant_marker: "परिजन द्वारा बताया गया"
+
+  conflict_today: "आज रोगी ने"
+  conflict_record: "पूर्व अभिलेख"
+  conflict_not_mentioned: "उल्लेख नहीं"
+  conflict_resolution: "चिकित्सक द्वारा सत्यापन आवश्यक"
+
+  alert_awaiting: "स्वीकृति प्रतीक्षित"
+  alert_acknowledged: "{actor} द्वारा स्वीकृत"
+
+  document_unprocessed: "{document} अपलोड हुआ, अभी संसाधित नहीं"
+  document_low_confidence: "{document} कम विश्वसनीयता से पढ़ा गया — मूल से मिलाएँ"
+  document_rejected: "{document} पढ़ा नहीं जा सका ({reason}) — नई तस्वीर आवश्यक है"
+
+  interaction_prompt: "इन दोनों में पारस्परिक क्रिया संभव है — कृपया समीक्षा करें।"
+
+  range_below: "इस रिपोर्ट पर छपी संदर्भ सीमा से कम"
+  range_above: "इस रिपोर्ट पर छपी संदर्भ सीमा से अधिक"
+  range_unavailable: "इस रिपोर्ट पर कोई संदर्भ सीमा नहीं छपी — तुलना नहीं की गई"
+
+  demo_banner: "प्रदर्शन मोड — यह विवरण नमूना डेटा से तैयार किया गया है।"
+
+sections:
+  identity: "रोगी"
+  chief_complaint: "मुख्य शिकायत"
+  hpi: "वर्तमान बीमारी का विवरण"
+  past_medical: "पूर्व चिकित्सा इतिहास"
+  past_surgical: "पूर्व शल्य इतिहास"
+  medications: "औषधि इतिहास"
+  allergies: "एलर्जी"
+  family_history: "पारिवारिक इतिहास"
+  personal_history: "व्यक्तिगत इतिहास"
+  review_of_systems: "प्रणालियों की समीक्षा"
+  investigations: "पूर्व जाँचें"
+  ayurveda: "आयुर्वेद — रोगी द्वारा बताया गया"
+  red_flag_screen: "स्क्रीनिंग उत्तर"
+  consent: "सहमति"
+
+# Field labels in Hindi.
+#
+# Deliberately partial. It covers the fields the Jetson's extractor currently
+# produces; anything else falls back to the English display from the concept
+# registry, which a Hindi-speaking clinician can still read. The alternative —
+# machine-translating a clinical term nobody reviewed — is how "not applicable"
+# becomes "absent" on a document somebody acts on.
+#
+# STATUS: engineer-authored. Pending review by a Hindi-speaking clinician at
+# AIIA. Recorded in docs/DECISIONS.md.
+labels:
+  chief_complaint: "मुख्य शिकायत"
+  complaint_site: "स्थान"
+  duration: "अवधि"
+  onset: "शुरुआत"
+  severity: "तीव्रता"
+  character: "प्रकृति"
+  radiation: "फैलाव"
+  progression: "बदलाव"
+  aggravating_factors: "बढ़ाने वाले कारक"
+  relieving_factors: "आराम देने वाले कारक"
+  associated_symptoms: "साथ के लक्षण"
+  previous_episodes: "पहले के प्रकरण"
+  past_medical_history: "पूर्व रोग"
+  known_diabetes: "ज्ञात मधुमेह"
+  known_hypertension: "ज्ञात उच्च रक्तचाप"
+  known_asthma: "ज्ञात दमा"
+  known_thyroid_disorder: "ज्ञात थायरॉइड विकार"
+  past_surgery: "पूर्व शल्य क्रिया"
+  hospitalisation: "पूर्व भर्ती"
+  current_medications: "वर्तमान औषधियाँ"
+  ayurvedic_medications: "आयुर्वेदिक औषधियाँ"
+  adherence: "औषधि नियमितता"
+  drug_allergy: "औषधि एलर्जी"
+  food_allergy: "भोजन एलर्जी"
+  family_history: "पारिवारिक इतिहास"
+  diet: "आहार"
+  appetite: "भूख"
+  sleep: "नींद"
+  bowel_habit: "मल प्रवृत्ति"
+  bladder_habit: "मूत्र प्रवृत्ति"
+  tobacco: "तंबाकू सेवन"
+  alcohol: "मद्यपान"
+  occupation: "व्यवसाय"
+  menstrual_history: "मासिक धर्म इतिहास"
+  pregnancy: "गर्भावस्था"
+  breathlessness: "साँस लेने में कठिनाई"
+  chest_pain: "सीने में दर्द"
+  bleeding: "रक्तस्राव"
+  loss_of_consciousness: "बेहोशी"
+  altered_sensorium: "चेतना में परिवर्तन"
+  weight_loss: "वज़न घटना"
+  fever_duration: "बुखार की अवधि"
+  prakriti_self_report: "प्रकृति (स्वयं बताई)"
+  agni: "अग्नि"
+  koshtha: "कोष्ठ"
+  nidra: "निद्रा"
+  mala: "मल"
+  mutra: "मूत्र"
+  prior_investigations: "पूर्व जाँचें"

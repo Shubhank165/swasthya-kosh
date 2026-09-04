@@ -1,0 +1,55 @@
+# What must not go into the image.
+#
+# Without this the build context is the whole working tree, and the developer's
+# own 181 MB virtualenv, the caches and `stale/` all shipped to Cloud Run — the
+# image was 456 MB of which most was never executed. Worse than the size: a
+# production image that carries a second Python environment gives anyone who
+# gets a shell in it a set of tools and a copy of code that is not the code
+# being run.
+
+# Local environments and caches. The image builds its own venv in the builder
+# stage; this one is somebody's laptop.
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.hypothesis/
+**/.coverage
+**/htmlcov/
+**/*.egg-info/
+**/dist/
+**/build/
+
+# Code that no longer runs. Kept in the repository, not maintained, and
+# definitely not deployed.
+backend/stale/
+
+# Uploaded documents from a local run. These are patient scans in every
+# environment that matters; baking them into an image would distribute them.
+backend/uploads/
+
+# Secrets and local config. `.env` is gitignored too — this is the second lock,
+# because a build context is assembled from the filesystem, not from git.
+.env
+.env.*
+!.env.example
+**/*.pem
+**/*.key
+**/service-account*.json
+
+# Version control and tooling.
+.git/
+.github/
+.gitignore
+.claude/
+
+# Documentation and infrastructure. Neither is read at runtime; the deploy
+# scripts run from a checkout, not from inside the image.
+docs/
+infra/
+*.md
+Makefile
+docker-compose.yml

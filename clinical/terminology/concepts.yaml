@@ -415,10 +415,10 @@ manas_stress:
 # --- documents and confirmation ----------------------------------------------------
 has_prior_documents:
   display: Brought previous prescriptions or reports
-  section: documents
+  section: investigations
 document_upload:
   display: Documents uploaded
-  section: documents
+  section: investigations
 intake_confirmed:
   display: Patient reviewed and confirmed the recorded history
-  section: confirmation
+  section: consent

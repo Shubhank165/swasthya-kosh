@@ -1,0 +1,79 @@
+{
+  "kind": "lab_report",
+  "page_count": 1,
+  "overall_confidence": 0.97,
+  "document_date": "2026-08-28",
+  "issuing_facility": "Central Pathology Laboratory",
+  "page_text": [
+    "Central Pathology Laboratory\nHaemoglobin        9.8 g/dL      (12.0 - 15.0 g/dL)\nFasting glucose    148 mg/dL     (70 - 100 mg/dL)\nSerum ferritin     18 ng/mL      \n"
+  ],
+  "items": [
+    {
+      "item_id": "item_lab1",
+      "kind": "lab_result",
+      "raw_text": "Haemoglobin 9.8 g/dL (12.0 - 15.0 g/dL)",
+      "page": 1,
+      "bbox": {
+        "x": 0.08,
+        "y": 0.24,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.97,
+      "lab_result": {
+        "analyte": "Haemoglobin",
+        "value": 9.8,
+        "unit": "g/dL",
+        "reference_range": {
+          "low": 12.0,
+          "high": 15.0,
+          "unit": "g/dL",
+          "raw_text": "12.0 - 15.0 g/dL"
+        }
+      }
+    },
+    {
+      "item_id": "item_lab2",
+      "kind": "lab_result",
+      "raw_text": "Fasting glucose 148 mg/dL (70 - 100 mg/dL)",
+      "page": 1,
+      "bbox": {
+        "x": 0.08,
+        "y": 0.3,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.96,
+      "lab_result": {
+        "analyte": "Fasting glucose",
+        "value": 148,
+        "unit": "mg/dL",
+        "reference_range": {
+          "low": 70,
+          "high": 100,
+          "unit": "mg/dL",
+          "raw_text": "70 - 100 mg/dL"
+        }
+      }
+    },
+    {
+      "item_id": "item_lab3",
+      "kind": "lab_result",
+      "raw_text": "Serum ferritin 18 ng/mL",
+      "page": 1,
+      "bbox": {
+        "x": 0.08,
+        "y": 0.36,
+        "width": 0.6,
+        "height": 0.04
+      },
+      "confidence": 0.95,
+      "lab_result": {
+        "analyte": "Serum ferritin",
+        "value": 18,
+        "unit": "ng/mL"
+      }
+    }
+  ],
+  "_fixture_name": "lab_report"
+}

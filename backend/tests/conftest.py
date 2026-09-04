@@ -1,68 +1,87 @@
 """Shared fixtures.
 
-Everything here is deterministic: a frozen clock, sequential ids, an in-memory
-bus. A test that passes today must pass identically in six months, because the
-whole point of the deterministic core is that its behaviour is reproducible.
+The suite runs against SQLite with the schema created from the ORM metadata, so
+it needs no database container and no migration step. `tests/integration/`
+additionally runs the migration itself, because "the metadata is right" and "the
+migration produces the metadata" are two different claims.
+
+Time and identifiers are frozen and sequential throughout. A test that passes
+because `uuid4` happened to sort a certain way is a test that fails on a
+Thursday.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import json
+from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.api.deps import get_clock, get_ids, get_settings_dep
 from app.core.clock import FrozenClock
 from app.core.config import Settings
 from app.core.content import ClinicalContent, load_clinical_content
 from app.core.ids import SequentialIdFactory
-from app.db import get_session
-from app.domain.clinical.enums import (
-    Certainty,
-    FactStatus,
-    ReporterRole,
-    Section,
-    SourceType,
-    Temporality,
-)
-from app.domain.clinical.fact import ClinicalFact
-from app.domain.clinical.patient_state import PatientIntakeState
-from app.domain.clinical.provenance import (
-    ConceptRef,
-    FactId,
-    IntakeId,
-    SegmentId,
-    SourceRef,
-)
-from app.domain.statemachine.engine import ClinicalStateMachine
-from app.events.bus import InProcessBus, get_event_bus, reset_event_bus
-from app.main import create_app
+from app.db.tenancy import tenant_scope
+from app.events.bus import InProcessBus
 from app.models import Base
-from app.services.seed import seed_facility
 
-START = datetime(2026, 1, 15, 9, 0, 0, tzinfo=UTC)
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = BACKEND_ROOT.parent
+FIXTURES = Path(__file__).parent / "fixtures"
+
+HOSPITAL_ID = "aiia-delhi"
+OTHER_HOSPITAL_ID = "test-other"
+
+#: Fixed instant for every test. Reports are golden-file compared, so the clock
+#: has to be the same on every machine and in CI.
+FROZEN_NOW = datetime(2026, 9, 3, 10, 21, 5, tzinfo=UTC)
 
 
 @pytest.fixture
-def settings() -> Settings:
-    """Settings pinned to the repo's own clinical content."""
-    return Settings(environment="test", database_url="sqlite+aiosqlite:///:memory:")
+def settings(tmp_path: Path) -> Settings:
+    """Local settings: mocks everywhere, storage under the test's tmp dir."""
+    return Settings(
+        environment="test",
+        database_url="sqlite+aiosqlite:///:memory:",
+        clinical_content_dir=REPO_ROOT / "clinical",
+        document_storage_dir=tmp_path / "uploads",
+        ocr_fixtures_dir=FIXTURES / "ocr",
+        ocr_provider="mock",
+        repair_provider="mock",
+        abha_provider="mock",
+        storage_backend="local",
+        demo_mode=False,
+        log_json=False,
+        kiosk_tokens={"test-kiosk-token": HOSPITAL_ID},
+    )
 
 
 @pytest.fixture(scope="session")
 def content() -> ClinicalContent:
-    """Loaded once: parsing every pathway per test would dominate the suite."""
-    return load_clinical_content(Settings(environment="test"))
+    """The real clinical content. Loaded once — it is read-only."""
+    return load_clinical_content(
+        Settings(clinical_content_dir=REPO_ROOT / "clinical")
+    )
 
 
 @pytest.fixture
 def clock() -> FrozenClock:
-    """Advances one second per read, so recorded_at ordering is meaningful."""
-    return FrozenClock(start=START, step=timedelta(seconds=1))
+    """A clock that advances one second per read.
+
+    Advancing rather than standing still: two facts recorded in the same test
+    should not share a timestamp, or an ordering bug hides.
+    """
+    return FrozenClock(start=FROZEN_NOW, step=timedelta(seconds=1))
+
+
+@pytest.fixture
+def still_clock() -> FrozenClock:
+    """A clock that does not move. For byte-identical golden files."""
+    return FrozenClock(start=FROZEN_NOW)
 
 
 @pytest.fixture
@@ -71,145 +90,276 @@ def ids() -> SequentialIdFactory:
 
 
 @pytest.fixture
-def machine(content: ClinicalContent) -> ClinicalStateMachine:
-    return ClinicalStateMachine(content.content_set)
-
-
-@pytest.fixture
-def empty_state() -> PatientIntakeState:
-    return PatientIntakeState(intake_id=IntakeId("intake_test"))
-
-
-@pytest.fixture
 def bus() -> InProcessBus:
-    reset_event_bus()
-    instance = InProcessBus()
-    instance.record_history(True)
-    return instance
+    published = InProcessBus()
+    published.record_history(True)
+    return published
 
 
-@pytest_asyncio.fixture
-async def session() -> AsyncIterator[AsyncSession]:
-    """A real database on SQLite, schema built from the ORM metadata.
-
-    SQLite for speed; the concurrency proof that needs `FOR UPDATE SKIP LOCKED`
-    runs against Postgres in `tests/integration/`.
-    """
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
-    async with engine.begin() as connection:
+@pytest.fixture
+async def engine() -> AsyncIterator[Any]:
+    """An in-memory SQLite engine with the schema created."""
+    created = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
+    async with created.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+    yield created
+    await created.dispose()
+
+
+@pytest.fixture
+async def session(engine: Any) -> AsyncIterator[AsyncSession]:
+    """One session, inside the seeded hospital's tenant scope."""
     factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-    async with factory() as db:
-        yield db
-    await engine.dispose()
+    async with factory() as opened:
+        await _create_hospitals(opened)
+        with tenant_scope(HOSPITAL_ID):
+            yield opened
+        await opened.rollback()
 
 
-# --- fact construction helpers -----------------------------------------------
+async def _create_hospitals(opened: AsyncSession) -> None:
+    from app.repositories.patients import HospitalRepository
+
+    repository = HospitalRepository(opened)
+    await repository.create(
+        hospital_id=HOSPITAL_ID,
+        display_name="All India Institute of Ayurveda",
+        departments=["kayachikitsa", "panchakarma", "general"],
+        default_language="hi",
+    )
+    await repository.create(
+        hospital_id=OTHER_HOSPITAL_ID,
+        display_name="Another Hospital",
+        departments=["general"],
+    )
+    await opened.commit()
 
 
-def make_fact(
-    concept: str,
-    *,
-    status: FactStatus = FactStatus.PRESENT,
-    value: object | None = None,
-    fact_id: str | None = None,
-    section: Section = Section.HPI,
-    source_type: SourceType = SourceType.VOICE,
-    certainty: Certainty = Certainty.REPORTED,
-    temporality: Temporality = Temporality.CURRENT,
-    confidence: float = 0.9,
-    reported_by: ReporterRole = ReporterRole.SELF,
-    original_expression: str | None = None,
-    original_language: str | None = None,
-    recorded_at: datetime | None = None,
-    supersedes: str | None = None,
-    patient_confirmed: bool = False,
-    physician_verified: bool = False,
-    display: str | None = None,
-) -> ClinicalFact:
-    """Build a fact with sensible defaults. Used across the whole suite."""
-    if source_type is SourceType.DOCUMENT:
-        from app.domain.clinical.provenance import DocumentId
+@pytest.fixture
+def unscoped_session_factory(engine: Any) -> Any:
+    """Session factory with no tenant scope. For the tenancy tests."""
+    return async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
-        ref = SourceRef.from_document(DocumentId("Discharge_summary_2.jpg"), page=1)
-    elif source_type in {SourceType.VOICE}:
-        ref = SourceRef.from_transcript(SegmentId("seg-1"), 0, 1200)
-    else:
-        ref = SourceRef.from_actor(source_type.value)
-    return ClinicalFact(
-        fact_id=FactId(fact_id or f"fact_{concept}"),
-        concept=ConceptRef(concept, display=display),
-        status=status,
-        certainty=certainty,
-        temporality=temporality,
-        source_type=source_type,
-        source_ref=ref,
-        confidence=confidence,
-        reported_by=reported_by,
-        recorded_at=recorded_at or START,
-        section=section,
-        value=value,  # type: ignore[arg-type]
-        original_expression=original_expression,
-        original_language=original_language,
-        patient_confirmed=patient_confirmed,
-        physician_verified=physician_verified,
-        supersedes=FactId(supersedes) if supersedes else None,
+
+# --- payload fixtures --------------------------------------------------------
+
+
+def load_kiosk_fixture(name: str) -> dict[str, Any]:
+    with (FIXTURES / "kiosk" / name).open(encoding="utf-8") as handle:
+        loaded: dict[str, Any] = json.load(handle)
+    return loaded
+
+
+@pytest.fixture
+def kiosk_payload() -> dict[str, Any]:
+    """The reference 0.1 payload. A complete Hindi intake."""
+    return load_kiosk_fixture("0.1.json")
+
+
+@pytest.fixture
+def ocr_images() -> dict[str, bytes]:
+    """The fixture image bytes, keyed by name."""
+    import sys
+
+    sys.path.insert(0, str(BACKEND_ROOT))
+    from tests.fixtures.build_ocr_fixtures import IMAGES
+
+    return dict(IMAGES)
+
+
+# --- assembled services ------------------------------------------------------
+
+
+@pytest.fixture
+def providers(settings: Settings) -> Any:
+    from app.adapters.registry import build_providers
+
+    return build_providers(settings)
+
+
+@pytest.fixture
+def ingest_service(
+    session: AsyncSession,
+    bus: InProcessBus,
+    clock: FrozenClock,
+    ids: SequentialIdFactory,
+    providers: Any,
+) -> Any:
+    from app.repositories.consent import AuditRepository, IngestRawRepository
+    from app.repositories.intakes import IntakeRepository
+    from app.services.ingest import IngestService
+
+    return IngestService(
+        intakes=IntakeRepository(session),
+        raw=IngestRawRepository(session),
+        audit=AuditRepository(session),
+        bus=bus,
+        clock=clock,
+        ids=ids,
+        repair_provider=providers.repair,
     )
 
 
 @pytest.fixture
-def fact_factory():  # type: ignore[no-untyped-def]
-    return make_fact
+def document_service(
+    session: AsyncSession,
+    bus: InProcessBus,
+    clock: FrozenClock,
+    ids: SequentialIdFactory,
+    providers: Any,
+    content: ClinicalContent,
+    settings: Settings,
+) -> Any:
+    from app.repositories.documents import DocumentRepository
+    from app.repositories.intakes import IntakeRepository
+    from app.services.documents import DocumentService
+
+    return DocumentService(
+        documents=DocumentRepository(session),
+        intakes=IntakeRepository(session),
+        storage=providers.storage,
+        ocr=providers.ocr,
+        bus=bus,
+        clock=clock,
+        ids=ids,
+        interactions=content.interactions,
+        ingredients=content.ingredients,
+        confidence_floor=settings.ocr_confidence_floor,
+    )
 
 
-# --- API fixtures ------------------------------------------------------------
+@pytest.fixture
+def report_service(
+    session: AsyncSession,
+    bus: InProcessBus,
+    still_clock: FrozenClock,
+    ids: SequentialIdFactory,
+    content: ClinicalContent,
+) -> Any:
+    from app.domain.report.builder import FieldLabels
+    from app.repositories.consent import AuditRepository, ReportRepository
+    from app.repositories.documents import DocumentRepository
+    from app.repositories.intakes import IntakeRepository
+    from app.services.reports import ReportService
 
-@pytest_asyncio.fixture
-async def api() -> AsyncIterator[AsyncClient]:
-    """An app wired to an in-memory database, a frozen clock and sequential ids.
+    return ReportService(
+        intakes=IntakeRepository(session),
+        documents=DocumentRepository(session),
+        reports=ReportRepository(session),
+        audit=AuditRepository(session),
+        templates=content.templates,
+        labels=FieldLabels(content.field_labels()),
+        interactions=content.interactions,
+        ingredients=content.ingredients,
+        bus=bus,
+        clock=still_clock,
+        ids=ids,
+    )
 
-    Deterministic end to end: the same request sequence produces the same ids
-    and the same timestamps every run.
+
+@pytest.fixture
+def worklist_service(
+    session: AsyncSession, bus: InProcessBus, clock: FrozenClock, content: ClinicalContent
+) -> Any:
+    from app.repositories.consent import AuditRepository
+    from app.repositories.intakes import IntakeRepository
+    from app.services.worklist import WorklistService
+
+    return WorklistService(
+        intakes=IntakeRepository(session),
+        audit=AuditRepository(session),
+        bus=bus,
+        clock=clock,
+        session=session,
+        ingredients=content.ingredients,
+    )
+
+
+@pytest.fixture
+def identity_service(
+    session: AsyncSession,
+    clock: FrozenClock,
+    ids: SequentialIdFactory,
+    providers: Any,
+    content: ClinicalContent,
+) -> Any:
+    from app.repositories.intakes import IntakeRepository
+    from app.repositories.patients import PatientRepository
+    from app.services.identity import IdentityService
+
+    return IdentityService(
+        patients=PatientRepository(session),
+        intakes=IntakeRepository(session),
+        abha=providers.abha,
+        clock=clock,
+        ids=ids,
+        labels=content.field_labels(),
+    )
+
+
+# --- HTTP client -------------------------------------------------------------
+
+
+@pytest.fixture
+def app_client(engine: Any, settings: Settings, still_clock: FrozenClock) -> Iterator[Any]:
+    """A `TestClient` wired to the in-memory database.
+
+    Overrides settings, the clock and the id factory so API tests are as
+    deterministic as the unit tests.
     """
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-    factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    from fastapi.testclient import TestClient
 
-    settings = Settings(environment="test", database_url="sqlite+aiosqlite:///:memory:")
-    clock = FrozenClock(start=START)
-    ids = SequentialIdFactory()
-    bus = InProcessBus()
-    bus.record_history(True)
+    from app import db as db_module
+    from app.api import auth, deps
+    from app.core import config as config_module
+    from app.core.content import get_clinical_content
+    from app.events.bus import reset_event_bus
+    from app.main import create_app
 
-    async with factory() as seed_session:
-        await seed_facility(seed_session, settings=settings, clock=clock)
-        await seed_session.commit()
+    config_module.get_settings.cache_clear()
+    get_clinical_content.cache_clear()
+    reset_event_bus()
+    deps.reset_providers()
 
-    async def _session() -> AsyncIterator[AsyncSession]:
-        async with factory() as db:
-            try:
-                yield db
-                await db.commit()
-            except Exception:
-                await db.rollback()
-                raise
+    db_module.configure(engine)
+    original = config_module.get_settings
+    config_module.get_settings = lambda: settings  # type: ignore[assignment]
 
-    app = create_app()
-    app.dependency_overrides[get_session] = _session
-    app.dependency_overrides[get_settings_dep] = lambda: settings
-    app.dependency_overrides[get_clock] = lambda: clock
-    app.dependency_overrides[get_ids] = lambda: ids
-    app.dependency_overrides[get_event_bus] = lambda: bus
+    application = create_app()
+    application.dependency_overrides[deps.get_settings_dep] = lambda: settings
+    application.dependency_overrides[auth.auth_settings] = lambda: settings
+    application.dependency_overrides[deps.get_clock] = lambda: still_clock
+    application.dependency_overrides[deps.get_ids] = SequentialIdFactory
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # Attached so a test can reach the same database the app is using —
-        # needed where a test has to stand in for a component this build mocks,
-        # such as the async OCR worker.
-        client.bus = bus  # type: ignore[attr-defined]
-        client.clock = clock  # type: ignore[attr-defined]
-        client.sessions = factory  # type: ignore[attr-defined]
-        client.settings = settings  # type: ignore[attr-defined]
+    with TestClient(application) as client:
         yield client
-    await engine.dispose()
+
+    config_module.get_settings = original  # type: ignore[assignment]
+    config_module.get_settings.cache_clear()
+    get_clinical_content.cache_clear()
+    reset_event_bus()
+    deps.reset_providers()
+
+
+#: Headers for each role, for API tests.
+KIOSK_HEADERS = {"Authorization": "Bearer test-kiosk-token"}
+STAFF_HEADERS = {
+    "X-User-Id": "staff-1",
+    "X-User-Role": "staff",
+    "X-Hospital-Id": HOSPITAL_ID,
+}
+PHYSICIAN_HEADERS = {
+    "X-User-Id": "dr-sharma",
+    "X-User-Role": "physician",
+    "X-Hospital-Id": HOSPITAL_ID,
+}
+ADMIN_HEADERS = {
+    "X-User-Id": "admin-1",
+    "X-User-Role": "admin",
+    "X-Hospital-Id": HOSPITAL_ID,
+}
+OTHER_STAFF_HEADERS = {
+    "X-User-Id": "staff-2",
+    "X-User-Role": "staff",
+    "X-Hospital-Id": OTHER_HOSPITAL_ID,
+}

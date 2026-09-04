@@ -1,0 +1,161 @@
+# Medicine name -> ingredient key.
+#
+# Prescriptions are written by hand, in brand names, with dosage forms attached:
+# "Tab. Glycomet 500 BD". The interaction table is keyed on ingredients, so
+# something has to bridge the two, and that something is this file rather than a
+# fuzzy matcher — an interaction flag raised on a spelling guess is worse than
+# no flag.
+#
+# Matching is exact after folding (case, punctuation, diacritics). A name that
+# is not listed here resolves to nothing and contributes to no interaction
+# finding. That is the intended failure mode: a miss is safe, a false match is
+# not.
+#
+# STATUS: engineer-authored. The brand list is the common Indian OPD subset and
+# is nowhere near exhaustive. Pending review by the AIIA clinical mentor.
+
+ingredients:
+  metformin:
+    - metformin
+    - metformin hydrochloride
+    - glycomet
+    - glucophage
+    - obimet
+  glibenclamide:
+    - glibenclamide
+    - glyburide
+    - daonil
+    - euglucon
+  warfarin:
+    - warfarin
+    - warfarin sodium
+    - warf
+    - uniwarfin
+  aspirin:
+    - aspirin
+    - acetylsalicylic acid
+    - asa
+    - ecosprin
+    - disprin
+  clopidogrel:
+    - clopidogrel
+    - plavix
+    - clopilet
+    - deplatt
+  omeprazole:
+    - omeprazole
+    - omez
+    - ocid
+  ciprofloxacin:
+    - ciprofloxacin
+    - cifran
+    - ciplox
+  fluconazole:
+    - fluconazole
+    - forcan
+    - zocon
+  enalapril:
+    - enalapril
+    - enalapril maleate
+    - envas
+    - enam
+  spironolactone:
+    - spironolactone
+    - aldactone
+  potassium_chloride:
+    - potassium chloride
+    - kcl
+    - potklor
+  amlodipine:
+    - amlodipine
+    - amlong
+    - amlodac
+    - stamlo
+  simvastatin:
+    - simvastatin
+    - simvotin
+    - simcard
+  digoxin:
+    - digoxin
+    - lanoxin
+    - digoxin sandoz
+  furosemide:
+    - furosemide
+    - frusemide
+    - lasix
+  methotrexate:
+    - methotrexate
+    - folitrax
+    - mtx
+  trimethoprim:
+    - trimethoprim
+    - cotrimoxazole
+    - co-trimoxazole
+    - septran
+    - bactrim
+  metronidazole:
+    - metronidazole
+    - flagyl
+    - metrogyl
+  ibuprofen:
+    - ibuprofen
+    - brufen
+    - combiflam
+  levothyroxine:
+    - levothyroxine
+    - thyroxine
+    - eltroxin
+    - thyronorm
+  calcium_carbonate:
+    - calcium carbonate
+    - shelcal
+    - calcium
+  ferrous_sulphate:
+    - ferrous sulphate
+    - ferrous sulfate
+    - iron
+    - fefol
+    - orofer
+  phenytoin:
+    - phenytoin
+    - eptoin
+    - dilantin
+  isoniazid:
+    - isoniazid
+    - inh
+    - isonex
+  rifampicin:
+    - rifampicin
+    - rifampin
+    - rcin
+    - rimactane
+  oral_contraceptive:
+    - oral contraceptive
+    - ocp
+    - mala d
+    - mala-d
+    - ovral
+  atenolol:
+    - atenolol
+    - aten
+    - tenormin
+  verapamil:
+    - verapamil
+    - calaptin
+    - isoptin
+  amitriptyline:
+    - amitriptyline
+    - tryptomer
+    - amitone
+  tramadol:
+    - tramadol
+    - ultracet
+    - tramazac
+  contrast_media:
+    - iodinated contrast
+    - contrast media
+    - iohexol
+    - omnipaque
+  alcohol:
+    - alcohol
+    - ethanol

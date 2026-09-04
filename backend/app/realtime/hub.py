@@ -22,43 +22,37 @@ from app.events.schemas import Event, EventName
 
 logger = get_logger(__name__)
 
-#: Events a dashboard subscriber receives.
-DASHBOARD_EVENTS: frozenset[EventName] = frozenset(
+#: Events a worklist subscriber receives. Everything that changes what a doctor
+#: or a triage nurse would do next, and nothing that does not.
+WORKLIST_EVENTS: frozenset[EventName] = frozenset(
     {
-        EventName.TICKET_ISSUED,
-        EventName.TICKET_CALLED,
-        EventName.TICKET_RECALLED,
-        EventName.TICKET_STARTED,
-        EventName.TICKET_COMPLETED,
-        EventName.TICKET_NO_SHOW,
-        EventName.TICKET_DEFERRED,
-        EventName.TICKET_TRANSFERRED,
-        EventName.TICKET_ESCALATED,
-        EventName.TICKET_CANCELLED,
-        EventName.TICKET_OVERTAKEN,
-        EventName.INSTANCE_OPENED,
-        EventName.INSTANCE_PAUSED,
-        EventName.INSTANCE_RESUMED,
-        EventName.INSTANCE_CLOSED,
-        EventName.INTAKE_READY,
-        EventName.REDFLAG_RAISED,
+        EventName.INTAKE_RECEIVED,
+        EventName.INTAKE_NEEDS_REVIEW,
+        EventName.INTAKE_SEEN,
+        EventName.REDFLAG_RECEIVED,
         EventName.REDFLAG_ACKNOWLEDGED,
-        EventName.REDFLAG_DISMISSED,
+        EventName.CONTRADICTION_DETECTED,
+        EventName.DOCUMENT_PROCESSED,
+        EventName.DOCUMENT_LOW_CONFIDENCE,
+        EventName.DOCUMENT_REJECTED,
         EventName.REPORT_READY,
+        EventName.REPORT_PHYSICIAN_VERIFIED,
     }
 )
 
-#: Events the kiosk driving one intake receives.
+#: Kept under its old name so an existing dashboard client does not break.
+DASHBOARD_EVENTS = WORKLIST_EVENTS
+
+#: Events the kiosk that submitted one intake receives — chiefly so it can show
+#: "your prescription has been read" while the patient is still standing there.
 INTAKE_EVENTS: frozenset[EventName] = frozenset(
     {
-        EventName.INTAKE_STARTED,
+        EventName.INTAKE_RECEIVED,
         EventName.INTAKE_UPDATED,
-        EventName.INTAKE_READY,
-        EventName.INTAKE_CONFIRMED,
-        EventName.INTAKE_ABANDONED,
         EventName.DOCUMENT_UPLOADED,
         EventName.DOCUMENT_PROCESSED,
         EventName.DOCUMENT_LOW_CONFIDENCE,
+        EventName.DOCUMENT_REJECTED,
     }
 )
 

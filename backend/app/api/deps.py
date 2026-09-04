@@ -1,9 +1,9 @@
-"""FastAPI dependencies: sessions, services, auth and idempotency.
+"""FastAPI dependencies: sessions, tenancy, services, idempotency.
 
-Role checking here is a header-based stand-in, wired so the endpoints that must
-be physician-only genuinely are. Real authentication is a deployment concern —
-the hospital's own identity provider — and the point of this shape is that
-swapping it changes this file and nothing else.
+Every service is constructed here, scoped to the caller's hospital. The tenant
+context is set from the authenticated principal before any repository runs, so
+the guard in `app/db/tenancy.py` has something to check against and every query
+in the request carries the right scope without being told.
 """
 
 from __future__ import annotations
@@ -11,105 +11,44 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import StrEnum
 from typing import Annotated, Any
 
-from fastapi import Depends, Header, Request
+from fastapi import BackgroundTasks, Depends, Header, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.queue.dispatch import DocumentDispatcher, build_dispatcher
+from app.adapters.registry import Providers, build_providers
+from app.api.auth import Principal, PrincipalDep
 from app.core.clock import Clock, SystemClock
 from app.core.config import Settings, get_settings
 from app.core.content import ClinicalContent, get_clinical_content
-from app.core.errors import ForbiddenError, UnauthorizedError
-from app.core.idempotency import (
-    IdempotencyRecord,
-    check_replay,
-    fingerprint,
-)
+from app.core.idempotency import IdempotencyRecord, check_replay, fingerprint
 from app.core.ids import IdFactory, UuidIdFactory
 from app.db import get_session
+from app.db.tenancy import reset_tenant, set_tenant
+from app.domain.report.builder import FieldLabels
 from app.events.bus import EventBus, get_event_bus
-from app.repositories.alerts import AlertRepository
 from app.repositories.consent import (
     AuditRepository,
     ConsentRepository,
-    DocumentRepository,
+    IngestRawRepository,
+    MetricsRepository,
     ReportRepository,
     SqlIdempotencyStore,
 )
+from app.repositories.documents import DocumentRepository
 from app.repositories.intakes import IntakeRepository
-from app.repositories.queues import QueueRepository
+from app.repositories.patients import HospitalRepository, PatientRepository
 from app.repositories.terminology import TerminologyRepository
-from app.services.intake import IntakeService
-from app.services.queue import QueueService
+from app.services.documents import DocumentService
+from app.services.identity import IdentityService
+from app.services.ingest import IngestService
+from app.services.reports import ReportService
 from app.services.terminology import TerminologyService
-
-
-class Role(StrEnum):
-    """Access roles. `patient_session` is the kiosk itself, and it deliberately
-    cannot reach physician endpoints."""
-
-    PATIENT_SESSION = "patient_session"
-    STAFF = "staff"
-    TRIAGE = "triage"
-    PHYSICIAN = "physician"
-    ADMIN = "admin"
-
-
-@dataclass(frozen=True, slots=True)
-class Principal:
-    """Who is making the request."""
-
-    user_id: str
-    role: Role
-
-    def has_any(self, *roles: Role) -> bool:
-        return self.role is Role.ADMIN or self.role in roles
-
+from app.services.worklist import WorklistService
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
-
-
-async def current_principal(
-    x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
-    x_user_role: Annotated[str | None, Header(alias="X-User-Role")] = None,
-) -> Principal:
-    """Identify the caller from headers.
-
-    A stand-in for the hospital's identity provider. It is strict about the
-    role being a known one so an unrecognised value fails closed rather than
-    landing somewhere permissive.
-    """
-    if not x_user_id or not x_user_role:
-        raise UnauthorizedError("X-User-Id and X-User-Role headers are required")
-    try:
-        role = Role(x_user_role)
-    except ValueError as exc:
-        raise UnauthorizedError(f"unknown role '{x_user_role}'") from exc
-    return Principal(user_id=x_user_id, role=role)
-
-
-PrincipalDep = Annotated[Principal, Depends(current_principal)]
-
-
-def require_roles(*roles: Role) -> Callable[[Principal], Principal]:
-    """Dependency factory enforcing role membership.
-
-    Used to make `POST /physician/{intake_id}/verify` physician-only, which is
-    the one place in the API where the answer changes the clinical weight of the
-    record.
-    """
-
-    def _check(principal: PrincipalDep) -> Principal:
-        if not principal.has_any(*roles):
-            raise ForbiddenError(
-                f"role '{principal.role}' may not perform this action",
-                details={"required": [r.value for r in roles]},
-            )
-        return principal
-
-    return _check
 
 
 def get_settings_dep() -> Settings:
@@ -134,52 +73,198 @@ ClockDep = Annotated[Clock, Depends(get_clock)]
 IdsDep = Annotated[IdFactory, Depends(get_ids)]
 BusDep = Annotated[EventBus, Depends(get_event_bus)]
 
+_providers: Providers | None = None
 
-async def get_intake_service(
+
+def get_providers(settings: SettingsDep) -> Providers:
+    """The configured providers, built once per process."""
+    global _providers
+    if _providers is None:
+        _providers = build_providers(settings)
+    return _providers
+
+
+def reset_providers() -> None:
+    """Drop the cached providers. Used between tests."""
+    global _providers
+    _providers = None
+
+
+ProvidersDep = Annotated[Providers, Depends(get_providers)]
+
+
+async def tenant_context(principal: PrincipalDep) -> AsyncIterator[str]:
+    """Put the caller's hospital in scope for the whole request.
+
+    A `ContextVar` set here and reset in the `finally`, so it survives every
+    `await` in the request and cannot leak into a concurrent one.
+    """
+    token = set_tenant(principal.hospital_id)
+    try:
+        yield principal.hospital_id
+    finally:
+        reset_tenant(token)
+
+
+TenantDep = Annotated[str, Depends(tenant_context)]
+
+
+def get_labels(content: ContentDep) -> FieldLabels:
+    return FieldLabels(content.field_labels())
+
+
+LabelsDep = Annotated[FieldLabels, Depends(get_labels)]
+
+
+# --- services ----------------------------------------------------------------
+
+
+async def get_ingest_service(
     session: SessionDep,
     settings: SettingsDep,
-    content: ContentDep,
+    providers: ProvidersDep,
     bus: BusDep,
     clock: ClockDep,
     ids: IdsDep,
-) -> IntakeService:
-    return IntakeService(
+    hospital_id: TenantDep,
+) -> IngestService:
+    return IngestService(
         intakes=IntakeRepository(session),
-        alerts=AlertRepository(session),
-        consent=ConsentRepository(session),
-        content=content,
+        raw=IngestRawRepository(session),
+        audit=AuditRepository(session),
         bus=bus,
-        settings=settings,
         clock=clock,
         ids=ids,
-        reports=ReportRepository(session),
-        terminology=TerminologyService(TerminologyRepository(session)),
+        repair_provider=providers.repair,
+        repair_max_attempts=settings.repair_max_attempts,
+        demo=settings.demo_mode,
     )
 
 
-async def get_queue_service(
+async def get_document_service(
     session: SessionDep,
     settings: SettingsDep,
+    content: ContentDep,
+    providers: ProvidersDep,
     bus: BusDep,
     clock: ClockDep,
     ids: IdsDep,
-) -> QueueService:
-    return QueueService(
-        queues=QueueRepository(session),
-        alerts=AlertRepository(session),
+    hospital_id: TenantDep,
+) -> DocumentService:
+    return DocumentService(
+        documents=DocumentRepository(session),
+        intakes=IntakeRepository(session),
+        storage=providers.storage,
+        ocr=providers.ocr,
         bus=bus,
-        settings=settings,
         clock=clock,
         ids=ids,
+        interactions=content.interactions,
+        ingredients=content.ingredients,
+        confidence_floor=settings.ocr_confidence_floor,
+        signed_url_ttl=settings.signed_url_ttl_seconds,
+        demo=settings.demo_mode,
+    )
+
+
+async def get_worker_document_service(
+    session: SessionDep,
+    settings: SettingsDep,
+    content: ContentDep,
+    providers: ProvidersDep,
+    bus: BusDep,
+    clock: ClockDep,
+    ids: IdsDep,
+) -> DocumentService:
+    """The same service, built without a principal.
+
+    The Pub/Sub worker has no user and no token-derived hospital: the hospital
+    comes from the message, and the handler puts it in scope itself before
+    anything queries. Depending on `TenantDep` here would drag in
+    authentication, and the push subscription would have to be issued a kiosk
+    token — a credential that can also submit intakes, handed to a machine that
+    only needs to read one document.
+    """
+    return DocumentService(
+        documents=DocumentRepository(session),
+        intakes=IntakeRepository(session),
+        storage=providers.storage,
+        ocr=providers.ocr,
+        bus=bus,
+        clock=clock,
+        ids=ids,
+        interactions=content.interactions,
+        ingredients=content.ingredients,
+        confidence_floor=settings.ocr_confidence_floor,
+        signed_url_ttl=settings.signed_url_ttl_seconds,
+        demo=settings.demo_mode,
+    )
+
+
+async def get_report_service(
+    session: SessionDep,
+    settings: SettingsDep,
+    content: ContentDep,
+    labels: LabelsDep,
+    bus: BusDep,
+    clock: ClockDep,
+    ids: IdsDep,
+    hospital_id: TenantDep,
+) -> ReportService:
+    return ReportService(
+        intakes=IntakeRepository(session),
+        documents=DocumentRepository(session),
+        reports=ReportRepository(session),
+        audit=AuditRepository(session),
+        templates=content.templates,
+        labels=labels,
+        interactions=content.interactions,
+        ingredients=content.ingredients,
+        bus=bus,
+        clock=clock,
+        ids=ids,
+        facility_timezone=settings.facility_timezone,
+        demo=settings.demo_mode,
+    )
+
+
+async def get_identity_service(
+    session: SessionDep,
+    content: ContentDep,
+    providers: ProvidersDep,
+    clock: ClockDep,
+    ids: IdsDep,
+    hospital_id: TenantDep,
+) -> IdentityService:
+    return IdentityService(
+        patients=PatientRepository(session),
+        intakes=IntakeRepository(session),
+        abha=providers.abha,
+        clock=clock,
+        ids=ids,
+        labels=content.field_labels(),
+    )
+
+
+async def get_worklist_service(
+    session: SessionDep,
+    content: ContentDep,
+    bus: BusDep,
+    clock: ClockDep,
+    hospital_id: TenantDep,
+) -> WorklistService:
+    return WorklistService(
+        intakes=IntakeRepository(session),
+        audit=AuditRepository(session),
+        bus=bus,
+        clock=clock,
+        session=session,
+        ingredients=content.ingredients,
     )
 
 
 async def get_terminology_service(session: SessionDep) -> TerminologyService:
     return TerminologyService(TerminologyRepository(session))
-
-
-async def get_document_repository(session: SessionDep) -> DocumentRepository:
-    return DocumentRepository(session)
 
 
 async def get_consent_repository(session: SessionDep) -> ConsentRepository:
@@ -190,22 +275,53 @@ async def get_audit_repository(session: SessionDep) -> AuditRepository:
     return AuditRepository(session)
 
 
-async def get_report_repository(session: SessionDep) -> ReportRepository:
-    return ReportRepository(session)
+async def get_hospital_repository(session: SessionDep) -> HospitalRepository:
+    return HospitalRepository(session)
 
 
-async def get_queue_repository(session: SessionDep) -> QueueRepository:
-    return QueueRepository(session)
+async def get_raw_repository(session: SessionDep) -> IngestRawRepository:
+    return IngestRawRepository(session)
 
 
-IntakeServiceDep = Annotated[IntakeService, Depends(get_intake_service)]
-QueueServiceDep = Annotated[QueueService, Depends(get_queue_service)]
+async def get_metrics_repository(session: SessionDep) -> MetricsRepository:
+    return MetricsRepository(session)
+
+
+IngestServiceDep = Annotated[IngestService, Depends(get_ingest_service)]
+DocumentServiceDep = Annotated[DocumentService, Depends(get_document_service)]
+WorkerDocumentServiceDep = Annotated[DocumentService, Depends(get_worker_document_service)]
+
+ReportServiceDep = Annotated[ReportService, Depends(get_report_service)]
+IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
+WorklistServiceDep = Annotated[WorklistService, Depends(get_worklist_service)]
 TerminologyServiceDep = Annotated[TerminologyService, Depends(get_terminology_service)]
-DocumentRepoDep = Annotated[DocumentRepository, Depends(get_document_repository)]
 ConsentRepoDep = Annotated[ConsentRepository, Depends(get_consent_repository)]
 AuditRepoDep = Annotated[AuditRepository, Depends(get_audit_repository)]
-ReportRepoDep = Annotated[ReportRepository, Depends(get_report_repository)]
-QueueRepoDep = Annotated[QueueRepository, Depends(get_queue_repository)]
+HospitalRepoDep = Annotated[HospitalRepository, Depends(get_hospital_repository)]
+RawRepoDep = Annotated[IngestRawRepository, Depends(get_raw_repository)]
+MetricsRepoDep = Annotated[MetricsRepository, Depends(get_metrics_repository)]
+
+
+async def get_document_dispatcher(
+    settings: SettingsDep,
+    service: DocumentServiceDep,
+    background: BackgroundTasks,
+) -> DocumentDispatcher:
+    """Where this request's OCR work goes.
+
+    Per request, not per process: the inline dispatcher closes over this
+    request's `BackgroundTasks` and its session-scoped service. The Pub/Sub one
+    is cheap to construct — it reuses a process-wide publisher — so the two are
+    built the same way rather than one being cached and the other not.
+    """
+    return build_dispatcher(settings, background=background, service=service)
+
+
+DocumentDispatcherDep = Annotated[DocumentDispatcher, Depends(get_document_dispatcher)]
+
+
+
+# --- idempotency -------------------------------------------------------------
 
 
 @dataclass
@@ -213,7 +329,7 @@ class IdempotencyGuard:
     """Replay protection for one request.
 
     A kiosk that lost the LAN and retried must get its original response back,
-    not a duplicate fact. `stored` returns the earlier response when the key and
+    not a second intake. `stored` returns the earlier response when the key and
     body match; `remember` records the outcome of a fresh request.
     """
 
@@ -246,6 +362,7 @@ class IdempotencyGuard:
 async def idempotency_guard(
     request: Request,
     session: SessionDep,
+    principal: PrincipalDep,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> AsyncIterator[IdempotencyGuard]:
     """Build the guard for the current request, reading its body once."""
@@ -260,7 +377,7 @@ async def idempotency_guard(
             except ValueError:
                 payload = raw.decode("utf-8", errors="replace")
     yield IdempotencyGuard(
-        store=SqlIdempotencyStore(session),
+        store=SqlIdempotencyStore(session, hospital_id=principal.hospital_id),
         key=idempotency_key,
         endpoint=f"{request.method} {request.url.path}",
         payload=payload,
@@ -268,6 +385,7 @@ async def idempotency_guard(
 
 
 IdempotencyDep = Annotated[IdempotencyGuard, Depends(idempotency_guard)]
+
 
 async def idempotent[ModelT: BaseModel](
     guard: IdempotencyGuard,
@@ -278,8 +396,7 @@ async def idempotent[ModelT: BaseModel](
 
     Without a key it simply runs. With one, a retry returns the original
     response rather than performing the action twice — which is what stops a
-    kiosk that lost the LAN from issuing a second token or writing a second
-    consent artefact.
+    kiosk that lost the LAN from writing a second intake for the same patient.
     """
     replay = await guard.stored()
     if replay is not None:
@@ -287,3 +404,32 @@ async def idempotent[ModelT: BaseModel](
     result = await produce()
     await guard.remember(result.model_dump(mode="json"))
     return result
+
+
+__all__ = [
+    "AuditRepoDep",
+    "BusDep",
+    "ClockDep",
+    "ConsentRepoDep",
+    "ContentDep",
+    "DocumentServiceDep",
+    "HospitalRepoDep",
+    "IdempotencyDep",
+    "IdentityServiceDep",
+    "IdsDep",
+    "IngestServiceDep",
+    "LabelsDep",
+    "MetricsRepoDep",
+    "Principal",
+    "ProvidersDep",
+    "RawRepoDep",
+    "ReportServiceDep",
+    "SessionDep",
+    "SettingsDep",
+    "TenantDep",
+    "TerminologyServiceDep",
+    "WorkerDocumentServiceDep",
+    "WorklistServiceDep",
+    "idempotent",
+    "reset_providers",
+]

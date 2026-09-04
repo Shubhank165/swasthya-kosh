@@ -1,8 +1,8 @@
 """WebSocket endpoints.
 
-`/ws/dashboard?department=` fans queue, intake and alert activity out to staff
-screens. `/ws/intakes/{id}` gives the kiosk live state for the session it is
-driving.
+`/ws/worklist?department=` fans intake, document and alert activity out to the
+doctor dashboard. `/ws/intakes/{id}` lets the kiosk that submitted an intake see
+its document being read while the patient is still standing there.
 
 Neither carries clinical text: the frames are the `Event` wire form, and events
 are identifiers and counters by construction.
@@ -17,7 +17,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from app.core.config import get_settings
-from app.realtime.hub import DASHBOARD_EVENTS, INTAKE_EVENTS, get_hub
+from app.realtime.hub import INTAKE_EVENTS, WORKLIST_EVENTS, get_hub
 
 router = APIRouter(tags=["realtime"])
 
@@ -31,25 +31,25 @@ async def _heartbeat(socket: WebSocket, interval: int) -> None:
         await socket.send_json({"event": "heartbeat"})
 
 
-@router.websocket("/ws/dashboard")
-async def dashboard_socket(
+@router.websocket("/ws/worklist")
+async def worklist_socket(
     socket: WebSocket,
     department: Annotated[str | None, Query()] = None,
 ) -> None:
     hub = get_hub()
     settings = get_settings()
     subscription = await hub.connect(
-        socket, names=DASHBOARD_EVENTS, department_code=department
+        socket, names=WORKLIST_EVENTS, department_code=department
     )
     heartbeat = asyncio.create_task(
         _heartbeat(socket, settings.websocket_heartbeat_seconds)
     )
     try:
         await socket.send_json(
-            {"event": "subscribed", "channel": "dashboard", "department": department}
+            {"event": "subscribed", "channel": "worklist", "department": department}
         )
         while True:
-            # The dashboard is push-only; receiving is how we notice a hangup.
+            # The worklist is push-only; receiving is how we notice a hangup.
             await socket.receive_text()
     except WebSocketDisconnect:
         pass

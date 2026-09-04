@@ -1,336 +1,151 @@
-"""Intake endpoints.
-
-`POST /intakes/{id}/answers` is the hot path: it records one answer and returns
-the updated state together with the next question, so a kiosk needs one round
-trip per turn even on a poor LAN.
-"""
+"""Intake ingest and read endpoints — §5, §10."""
 
 from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Body, Query, status
 
-from app.adapters.mocks import MockOCRProvider
+from app.api.auth import RequireKioskOrStaff, RequirePhysician, RequireStaff
 from app.api.deps import (
-    ContentDep,
-    DocumentRepoDep,
     IdempotencyDep,
-    IdsDep,
-    IntakeServiceDep,
-    Principal,
-    PrincipalDep,
-    Role,
+    IngestServiceDep,
+    LabelsDep,
+    ReportServiceDep,
     SettingsDep,
     idempotent,
-    require_roles,
 )
-from app.api.serialisers import (
-    coverage_out,
-    next_step_out,
-    report_out,
-    snapshot_out,
-)
-from app.domain.clinical.provenance import UserId
-from app.schemas.common import Acknowledgement
-from app.schemas.intake import (
-    CompleteOut,
-    ConfirmRequest,
-    CoverageOut,
-    CreateIntakeRequest,
-    EvidenceOut,
-    IntakeSnapshotOut,
-    PhysicianVerifyRequest,
+from app.api.serialise import intake_out, report_out
+from app.schemas.api import (
+    IngestResponse,
+    IntakeOut,
     ReportOut,
-    StepOut,
-    SubmitAnswerRequest,
-    UpdateIntakeRequest,
+    VerifyRequest,
 )
-from app.services.answers import SubmittedAnswer
 
 router = APIRouter(prefix="/intakes", tags=["intakes"])
 
 
-@router.post("", response_model=IntakeSnapshotOut, status_code=status.HTTP_201_CREATED)
-async def create_intake(
-    body: CreateIntakeRequest,
-    service: IntakeServiceDep,
+@router.post(
+    "/ingest",
+    response_model=IngestResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Receive a completed intake from a kiosk",
+)
+async def ingest(
+    principal: RequireKioskOrStaff,
+    service: IngestServiceDep,
     guard: IdempotencyDep,
-    _: PrincipalDep,
-) -> IntakeSnapshotOut:
-    replay = await guard.stored()
-    if replay is not None:
-        return IntakeSnapshotOut.model_validate(replay.response_body)
-    snapshot = await service.start(
-        kiosk_id=body.kiosk_id,
-        department_code=body.department_code,
-        patient_id=body.patient_id,
-        language=body.language,
-    )
-    out = snapshot_out(snapshot)
-    await guard.remember(out.model_dump(mode="json"), status_code=201)
-    return out
+    payload: Annotated[dict[str, Any], Body()],
+) -> IngestResponse:
+    """Take one kiosk payload all the way to a persisted record.
+
+    Idempotent on `Idempotency-Key`: the same key replayed returns the original
+    result and creates nothing. The Jetson retries, and a hospital LAN gives it
+    reason to.
+
+    A payload that fails its contract goes to the repair path, not to a
+    rejection — see §5.1. One that cannot be repaired is stored raw and comes
+    back with `needs_manual_review: true` and a 200, because a device that keeps
+    retrying an unparseable payload eventually drops it, and the answers are
+    worth more than the status code.
+    """
+
+    async def _produce() -> IngestResponse:
+        result = await service.ingest(
+            payload, hospital_id=principal.hospital_id, actor_id=principal.user_id
+        )
+        return IngestResponse.model_validate(result.to_dict())
+
+    return await idempotent(guard, IngestResponse, _produce)
 
 
-@router.get("/{intake_id}", response_model=IntakeSnapshotOut)
+@router.get(
+    "/{intake_id}",
+    response_model=IntakeOut,
+    summary="The canonical record for one intake",
+)
 async def get_intake(
-    intake_id: str, service: IntakeServiceDep, _: PrincipalDep
-) -> IntakeSnapshotOut:
-    return snapshot_out(await service.get(intake_id))
-
-
-@router.patch("/{intake_id}", response_model=IntakeSnapshotOut)
-async def update_intake(
     intake_id: str,
-    body: UpdateIntakeRequest,
-    service: IntakeServiceDep,
-    guard: IdempotencyDep,
-    _: PrincipalDep,
-) -> IntakeSnapshotOut:
-    """Session metadata only. Clinical facts are never written through here —
-    they go through `/answers`, which is the one path that builds provenance."""
-
-    async def produce() -> IntakeSnapshotOut:
-        return snapshot_out(
-            await service.update_metadata(
-                intake_id,
-                language=body.language,
-                reporter=body.reporter,
-                ayurveda_enabled=body.ayurveda_enabled,
-                patient_id=body.patient_id,
-            )
-        )
-
-    return await idempotent(guard, IntakeSnapshotOut, produce)
-
-
-@router.post("/{intake_id}/answers", response_model=IntakeSnapshotOut)
-async def submit_answer(
-    intake_id: str,
-    body: SubmitAnswerRequest,
-    service: IntakeServiceDep,
-    guard: IdempotencyDep,
-    _: PrincipalDep,
-) -> IntakeSnapshotOut:
-    """Record one answer; return the updated state and the next question."""
-    replay = await guard.stored()
-    if replay is not None:
-        return IntakeSnapshotOut.model_validate(replay.response_body)
-    snapshot = await service.submit_answer(
-        intake_id,
-        SubmittedAnswer(
-            concept=body.concept,
-            value=body.value,
-            original_expression=body.original_expression,
-            original_language=body.original_language,
-            source_type=body.source_type,
-            reported_by=body.reported_by,
-            confidence=body.confidence,
-            declined=body.declined,
-            segment_id=body.segment_id,
-            start_ms=body.start_ms,
-            end_ms=body.end_ms,
-            actor=body.actor,
-        ),
-        expected_revision=body.expected_revision,
-    )
-    out = snapshot_out(snapshot)
-    await guard.remember(out.model_dump(mode="json"))
-    return out
-
-
-@router.get("/{intake_id}/next-step", response_model=StepOut | CompleteOut)
-async def next_step(
-    intake_id: str, service: IntakeServiceDep, _: PrincipalDep
-) -> StepOut | CompleteOut:
-    return next_step_out(await service.next_step(intake_id))
-
-
-@router.get("/{intake_id}/coverage", response_model=CoverageOut)
-async def coverage(intake_id: str, service: IntakeServiceDep, _: PrincipalDep) -> CoverageOut:
-    return coverage_out(await service.coverage(intake_id))
-
-
-@router.post("/{intake_id}/documents", response_model=IntakeSnapshotOut)
-async def upload_document(
-    intake_id: str,
-    service: IntakeServiceDep,
-    documents: DocumentRepoDep,
-    content: ContentDep,
+    principal: RequireStaff,
+    service: ReportServiceDep,
+    labels: LabelsDep,
     settings: SettingsDep,
-    ids: IdsDep,
-    _: PrincipalDep,
-    file: Annotated[UploadFile, File()],
-    kind: Annotated[str, Query()] = "other",
-) -> IntakeSnapshotOut:
-    """Accept a scan and run it through OCR.
-
-    The extraction runs inline here with the mock provider. In production this
-    hands off to an async worker — the shape is the same, and the facts it
-    produces enter the record as unverified either way.
-    """
-    payload = await file.read()
-    document_id = ids.new_id("doc")
-    storage_dir = settings.document_storage_dir
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    storage_key = str(storage_dir / document_id)
-    (storage_dir / document_id).write_bytes(payload)
-
-    now = service.clock.now()
-    await documents.add(
-        document_id=document_id,
-        intake_id=intake_id,
-        kind=kind,
-        content_type=file.content_type or "application/octet-stream",
-        storage_key=storage_key,
-        byte_size=len(payload),
-        uploaded_at=now,
+) -> IntakeOut:
+    """Everything on the record, with contradictions recomputed."""
+    record = await service.load_record(
+        hospital_id=principal.hospital_id, intake_id=intake_id
     )
-    await service.attach_document(
-        intake_id, document_id=document_id, kind=kind, uploaded_at=now
-    )
-
-    ocr = MockOCRProvider(content.concepts, id_factory=ids)
-    extraction = await ocr.process(
-        document_id, payload, content_type=file.content_type or "application/octet-stream"
-    )
-    await documents.mark_processed(
-        document_id,
-        processed_at=service.clock.now(),
-        page_count=len(extraction.pages),
-        overall_confidence=extraction.overall_confidence,
-        low_confidence=extraction.low_confidence,
-        kind=extraction.document_kind,
-    )
-    snapshot = await service.apply_document_extraction(
-        intake_id,
-        document_id=document_id,
-        facts=extraction.facts,
-        low_confidence=extraction.low_confidence,
-        page_count=len(extraction.pages),
-        kind=extraction.document_kind,
-    )
-    return snapshot_out(snapshot)
+    return intake_out(record, labels=labels, demo=settings.demo_mode)
 
 
-@router.post("/{intake_id}/confirm", response_model=IntakeSnapshotOut)
-async def confirm(
+@router.get(
+    "/{intake_id}/report",
+    response_model=ReportOut,
+    summary="The physician report",
+)
+async def get_report(
     intake_id: str,
-    body: ConfirmRequest,
-    service: IntakeServiceDep,
-    guard: IdempotencyDep,
-    _: PrincipalDep,
-) -> IntakeSnapshotOut:
-    """Patient confirmation loop.
+    principal: RequireStaff,
+    service: ReportServiceDep,
+    settings: SettingsDep,
+    language: Annotated[str | None, Query()] = None,
+) -> ReportOut:
+    """Build and return the report.
 
-    Confirming raises certainty on the facts the patient re-affirmed. It does
-    not set `physician_verified` — the two are independent, and neither implies
-    the other.
+    Regenerated on every call rather than served from cache: a document that
+    arrived after the last read changes the document section, and a physician
+    reading a stale report is worse than one waiting a few hundred milliseconds.
     """
-    replay = await guard.stored()
-    if replay is not None:
-        return IntakeSnapshotOut.model_validate(replay.response_body)
-    snapshot = await service.confirm(intake_id, corrections=body.corrections)
-    out = snapshot_out(snapshot)
-    await guard.remember(out.model_dump(mode="json"))
-    return out
+    bundle = await service.build(
+        hospital_id=principal.hospital_id, intake_id=intake_id, language=language
+    )
+    return report_out(bundle, demo=settings.demo_mode)
 
 
-@router.get("/{intake_id}/report", response_model=ReportOut)
-async def report(intake_id: str, service: IntakeServiceDep, _: PrincipalDep) -> ReportOut:
-    return report_out(await service.summary(intake_id))
-
-
-@router.get("/{intake_id}/fhir", response_model=dict)
-async def fhir_bundle(
+@router.get(
+    "/{intake_id}/facts/{fact_id}/evidence",
+    summary="What one fact rests on",
+)
+async def get_evidence(
     intake_id: str,
-    service: IntakeServiceDep,
-    principal: Annotated[Principal, Depends(require_roles(Role.PHYSICIAN, Role.STAFF))],
+    fact_id: str,
+    principal: RequireStaff,
+    service: ReportServiceDep,
 ) -> dict[str, Any]:
-    """The intake as a FHIR R4 Bundle.
+    """The transcript turn or document region behind a line of the report.
 
-    Every `Condition` carries dual codes — NAMASTE alongside ICD-11 — wherever a
-    mapping exists, and only the codes that exist where one does not. Nothing a
-    machine derived is asserted as confirmed: an unverified fact maps to
-    `verificationStatus: provisional` or `unconfirmed`.
+    This endpoint is why every fact carries a `SourceRef`. Without it the report
+    is an assertion; with it, it is evidence a clinician can check in one click.
     """
-    return await service.fhir_bundle(intake_id)
+    return await service.evidence_for(
+        hospital_id=principal.hospital_id, intake_id=intake_id, fact_id=fact_id
+    )
 
 
-@router.get("/{intake_id}/facts/{fact_id}/evidence", response_model=EvidenceOut)
-async def evidence(
-    intake_id: str, fact_id: str, service: IntakeServiceDep, _: PrincipalDep
-) -> EvidenceOut:
-    """Provenance for one fact, so a report line links to the transcript offset
-    or the document region it came from."""
-    return EvidenceOut.model_validate(await service.evidence_for(intake_id, fact_id))
-
-
-physician_router = APIRouter(prefix="/physician", tags=["physician"])
-
-
-@physician_router.post("/{intake_id}/verify", response_model=IntakeSnapshotOut)
-async def physician_verify(
+@router.post(
+    "/{intake_id}/verify",
+    response_model=ReportOut,
+    summary="Physician confirms or amends the record",
+)
+async def verify(
     intake_id: str,
-    body: PhysicianVerifyRequest,
-    service: IntakeServiceDep,
-    guard: IdempotencyDep,
-    principal: Annotated[Principal, Depends(require_roles(Role.PHYSICIAN))],
-) -> IntakeSnapshotOut:
-    """Physician sign-off. Physician-only, enforced by `require_roles`."""
+    principal: RequirePhysician,
+    service: ReportServiceDep,
+    settings: SettingsDep,
+    request: Annotated[VerifyRequest, Body()] = VerifyRequest(),
+) -> ReportOut:
+    """Sign off the record, or the fields named.
 
-    async def produce() -> IntakeSnapshotOut:
-        return snapshot_out(
-            await service.physician_verify(
-                intake_id, physician_id=UserId(body.physician_id), concepts=body.concepts
-            )
-        )
-
-    return await idempotent(guard, IntakeSnapshotOut, produce)
-
-
-alerts_router = APIRouter(prefix="/alerts", tags=["alerts"])
-
-
-@alerts_router.post("/{alert_id}/acknowledge", response_model=Acknowledgement)
-async def acknowledge_alert(
-    alert_id: str,
-    service: IntakeServiceDep,
-    guard: IdempotencyDep,
-    principal: Annotated[
-        Principal, Depends(require_roles(Role.TRIAGE, Role.PHYSICIAN, Role.STAFF))
-    ],
-) -> Acknowledgement:
-    """A human takes responsibility for an alert.
-
-    This is the only thing that permits `POST /tickets/{id}/escalate`, and it
-    records who did it. Nothing automatic can reach this endpoint.
+    Writes new fact revisions recording who verified what and when; it does not
+    edit the originals. Unsettled fields are skipped — an unresolved field with
+    a physician's name on it would be a certainty increase with a signature.
     """
-
-    async def produce() -> Acknowledgement:
-        alert = await service.acknowledge_alert(
-            alert_id, user_id=UserId(principal.user_id)
-        )
-        return Acknowledgement(
-            ok=True, message=f"alert {alert.rule_id} acknowledged by {principal.user_id}"
-        )
-
-    return await idempotent(guard, Acknowledgement, produce)
-
-
-@alerts_router.post("/{alert_id}/dismiss", response_model=Acknowledgement)
-async def dismiss_alert(
-    alert_id: str,
-    reason: Annotated[str, Query(min_length=1)],
-    service: IntakeServiceDep,
-    guard: IdempotencyDep,
-    principal: Annotated[Principal, Depends(require_roles(Role.TRIAGE, Role.PHYSICIAN))],
-) -> Acknowledgement:
-
-    async def produce() -> Acknowledgement:
-        alert = await service.dismiss_alert(
-            alert_id, user_id=UserId(principal.user_id), reason=reason
-        )
-        return Acknowledgement(ok=True, message=f"alert {alert.rule_id} dismissed")
-
-    return await idempotent(guard, Acknowledgement, produce)
+    bundle = await service.verify(
+        hospital_id=principal.hospital_id,
+        intake_id=intake_id,
+        physician_id=principal.user_id,
+        field_ids=request.field_ids,
+        language=request.language,
+    )
+    return report_out(bundle, demo=settings.demo_mode)

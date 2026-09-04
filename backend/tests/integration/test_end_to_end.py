@@ -1,490 +1,303 @@
-"""The full journey, driven through the API with mock providers.
+"""The whole path, through the HTTP API — §13.3.
 
-Definition of done item 3: identity → consent → chief complaint → pathway HPI →
-red-flag screen → history sections → document (mock OCR) → contradiction surfaced
-→ patient confirmation → report generated → ticket queued → physician
-verification, asserting the report content at the end.
+Ingest a kiosk payload, upload a prescription, let the OCR pass run, watch the
+contradiction surface, read the report, export the FHIR bundle. Every one of
+those steps has its own test elsewhere; none of them proves the pipeline is
+connected, and a build where each piece works and the wiring does not is the
+build that fails on stage.
 
-Runs on SQLite with the deterministic mocks, so it needs no network and no
-Postgres — the point is that the whole system runs end to end in CI.
+Deliberately over the API rather than over the services. The services are called
+by routers, by dependency-injected repositories, inside a tenant context set from
+an auth token — and that is the assembly that ships. A test that calls
+`IngestService.ingest` directly skips authentication, tenancy, serialisation and
+the background task, which is most of what there is to get wrong.
 """
 
 from __future__ import annotations
 
-import io
+from typing import Any
 
 import pytest
-from httpx import AsyncClient
 
-from tests.api.conftest import KIOSK, PHYSICIAN, STAFF, TRIAGE
-
-PREFIX = "/api/v1"
-KC_QUEUE = "q-kc-general"
-KC_INSTANCE = "qi-q-kc-general-2026-01-15"
-
-
-class Journey:
-    """A small driver so the test below reads as the story it is testing."""
-
-    def __init__(self, api: AsyncClient) -> None:
-        self.api = api
-        self.intake_id = ""
-        self.last: dict = {}
-
-    async def start(self) -> dict:
-        response = await self.api.post(
-            f"{PREFIX}/intakes",
-            json={"kiosk_id": "kiosk-1", "department_code": "KC"},
-            headers=KIOSK,
-        )
-        assert response.status_code == 201, response.text
-        self.last = response.json()
-        self.intake_id = self.last["intake"]["intake_id"]
-        return self.last
-
-    async def answer(self, concept: str, value: object = None, **extra: object) -> dict:
-        response = await self.api.post(
-            f"{PREFIX}/intakes/{self.intake_id}/answers",
-            json={"concept": concept, "value": value, **extra},
-            headers=KIOSK,
-        )
-        assert response.status_code == 200, f"{concept}: {response.text}"
-        self.last = response.json()
-        return self.last
-
-    async def consent(self) -> dict:
-        response = await self.api.post(
-            f"{PREFIX}/consent",
-            json={
-                "intake_id": self.intake_id,
-                "language": "hi",
-                "granted_purposes": ["history_intake", "document_processing"],
-                "refused_purposes": ["raw_audio_retention"],
-                "granting_party": "self",
-            },
-            headers=KIOSK,
-        )
-        assert response.status_code == 201, response.text
-        return response.json()
-
-    async def next_step(self) -> dict:
-        response = await self.api.get(
-            f"{PREFIX}/intakes/{self.intake_id}/next-step", headers=KIOSK
-        )
-        return response.json()
-
-    async def report(self) -> dict:
-        response = await self.api.get(
-            f"{PREFIX}/intakes/{self.intake_id}/report", headers=PHYSICIAN
-        )
-        assert response.status_code == 200, response.text
-        return response.json()
-
-    async def drive_to_completion(self, limit: int = 120) -> int:
-        """Answer whatever is asked until the machine says Complete."""
-        for asked in range(limit):
-            step = await self.next_step()
-            if step["kind"] == "complete":
-                return asked
-            await self.answer(step["concept"], _plausible(step))
-        raise AssertionError(f"intake did not complete within {limit} questions")
-
-
-def _plausible(step: dict) -> object:
-    """A valid answer for whatever the step asks."""
-    shape = step["answer"]["type"]
-    options = [o for o in step["answer"]["options"] if o != "unknown"]
-    if shape in {"single_choice", "confirmation"}:
-        return options[0] if options else "yes"
-    if shape == "multi_choice":
-        return [options[0]] if options else ["unknown"]
-    if shape == "scale":
-        return 5
-    if shape == "duration":
-        return {"magnitude": 3, "unit": "days"}
-    if shape == "quantity":
-        return {"magnitude": 34, "unit": step["answer"]["unit"] or "unit"}
-    if shape == "date":
-        return "2019"
-    if shape == "yes_no_unknown":
-        return "no"
-    return "recorded"
+from tests.conftest import KIOSK_HEADERS, PHYSICIAN_HEADERS, STAFF_HEADERS
 
 
 @pytest.fixture
-async def journey(api: AsyncClient) -> Journey:
-    return Journey(api)
+def journey(
+    app_client: Any, kiosk_payload: dict[str, Any], ocr_images: dict[str, bytes]
+) -> dict[str, Any]:
+    """One patient's complete visit.
 
-
-async def apply_document_fact(
-    api: AsyncClient,
-    intake_id: str,
-    *,
-    concept: str,
-    display: str,
-    text: str,
-    confidence: float,
-) -> None:
-    """Fold a document-derived fact into an intake.
-
-    Uses `IntakeService.apply_document_extraction` — the same entry point the
-    async OCR worker will call — against the same database the app is using.
+    A Hindi intake naming "Metformin", then a photographed prescription reading
+    `900.2 mg` — the digit the OCR benchmark actually got wrong. The two are the
+    same drug under different field ids, which is exactly the case the alignment
+    pass exists to make comparable.
     """
-    from app.core.config import Settings
-    from app.core.content import get_clinical_content
-    from app.domain.clinical.enums import (
-        Certainty,
-        FactStatus,
-        ReporterRole,
-        Section,
-        SourceType,
-        Temporality,
+    ingest = app_client.post(
+        "/api/v1/intakes/ingest", json=kiosk_payload, headers=KIOSK_HEADERS
     )
-    from app.domain.clinical.fact import ClinicalFact
-    from app.domain.clinical.provenance import (
-        ConceptRef,
-        DocumentId,
-        FactId,
-        SourceRef,
-        TextValue,
-    )
-    from app.repositories.alerts import AlertRepository
-    from app.repositories.consent import ConsentRepository
-    from app.repositories.intakes import IntakeRepository
-    from app.services.intake import IntakeService
+    assert ingest.status_code == 200, ingest.text
+    intake_id = ingest.json()["intake_id"]
 
-    fact = ClinicalFact(
-        fact_id=FactId(f"doc-fact-{concept}"),
-        concept=ConceptRef(concept, display=display),
-        status=FactStatus.PRESENT,
-        certainty=Certainty.REPORTED,
-        temporality=Temporality.HISTORICAL,
-        source_type=SourceType.DOCUMENT,
-        source_ref=SourceRef.from_document(DocumentId("Discharge_summary_2.jpg"), page=1),
-        confidence=confidence,
-        reported_by=ReporterRole.STAFF,
-        recorded_at=api.clock.now(),  # type: ignore[attr-defined]
-        section=Section.PAST_MEDICAL,
-        value=TextValue(text),
-    )
-
-    async with api.sessions() as session:  # type: ignore[attr-defined]
-        service = IntakeService(
-            intakes=IntakeRepository(session),
-            alerts=AlertRepository(session),
-            consent=ConsentRepository(session),
-            content=get_clinical_content(),
-            bus=api.bus,  # type: ignore[attr-defined]
-            settings=Settings(environment="test"),
-            clock=api.clock,  # type: ignore[attr-defined]
-        )
-        await service.apply_document_extraction(
-            intake_id,
-            document_id="Discharge_summary_2.jpg",
-            facts=(fact,),
-            low_confidence=False,
-            page_count=1,
-            kind="discharge_summary",
-        )
-        await session.commit()
-
-
-class TestFullIntakeJourney:
-    async def test_the_whole_story(self, api: AsyncClient, journey: Journey) -> None:
-        # --- identity -------------------------------------------------------
-        first = await journey.start()
-        assert first["next_step"]["concept"] == "preferred_language"
-        assert first["intake"]["state"] == "not_started"
-
-        await journey.answer("preferred_language", "hi")
-        assert journey.last["next_step"]["language"] == "hi"
-
-        await journey.answer("reporter_role", "self")
-        await journey.answer("age", {"magnitude": 58, "unit": "years"})
-        await journey.answer("sex", "male")
-
-        # --- consent --------------------------------------------------------
-        # No clinical fact may be recorded before this point.
-        blocked = await api.post(
-            f"{PREFIX}/intakes/{journey.intake_id}/answers",
-            json={"concept": "chief_complaint", "value": "chest_pain"},
-            headers=KIOSK,
-        )
-        assert blocked.status_code == 403
-
-        artefact = await journey.consent()
-        assert artefact["granted_purposes"] == ["history_intake", "document_processing"]
-        assert "raw_audio_retention" in artefact["refused_purposes"]
-
-        # A male patient is never asked about pregnancy; the record says why.
-        state = (await api.get(f"{PREFIX}/intakes/{journey.intake_id}", headers=KIOSK)).json()
-        pregnancy = [f for f in state["intake"]["facts"] if f["concept"] == "pregnancy"]
-        assert pregnancy and pregnancy[0]["status"] == "not_applicable"
-
-        # --- chief complaint, in the patient's own words ----------------------
-        await journey.answer(
-            "chief_complaint",
-            "chest_pain",
-            original_expression="seene mein jalan aur saans phoolna",
-            original_language="hi",
-            source_type="voice",
-            segment_id="seg-1",
-            start_ms=0,
-            end_ms=2400,
-            confidence=0.91,
-        )
-        assert journey.last["intake"]["active_pathway"] == "chest_pain"
-
-        # --- pathway HPI ------------------------------------------------------
-        await journey.answer("onset", "sudden")
-        await journey.answer("severity", 8)
-        await journey.answer("radiation", "to_left_arm")
-
-        # --- red-flag screen --------------------------------------------------
-        await journey.answer("dyspnoea", "yes")
-        alerts = journey.last["alerts"]
-        assert alerts, "expected an urgent review criterion to trigger"
-        rule_ids = {a["rule_id"] for a in alerts}
-        assert "acute_chest_pain_with_dyspnoea" in rule_ids
-        for alert in alerts:
-            assert alert["patient_safe_label"] == "Urgent clinical review criterion triggered"
-            assert alert["clinical_source"]
-            assert alert["is_open"], "an alert starts open and awaiting a human"
-
-        # --- the alert has changed nothing about the queue --------------------
-        ticket = (
-            await api.post(
-                f"{PREFIX}/queues/{KC_QUEUE}/tickets",
-                json={
-                    "instance_id": KC_INSTANCE,
-                    "intake_id": journey.intake_id,
-                    "age_years": 58,
-                },
-                headers=STAFF,
+    upload = app_client.post(
+        f"/api/v1/intakes/{intake_id}/documents",
+        files={
+            "file": (
+                "prescription.jpg",
+                ocr_images["prescription_lowconf"],
+                "image/jpeg",
             )
-        ).json()
-        assert ticket["queue_state"] == "waiting"
-        assert ticket["priority_class"] == "walkin"
+        },
+        data={"kind": "prescription"},
+        headers=KIOSK_HEADERS,
+    )
+    assert upload.status_code == 202, upload.text
 
-        # --- history sections, including a denial that will conflict ----------
-        await journey.answer("known_diabetes", "no")
-
-        # --- document upload and mock OCR -------------------------------------
-        upload = await api.post(
-            f"{PREFIX}/intakes/{journey.intake_id}/documents",
-            files={"file": ("Discharge_summary_2.jpg", io.BytesIO(b"scan"), "image/jpeg")},
-            params={"kind": "discharge_summary"},
-            headers=KIOSK,
-        )
-        assert upload.status_code == 200, upload.text
-        assert upload.json()["intake"]["documents"]
-
-        # --- finish the remaining history -------------------------------------
-        await journey.drive_to_completion()
-
-        # --- patient confirmation ----------------------------------------------
-        confirmed = await api.post(
-            f"{PREFIX}/intakes/{journey.intake_id}/confirm",
-            json={"corrections": []},
-            headers=KIOSK,
-        )
-        assert confirmed.status_code == 200, confirmed.text
-        body = confirmed.json()
-        assert body["coverage"]["is_complete"]
-        assert body["intake"]["state"] in {"ready", "awaiting_confirmation"}
-
-        # Confirmation raised certainty but not verification.
-        complaint = next(
-            f for f in body["intake"]["facts"] if f["concept"] == "chief_complaint"
-        )
-        assert complaint["patient_confirmed"] is True
-        assert complaint["physician_verified"] is False
-
-        # --- the report ---------------------------------------------------------
-        report = await journey.report()
-        text = report["rendered_text"]
-
-        assert text.startswith("DRAFT PRE-CONSULTATION INTAKE")
-        assert "no diagnosis and no clinical advice" in text
-        # The patient's own words survived the whole pipeline.
-        assert "seene mein jalan aur saans phoolna" in text
-        assert "CHIEF COMPLAINT" in text
-        assert "HISTORY OF PRESENTING ILLNESS" in text
-        assert "SAFETY" in text
-        assert "Urgent clinical review criterion triggered" in text
-        # Nothing that reads as a diagnosis or a piece of advice.
-        for forbidden in ("myocardial infarction", "heart attack", "you have", "we recommend"):
-            assert forbidden not in text.lower()
-        assert report["coverage_percentage"] == 100.0
-        assert report["physician_verified"] is False
-
-        # Every rendered line links back to the facts behind it.
-        lines = [line for section in report["sections"] for line in section["lines"]]
-        assert lines
-        assert all(line["fact_ids"] for line in lines)
-
-        # --- evidence click-through ---------------------------------------------
-        evidence = await api.get(
-            f"{PREFIX}/intakes/{journey.intake_id}/facts/"
-            f"{complaint['fact_id']}/evidence",
-            headers=PHYSICIAN,
-        )
-        assert evidence.status_code == 200
-        detail = evidence.json()
-        assert detail["original_expression"] == "seene mein jalan aur saans phoolna"
-        assert detail["revisions"]
-
-        # --- triage acknowledges, then escalates ---------------------------------
-        alert_id = alerts[0]["alert_id"]
-        refused = await api.post(
-            f"{PREFIX}/tickets/{ticket['ticket_id']}/escalate",
-            json={"alert_id": alert_id, "acting_user_id": "triage-1"},
-            headers=TRIAGE,
-        )
-        assert refused.status_code == 403, "escalation must require acknowledgement"
-
-        await api.post(f"{PREFIX}/alerts/{alert_id}/acknowledge", headers=TRIAGE)
-        escalated = await api.post(
-            f"{PREFIX}/tickets/{ticket['ticket_id']}/escalate",
-            json={"alert_id": alert_id, "acting_user_id": "triage-1"},
-            headers=TRIAGE,
-        )
-        assert escalated.json()["queue_state"] == "escalated"
-        assert escalated.json()["priority_class"] == "emergency"
-
-        # --- physician verification ------------------------------------------------
-        verified = await api.post(
-            f"{PREFIX}/physician/{journey.intake_id}/verify",
-            json={"physician_id": "dr-1"},
-            headers=PHYSICIAN,
-        )
-        assert verified.status_code == 200
-        assert all(
-            f["physician_verified"]
-            for f in verified.json()["intake"]["facts"]
-            if f["status"] not in {"not_asked", "not_applicable"}
-        )
-
-        # --- the consultation runs ---------------------------------------------------
-        await api.post(f"{PREFIX}/tickets/{ticket['ticket_id']}/start", headers=PHYSICIAN)
-        completed = await api.post(
-            f"{PREFIX}/tickets/{ticket['ticket_id']}/complete", headers=PHYSICIAN
-        )
-        assert completed.json()["queue_state"] == "completed"
+    return {"intake_id": intake_id, "ingest": ingest.json(), "upload": upload.json()}
 
 
-class TestAttendantReportedJourney:
-    async def test_an_attendant_reported_history_is_marked_as_such(
-        self, api: AsyncClient, journey: Journey
+class TestIngest:
+    def test_the_kiosk_payload_is_accepted_and_needs_no_repair(
+        self, journey: dict[str, Any]
     ) -> None:
-        """A son answering for his mother is weaker evidence than she is, and the
-        physician must be able to see which."""
-        await journey.start()
-        await journey.answer("preferred_language", "hi")
-        await journey.answer("reporter_role", "family_attendant")
-        await journey.consent()
-        await journey.answer(
-            "chief_complaint",
-            "joint_pain",
-            original_expression="maa ko jodon mein dard hai",
-            original_language="hi",
-            source_type="voice",
-            segment_id="s1",
-            start_ms=0,
-            end_ms=1800,
-        )
-        fact = next(
-            f for f in journey.last["intake"]["facts"] if f["concept"] == "chief_complaint"
-        )
-        assert fact["reported_by"] == "family_attendant"
+        body = journey["ingest"]
+        assert body["repaired"] is False
+        assert body["needs_manual_review"] is False
+        assert body["status"] == "complete"
+        # The useful half of the response: the fields the device could not
+        # settle, so staff can fill them before the consultation.
+        assert "severity" in body["unresolved_fields"]
 
-        await journey.drive_to_completion()
-        report = await journey.report()
-        assert "reported by attendant" in report["rendered_text"]
+    def test_the_upload_returns_immediately(self, journey: dict[str, Any]) -> None:
+        """202 and a document id.
 
-
-class TestAbandonedJourney:
-    async def test_an_abandoned_intake_keeps_what_was_captured(
-        self, api: AsyncClient, journey: Journey
-    ) -> None:
-        """A patient who walks away mid-history leaves a partial record, not a
-        deleted one — and the report says exactly what is missing."""
-        await journey.start()
-        await journey.answer("preferred_language", "en")
-        await journey.consent()
-        await journey.answer("chief_complaint", "fever")
-
-        report = await journey.report()
-        assert report["coverage_percentage"] < 100.0
-        assert report["unresolved"], "an incomplete intake must say what it is missing"
-        text = report["rendered_text"]
-        assert "UNRESOLVED" in text
-        assert "not asked" in text
-
-
-class TestContradictionSurfacing:
-    async def test_a_denial_against_a_prior_record_is_surfaced_unresolved(
-        self, api: AsyncClient, journey: Journey
-    ) -> None:
-        """The conflict is the finding. The system reports both sides and stops.
-
-        The document fact is injected through `apply_document_extraction`, which
-        is the same entry point the async OCR worker will use — this build ships
-        the mock provider, so the test stands in for the worker.
+        Nothing about the patient's experience waits on a model. They have
+        already answered the questions and gone to sit down.
         """
-        await journey.start()
-        await journey.answer("preferred_language", "en")
-        await journey.consent()
-        await journey.answer("chief_complaint", "fever")
-        await journey.answer("known_diabetes", "no")
+        assert journey["upload"]["document_id"]
+        assert journey["upload"]["status"] in {"received", "processing", "processed"}
 
-        await apply_document_fact(
-            api,
-            journey.intake_id,
-            concept="known_diabetes",
-            display="Diabetes",
-            text="Type 2 Diabetes Mellitus",
-            confidence=0.94,
-        )
 
-        report = await journey.report()
-        assert report["conflicts"], "the disagreement must be surfaced"
-        conflict = report["conflicts"][0]
-        assert conflict["concept"] == "known_diabetes"
-        assert conflict["resolution"] == "Physician verification required"
-        assert conflict["reported_today"]["statement"] == "denies Diabetes"
-        assert "Type 2 Diabetes Mellitus" in conflict["from_record"]["statement"]
-        # Neither side is presented as the correct one.
-        assert conflict["reported_today"]["source_type"] == "touch"
-        assert conflict["from_record"]["source_type"] == "document"
-        assert conflict["from_record"]["confidence"] == 0.94
-
-        text = report["rendered_text"]
-        assert "INFORMATION CONFLICT" in text
-        assert "Physician verification required" in text
-
-    async def test_the_patient_s_own_answer_is_not_overwritten_by_the_document(
-        self, api: AsyncClient, journey: Journey
+class TestTheDocumentIsRead:
+    def test_ocr_ran_and_the_document_is_attached_to_the_intake(
+        self, app_client: Any, journey: dict[str, Any]
     ) -> None:
-        """A scan must never silently replace what the patient said."""
-        await journey.start()
-        await journey.answer("preferred_language", "en")
-        await journey.consent()
-        await journey.answer("chief_complaint", "fever")
-        await journey.answer("known_diabetes", "no")
-
-        await apply_document_fact(
-            api,
-            journey.intake_id,
-            concept="known_diabetes",
-            display="Diabetes",
-            text="Type 2 Diabetes Mellitus",
-            confidence=0.94,
+        """The background task ran; `TestClient` drains it before returning."""
+        listed = app_client.get(
+            f"/api/v1/intakes/{journey['intake_id']}/documents", headers=STAFF_HEADERS
         )
+        assert listed.status_code == 200, listed.text
+        documents = listed.json()
+        assert len(documents) == 1
+        assert documents[0]["status"] == "processed"
+        assert documents[0]["low_confidence"] is True
 
-        state = (
-            await api.get(f"{PREFIX}/intakes/{journey.intake_id}", headers=KIOSK)
+    def test_the_low_confidence_dose_is_marked_rather_than_trusted(
+        self, app_client: Any, journey: dict[str, Any]
+    ) -> None:
+        """`900.2` for `100.2`. Read, kept, and flagged for a human to check."""
+        record = app_client.get(
+            f"/api/v1/intakes/{journey['intake_id']}", headers=STAFF_HEADERS
         ).json()
-        live = next(f for f in state["intake"]["facts"] if f["concept"] == "known_diabetes")
-        assert live["status"] == "absent", "the patient's denial stands"
-        assert live["source_type"] == "touch"
+        doses = [
+            fact
+            for fact in record["facts"]
+            if fact["channel"] == "document" and "metformin" in fact["field_id"]
+        ]
+        assert doses, "the prescription produced no medication fact"
+        assert all(fact["needs_verification"] for fact in doses)
+        assert any("900.2" in (fact["rendered"] or "") for fact in doses)
+
+
+class TestTheContradictionSurfaces:
+    def test_the_spoken_dose_and_the_printed_dose_are_compared(
+        self, app_client: Any, journey: dict[str, Any]
+    ) -> None:
+        """The point of the whole pipeline.
+
+        The patient said "Metformin". The paper says "900.2 mg BD". Different
+        field ids, same drug, and the physician needs to be told they disagree —
+        not told the patient forgot to mention a medicine they did mention.
+        """
+        record = app_client.get(
+            f"/api/v1/intakes/{journey['intake_id']}", headers=STAFF_HEADERS
+        ).json()
+        conflicts = {c["field_id"] for c in record["contradictions"]}
+        assert "medication_metformin" in conflicts
+
+        metformin = next(
+            c for c in record["contradictions"] if c["field_id"] == "medication_metformin"
+        )
+        assert metformin["reported_today"] is not None, (
+            "the voice answer was not aligned onto the document field, so the "
+            "prescription reads as a medicine the patient never mentioned"
+        )
+        assert metformin["resolution"]
+
+    def test_the_record_asks_for_review(
+        self, app_client: Any, journey: dict[str, Any]
+    ) -> None:
+        record = app_client.get(
+            f"/api/v1/intakes/{journey['intake_id']}", headers=STAFF_HEADERS
+        ).json()
+        assert record["needs_review"] is True
+
+    def test_the_intake_shows_on_the_worklist_needing_a_human(
+        self, app_client: Any, journey: dict[str, Any]
+    ) -> None:
+        worklist = app_client.get("/api/v1/worklist", headers=STAFF_HEADERS).json()
+        row = next(
+            entry
+            for entry in worklist["entries"]
+            if entry["intake_id"] == journey["intake_id"]
+        )
+        assert row["state"] == "needs_review"
+        assert row["contradiction_count"] >= 1
+
+
+class TestTheReport:
+    def test_it_renders_in_the_patients_language_by_default(
+        self, app_client: Any, journey: dict[str, Any], content: Any
+    ) -> None:
+        """The intake was conducted in Hindi, so the report comes out in Hindi.
+
+        Not the server's default and not the reader's preference: the language
+        the patient answered in is the language their words are printed in, and
+        a report that defaulted to English would put a translation beside them.
+        """
+        response = app_client.get(
+            f"/api/v1/intakes/{journey['intake_id']}/report", headers=STAFF_HEADERS
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["language"] == "hi"
+        assert content.templates.require("hi").text("header_disclaimer") in body["text"]
+
+    @pytest.mark.parametrize("language", ["en", "hi"])
+    def test_it_carries_the_disclaimer_the_conflict_and_the_raw_reading(
+        self, app_client: Any, journey: dict[str, Any], content: Any, language: str
+    ) -> None:
+        response = app_client.get(
+            f"/api/v1/intakes/{journey['intake_id']}/report",
+            params={"language": language},
+            headers=STAFF_HEADERS,
+        )
+        assert response.status_code == 200, response.text
+        text = response.json()["text"]
+
+        templates = content.templates.require(language)
+        assert templates.text("header_disclaimer") in text
+        assert templates.text("footer_disclaimer") in text
+        # The patient's own words, in the script they were spoken in, in both.
+        assert "पेट में दर्द" in text
+        # The disputed dose, and the marker that says not to trust the digits.
+        assert "900.2" in text
+        assert templates.text("verify_marker") in text
+
+    def test_it_states_no_diagnosis_and_no_advice(
+        self, app_client: Any, journey: dict[str, Any]
+    ) -> None:
+        from app.domain.report.safety import find_unsupported_assertions
+
+        text = app_client.get(
+            f"/api/v1/intakes/{journey['intake_id']}/report", headers=STAFF_HEADERS
+        ).json()["text"]
+        assert find_unsupported_assertions(text) == ()
+
+    def test_a_physician_can_verify_it(
+        self, app_client: Any, journey: dict[str, Any]
+    ) -> None:
+        """Sign-off writes revisions; it does not edit the originals."""
+        response = app_client.post(
+            f"/api/v1/intakes/{journey['intake_id']}/verify",
+            json={},
+            headers=PHYSICIAN_HEADERS,
+        )
+        assert response.status_code == 200, response.text
+
+        record = app_client.get(
+            f"/api/v1/intakes/{journey['intake_id']}", headers=STAFF_HEADERS
+        ).json()
+        verified = [f for f in record["facts"] if f["physician_verified"]]
+        assert verified, "verification recorded nothing"
+        # An unsettled field never acquires a signature: that would be a
+        # certainty increase with a physician's name attached to it.
+        assert all(f["status"] == "answered" for f in verified)
+
+
+class TestTheFHIRBundle:
+    """§10 — the bundle, checked structurally.
+
+    Not a schema validation: that runs against the public validator and is
+    marked `network` in `tests/adapters/test_fhir.py`. What is asserted here is
+    that the exchange format comes out of the *live pipeline* intact — with the
+    documents and the contradictions in it, over HTTP, under a real token.
+    """
+
+    @pytest.fixture
+    def bundle(self, app_client: Any, journey: dict[str, Any]) -> dict[str, Any]:
+        response = app_client.get(
+            f"/api/v1/fhir/intakes/{journey['intake_id']}", headers=STAFF_HEADERS
+        )
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"].startswith("application/fhir+json")
+        parsed: dict[str, Any] = response.json()
+        return parsed
+
+    def test_it_is_a_bundle_of_resolvable_resources(
+        self, bundle: dict[str, Any]
+    ) -> None:
+        from tests.integration.fhir_checks import structural_errors
+
+        assert structural_errors(bundle) == []
+
+    def test_it_carries_the_patient_the_encounter_and_the_document(
+        self, bundle: dict[str, Any]
+    ) -> None:
+        kinds = [entry["resource"]["resourceType"] for entry in bundle["entry"]]
+        assert kinds[:2] == ["Patient", "Encounter"]
+        assert "DocumentReference" in kinds
+        assert "MedicationStatement" in kinds
+
+    def test_the_unresolved_field_is_absent_rather_than_false(
+        self, bundle: dict[str, Any]
+    ) -> None:
+        """Severity was asked and never settled.
+
+        It must come out as `dataAbsentReason: unknown` — not as a value, and
+        emphatically not as `false`. FHIR has the code because the distinction
+        matters, and this is the one place a bundle could quietly lie.
+        """
+        severity = _resource_for_field(bundle, "Severity")
+        assert "valueQuantity" not in severity
+        assert severity["dataAbsentReason"]["coding"][0]["code"] == "unknown"
+
+    def test_the_refused_field_says_it_was_refused(
+        self, bundle: dict[str, Any]
+    ) -> None:
+        tobacco = _resource_for_field(bundle, "tobacco")
+        assert tobacco["dataAbsentReason"]["coding"][0]["code"] == "asked-declined"
+
+    def test_nothing_the_patient_said_was_translated(
+        self, bundle: dict[str, Any]
+    ) -> None:
+        """`original_text` travels with the fact, in the original script."""
+        originals = [
+            extension["valueString"]
+            for entry in bundle["entry"]
+            for extension in entry["resource"].get("extension", [])
+            if extension["url"].endswith("/original-text")
+        ]
+        assert "पेट में दर्द" in originals
+
+
+def _resource_for_field(bundle: dict[str, Any], label: str) -> dict[str, Any]:
+    """The resource whose `code.text` is `label`."""
+    for entry in bundle["entry"]:
+        resource = entry["resource"]
+        if resource.get("code", {}).get("text") == label:
+            return resource
+    raise AssertionError(
+        f"no resource for {label!r}; bundle has "
+        f"{sorted({e['resource'].get('code', {}).get('text', '') for e in bundle['entry']})}"
+    )

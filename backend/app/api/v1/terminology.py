@@ -14,7 +14,8 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
 
-from app.api.deps import PrincipalDep, TerminologyServiceDep
+from app.api.auth import RequireStaff
+from app.api.deps import TerminologyServiceDep
 from app.schemas.terminology import TerminologyMatchOut, TerminologySearchOut
 from app.services.terminology import SUPPORTED_SYSTEMS
 
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/terminology", tags=["terminology"])
 @router.get("/search", response_model=TerminologySearchOut)
 async def search(
     service: TerminologyServiceDep,
-    _: PrincipalDep,
+    _: RequireStaff,
     q: Annotated[str, Query(min_length=1)],
     systems: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
@@ -51,21 +52,21 @@ async def search(
 
 @router.get("/CodeSystem/{system}", response_model=dict)
 async def code_system(
-    system: str, service: TerminologyServiceDep, _: PrincipalDep
+    system: str, service: TerminologyServiceDep, _: RequireStaff
 ) -> dict[str, Any]:
     """FHIR R4 `CodeSystem` for one terminology."""
     return await service.code_system(system)
 
 
 @router.get("/ConceptMap", response_model=dict)
-async def concept_map(service: TerminologyServiceDep, _: PrincipalDep) -> dict[str, Any]:
+async def concept_map(service: TerminologyServiceDep, _: RequireStaff) -> dict[str, Any]:
     """FHIR R4 `ConceptMap` across NAMASTE, TM2 and MMS."""
     return await service.concept_map()
 
 
 @router.get("/ValueSet/{system}", response_model=dict)
 async def value_set(
-    system: str, service: TerminologyServiceDep, _: PrincipalDep
+    system: str, service: TerminologyServiceDep, _: RequireStaff
 ) -> dict[str, Any]:
     """FHIR R4 `ValueSet` enumerating one system's codes."""
     return await service.value_set(system)
@@ -74,7 +75,7 @@ async def value_set(
 @router.get("/dual-codes", response_model=dict[str, str])
 async def dual_codes(
     service: TerminologyServiceDep,
-    _: PrincipalDep,
+    _: RequireStaff,
     system: Annotated[str, Query()],
     code: Annotated[str, Query()],
 ) -> dict[str, str]:

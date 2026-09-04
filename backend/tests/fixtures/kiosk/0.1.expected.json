@@ -1,0 +1,273 @@
+{
+  "completed_at": "2026-09-03T10:21:05+05:30",
+  "contradictions": [],
+  "created_at": "2026-09-03T10:21:05Z",
+  "department_code": "kayachikitsa",
+  "documents": [],
+  "facts": [
+    {
+      "certainty": "reported",
+      "channel": "voice",
+      "confidence": null,
+      "fact_id": "fact_52419a64-2e5b-5d56-980f-4f457f0c226b",
+      "field_id": "breathlessness",
+      "language": "hi",
+      "needs_verification": false,
+      "note": null,
+      "original_text": null,
+      "physician_verified": false,
+      "recorded_at": "2026-09-03T10:21:05+05:30",
+      "repaired": false,
+      "reported_by": "self",
+      "section": "red_flag_screen",
+      "source": {
+        "kind": "turn",
+        "question_id": null,
+        "transcript_excerpt": null,
+        "turn_id": 0
+      },
+      "status": "not_asked",
+      "supersedes": null,
+      "value": null
+    },
+    {
+      "certainty": "reported",
+      "channel": "voice",
+      "confidence": 0.93,
+      "fact_id": "fact_8c490cd3-3921-576b-a38a-d48698231624",
+      "field_id": "chief_complaint",
+      "language": "hi",
+      "needs_verification": false,
+      "note": null,
+      "original_text": "पेट में दर्द",
+      "physician_verified": false,
+      "recorded_at": "2026-09-03T10:21:05+05:30",
+      "repaired": false,
+      "reported_by": "self",
+      "section": "chief_complaint",
+      "source": {
+        "kind": "turn",
+        "question_id": "ask_complaint",
+        "transcript_excerpt": "पेट में दर्द",
+        "turn_id": 1
+      },
+      "status": "answered",
+      "supersedes": null,
+      "value": {
+        "code": "abdominal_pain",
+        "display": null,
+        "kind": "coded",
+        "system": null
+      }
+    },
+    {
+      "certainty": "reported",
+      "channel": "voice",
+      "confidence": 0.86,
+      "fact_id": "fact_e025b602-c9a2-5a24-a886-be475fb08fd5",
+      "field_id": "current_medications",
+      "language": "hi",
+      "needs_verification": false,
+      "note": null,
+      "original_text": "हाँ, मेटफॉर्मिन",
+      "physician_verified": false,
+      "recorded_at": "2026-09-03T10:21:05+05:30",
+      "repaired": false,
+      "reported_by": "self",
+      "section": "medications",
+      "source": {
+        "kind": "turn",
+        "question_id": "ask_medications",
+        "transcript_excerpt": "हाँ, मेटफॉर्मिन",
+        "turn_id": 7
+      },
+      "status": "answered",
+      "supersedes": null,
+      "value": {
+        "kind": "text",
+        "text": "Metformin 500"
+      }
+    },
+    {
+      "certainty": "reported",
+      "channel": "voice",
+      "confidence": 0.9,
+      "fact_id": "fact_76f6a1db-2d68-5aff-b058-4502e201aab2",
+      "field_id": "drug_allergy",
+      "language": "hi",
+      "needs_verification": false,
+      "note": null,
+      "original_text": null,
+      "physician_verified": false,
+      "recorded_at": "2026-09-03T10:21:05+05:30",
+      "repaired": false,
+      "reported_by": "self",
+      "section": "allergies",
+      "source": {
+        "kind": "turn",
+        "question_id": null,
+        "transcript_excerpt": null,
+        "turn_id": 8
+      },
+      "status": "answered",
+      "supersedes": null,
+      "value": {
+        "kind": "boolean",
+        "value": false
+      }
+    },
+    {
+      "certainty": "reported",
+      "channel": "voice",
+      "confidence": 0.91,
+      "fact_id": "fact_979d8071-6727-500f-85bc-14f4c0fa97f3",
+      "field_id": "duration",
+      "language": "hi",
+      "needs_verification": false,
+      "note": null,
+      "original_text": "तीन दिन से",
+      "physician_verified": false,
+      "recorded_at": "2026-09-03T10:21:05+05:30",
+      "repaired": false,
+      "reported_by": "self",
+      "section": "hpi",
+      "source": {
+        "kind": "turn",
+        "question_id": "ask_duration",
+        "transcript_excerpt": "तीन दिन से",
+        "turn_id": 3
+      },
+      "status": "answered",
+      "supersedes": null,
+      "value": {
+        "kind": "duration",
+        "magnitude": 3.0,
+        "unit": "day"
+      }
+    },
+    {
+      "certainty": "reported",
+      "channel": "voice",
+      "confidence": 0.86,
+      "fact_id": "fact_4f2f9035-f85b-562d-b227-3c78766bf8ed",
+      "field_id": "known_diabetes",
+      "language": "hi",
+      "needs_verification": false,
+      "note": null,
+      "original_text": "हाँ, मेटफॉर्मिन",
+      "physician_verified": false,
+      "recorded_at": "2026-09-03T10:21:05+05:30",
+      "repaired": false,
+      "reported_by": "self",
+      "section": "past_medical",
+      "source": {
+        "kind": "turn",
+        "question_id": "ask_medications",
+        "transcript_excerpt": "हाँ, मेटफॉर्मिन",
+        "turn_id": 7
+      },
+      "status": "answered",
+      "supersedes": null,
+      "value": {
+        "kind": "boolean",
+        "value": true
+      }
+    },
+    {
+      "certainty": "reported",
+      "channel": "voice",
+      "confidence": null,
+      "fact_id": "fact_868271e8-a47d-5a93-834e-1dcf4a550391",
+      "field_id": "pregnancy",
+      "language": "hi",
+      "needs_verification": false,
+      "note": null,
+      "original_text": null,
+      "physician_verified": false,
+      "recorded_at": "2026-09-03T10:21:05+05:30",
+      "repaired": false,
+      "reported_by": "self",
+      "section": "personal_history",
+      "source": {
+        "kind": "turn",
+        "question_id": null,
+        "transcript_excerpt": null,
+        "turn_id": 0
+      },
+      "status": "not_applicable",
+      "supersedes": null,
+      "value": null
+    },
+    {
+      "certainty": "reported",
+      "channel": "voice",
+      "confidence": 0.44,
+      "fact_id": "fact_15fec445-6ec3-5ce1-a371-c518647ea84a",
+      "field_id": "severity",
+      "language": "hi",
+      "needs_verification": false,
+      "note": null,
+      "original_text": "पता नहीं ठीक से",
+      "physician_verified": false,
+      "recorded_at": "2026-09-03T10:21:05+05:30",
+      "repaired": false,
+      "reported_by": "self",
+      "section": "hpi",
+      "source": {
+        "kind": "turn",
+        "question_id": "ask_severity",
+        "transcript_excerpt": "पता नहीं ठीक से",
+        "turn_id": 5
+      },
+      "status": "unresolved",
+      "supersedes": null,
+      "value": null
+    },
+    {
+      "certainty": "reported",
+      "channel": "voice",
+      "confidence": 0.88,
+      "fact_id": "fact_f4e76bf2-faa5-5d1a-8eb1-01dff9314cf4",
+      "field_id": "tobacco",
+      "language": "hi",
+      "needs_verification": false,
+      "note": null,
+      "original_text": "यह नहीं बताना चाहता",
+      "physician_verified": false,
+      "recorded_at": "2026-09-03T10:21:05+05:30",
+      "repaired": false,
+      "reported_by": "self",
+      "section": "personal_history",
+      "source": {
+        "kind": "turn",
+        "question_id": "ask_tobacco",
+        "transcript_excerpt": "यह नहीं बताना चाहता",
+        "turn_id": 9
+      },
+      "status": "refused",
+      "supersedes": null,
+      "value": null
+    }
+  ],
+  "hospital_id": "aiia-delhi",
+  "intake_id": "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e01",
+  "language": "hi",
+  "patient_ref": {
+    "type": "hospital_id",
+    "value": "UHID-100241"
+  },
+  "provenance": {
+    "content_version": "questions-2026-09-01",
+    "engine_version": "jetson-0.4.1",
+    "kiosk_id": "kiosk-aiia-01",
+    "needs_manual_review": false,
+    "repaired": false,
+    "schema_version": "0.1"
+  },
+  "record_version": "1.0",
+  "red_flags": [],
+  "reported_by": "self",
+  "started_at": "2026-09-03T10:14:22+05:30",
+  "status": "complete",
+  "updated_at": "2026-09-03T10:21:05Z"
+}

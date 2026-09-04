@@ -1,9 +1,9 @@
-"""Clinical enumerations.
+"""Clinical enumerations shared across the record, the report and the ontology.
 
-Every enum here is a clinical distinction, not an implementation detail. In
-particular `FactStatus` has five members and none of them may ever be collapsed
-into a boolean: "we did not ask" and "the patient said no" are different facts
-with different medico-legal weight.
+Every enum here is a clinical distinction, not an implementation detail.
+
+The field-status vocabulary lives in `app.domain.record` rather than here,
+because it arrives from the kiosk and is versioned with the canonical record.
 """
 
 from __future__ import annotations
@@ -11,45 +11,12 @@ from __future__ import annotations
 from enum import StrEnum
 
 
-class FactStatus(StrEnum):
-    """Whether a clinical concept is affirmed, denied, or simply unestablished."""
-
-    PRESENT = "present"
-    ABSENT = "absent"
-    UNKNOWN = "unknown"
-    NOT_ASKED = "not_asked"
-    NOT_APPLICABLE = "not_applicable"
-
-
-#: Statuses that mean the question has actually been put to the patient and
-#: settled. `UNKNOWN` counts: "I don't know" is an answer.
-ANSWERED_STATUSES: frozenset[FactStatus] = frozenset(
-    {FactStatus.PRESENT, FactStatus.ABSENT, FactStatus.UNKNOWN}
-)
-
-
-class SourceType(StrEnum):
-    """Where a fact physically came from."""
-
-    VOICE = "voice"
-    TOUCH = "touch"
-    DOCUMENT = "document"
-    PRIOR_RECORD = "prior_record"
-    STAFF = "staff"
-    DERIVED = "derived"
-
-
-class Temporality(StrEnum):
-    """When the fact holds relative to the encounter."""
-
-    CURRENT = "current"
-    HISTORICAL = "historical"
-    APPROXIMATE = "approximate"
-
-
 class ReporterRole(StrEnum):
-    """Who supplied the fact. An attendant-reported history is weaker evidence
-    than a self-reported one and the physician must be able to see which."""
+    """Who supplied the fact.
+
+    An attendant-reported history is weaker evidence than a self-reported one and
+    the physician must be able to see which.
+    """
 
     SELF = "self"
     PARENT_GUARDIAN = "parent_guardian"
@@ -62,7 +29,7 @@ class Certainty(StrEnum):
     """How firmly the reporter committed to the value.
 
     `"maybe two weeks"` is APPROXIMATE and must stay APPROXIMATE. Nothing in the
-    pipeline is permitted to promote certainty.
+    pipeline may promote certainty except a physician, explicitly.
     """
 
     CONFIRMED = "confirmed"
@@ -87,13 +54,15 @@ def certainty_rank(certainty: Certainty) -> int:
 
 
 class Section(StrEnum):
-    """Sections of the intake, in the clinical order a history is taken."""
+    """Sections of the history, in the clinical order it is taken.
+
+    The order is fixed by the problem statement and is the render order of the
+    report — see `SECTION_ORDER`.
+    """
 
     IDENTITY = "identity"
-    CONSENT = "consent"
     CHIEF_COMPLAINT = "chief_complaint"
     HPI = "hpi"
-    RED_FLAG_SCREEN = "red_flag_screen"
     PAST_MEDICAL = "past_medical"
     PAST_SURGICAL = "past_surgical"
     MEDICATIONS = "medications"
@@ -101,18 +70,18 @@ class Section(StrEnum):
     FAMILY_HISTORY = "family_history"
     PERSONAL_HISTORY = "personal_history"
     REVIEW_OF_SYSTEMS = "review_of_systems"
+    INVESTIGATIONS = "investigations"
     AYURVEDA = "ayurveda"
-    DOCUMENTS = "documents"
-    CONFIRMATION = "confirmation"
+    #: Screening answers the Jetson collected alongside its red-flag criteria.
+    RED_FLAG_SCREEN = "red_flag_screen"
+    CONSENT = "consent"
 
 
-#: Canonical section order used by the state machine and the summary builder.
+#: Canonical section order. The report renders in exactly this sequence.
 SECTION_ORDER: tuple[Section, ...] = (
     Section.IDENTITY,
-    Section.CONSENT,
     Section.CHIEF_COMPLAINT,
     Section.HPI,
-    Section.RED_FLAG_SCREEN,
     Section.PAST_MEDICAL,
     Section.PAST_SURGICAL,
     Section.MEDICATIONS,
@@ -120,24 +89,16 @@ SECTION_ORDER: tuple[Section, ...] = (
     Section.FAMILY_HISTORY,
     Section.PERSONAL_HISTORY,
     Section.REVIEW_OF_SYSTEMS,
+    Section.INVESTIGATIONS,
     Section.AYURVEDA,
-    Section.DOCUMENTS,
-    Section.CONFIRMATION,
+    Section.RED_FLAG_SCREEN,
+    Section.CONSENT,
 )
 
 
-class AnswerShape(StrEnum):
-    """Shape of answer a step expects. Drives both touch UI and voice parsing."""
-
-    SINGLE_CHOICE = "single_choice"
-    MULTI_CHOICE = "multi_choice"
-    QUANTITY = "quantity"
-    DURATION = "duration"
-    SCALE = "scale"
-    FREE_TEXT = "free_text"
-    YES_NO_UNKNOWN = "yes_no_unknown"
-    DATE = "date"
-    CONFIRMATION = "confirmation"
+def section_rank(section: Section) -> int:
+    """Position of `section` in the canonical order."""
+    return SECTION_ORDER.index(section)
 
 
 class Severity(StrEnum):
@@ -154,20 +115,3 @@ _SEVERITY_ORDER: tuple[Severity, ...] = (Severity.MODERATE, Severity.HIGH, Sever
 def severity_rank(severity: Severity) -> int:
     """Position of `severity` on the low->high scale."""
     return _SEVERITY_ORDER.index(severity)
-
-
-class IntakeState(StrEnum):
-    """MediKiosk-owned lifecycle of a history-taking session.
-
-    Orthogonal to `QueueState`. Neither derives from the other.
-    """
-
-    NOT_STARTED = "not_started"
-    IDENTIFIED = "identified"
-    CONSENTED = "consented"
-    IN_PROGRESS = "in_progress"
-    AWAITING_CONFIRMATION = "awaiting_confirmation"
-    READY = "ready"
-    SYNCED = "synced"
-    PARTIAL = "partial"
-    ABANDONED = "abandoned"

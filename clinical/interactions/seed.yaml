@@ -1,0 +1,139 @@
+# Drug–drug interaction seed table.
+#
+# Every row carries a `source`. A row without one does not load — see
+# `app/domain/documents/interactions.py`. This is a small, deliberately
+# conservative seed covering pairs common in an Indian OPD population; it is not
+# a substitute for a licensed interaction database and the README says so.
+#
+# Scope: drug–drug only, among medicines the patient is *already taking*.
+# There are no herb–drug rows and there will not be: the evidence base is thin
+# and the claim would not survive review.
+#
+# `effect` is descriptive. It never contains an instruction, a dose change or a
+# recommendation — the report renders every row as "these two may interact,
+# please review".
+#
+# STATUS: engineer-authored from the public sources named below. Pending review
+# by the AIIA clinical mentor before any deployment carrying real patients.
+
+rules:
+  - a: warfarin
+    b: aspirin
+    severity: major
+    effect: "additive bleeding risk"
+    source: "CDSCO National Formulary of India, 6th ed., Appendix: drug interactions"
+
+  - a: warfarin
+    b: ciprofloxacin
+    severity: major
+    effect: "reported increase in anticoagulant effect"
+    source: "WHO Model Formulary 2008, ciprofloxacin monograph"
+
+  - a: warfarin
+    b: fluconazole
+    severity: major
+    effect: "reported increase in anticoagulant effect"
+    source: "WHO Model Formulary 2008, fluconazole monograph"
+
+  - a: metformin
+    b: contrast_media
+    severity: major
+    effect: "reported risk of lactic acidosis around iodinated contrast administration"
+    source: "WHO Model Formulary 2008, metformin monograph"
+
+  - a: enalapril
+    b: spironolactone
+    severity: major
+    effect: "additive risk of raised serum potassium"
+    source: "WHO Model Formulary 2008, ACE inhibitor monograph"
+
+  - a: enalapril
+    b: potassium_chloride
+    severity: major
+    effect: "additive risk of raised serum potassium"
+    source: "WHO Model Formulary 2008, ACE inhibitor monograph"
+
+  - a: amlodipine
+    b: simvastatin
+    severity: moderate
+    effect: "reported increase in simvastatin exposure"
+    source: "WHO Model Formulary 2008, simvastatin monograph"
+
+  - a: clopidogrel
+    b: omeprazole
+    severity: moderate
+    effect: "reported reduction in clopidogrel activation"
+    source: "WHO Model Formulary 2008, clopidogrel monograph"
+
+  - a: digoxin
+    b: furosemide
+    severity: moderate
+    effect: "diuretic-induced low potassium may increase digoxin toxicity"
+    source: "WHO Model Formulary 2008, digoxin monograph"
+
+  - a: methotrexate
+    b: trimethoprim
+    severity: major
+    effect: "additive antifolate effect"
+    source: "WHO Model Formulary 2008, methotrexate monograph"
+
+  - a: metronidazole
+    b: alcohol
+    severity: moderate
+    effect: "reported disulfiram-like reaction"
+    source: "WHO Model Formulary 2008, metronidazole monograph"
+    note: "Recorded only when alcohol appears in the personal history."
+
+  - a: ibuprofen
+    b: enalapril
+    severity: moderate
+    effect: "NSAIDs may reduce the antihypertensive effect and affect renal function"
+    source: "WHO Model Formulary 2008, NSAID monograph"
+
+  - a: ibuprofen
+    b: warfarin
+    severity: major
+    effect: "additive bleeding risk"
+    source: "WHO Model Formulary 2008, NSAID monograph"
+
+  - a: levothyroxine
+    b: calcium_carbonate
+    severity: moderate
+    effect: "reported reduction in levothyroxine absorption when taken together"
+    source: "WHO Model Formulary 2008, levothyroxine monograph"
+
+  - a: levothyroxine
+    b: ferrous_sulphate
+    severity: moderate
+    effect: "reported reduction in levothyroxine absorption when taken together"
+    source: "WHO Model Formulary 2008, levothyroxine monograph"
+
+  - a: phenytoin
+    b: isoniazid
+    severity: moderate
+    effect: "reported increase in phenytoin concentration"
+    source: "WHO Model Formulary 2008, phenytoin monograph"
+
+  - a: rifampicin
+    b: oral_contraceptive
+    severity: major
+    effect: "reported reduction in contraceptive efficacy"
+    source: "WHO Model Formulary 2008, rifampicin monograph"
+
+  - a: atenolol
+    b: verapamil
+    severity: major
+    effect: "additive effect on heart rate and cardiac conduction"
+    source: "WHO Model Formulary 2008, verapamil monograph"
+
+  - a: glibenclamide
+    b: ciprofloxacin
+    severity: moderate
+    effect: "reported disturbance of blood glucose control"
+    source: "WHO Model Formulary 2008, sulfonylurea monograph"
+
+  - a: amitriptyline
+    b: tramadol
+    severity: moderate
+    effect: "additive serotonergic effect and lowered seizure threshold"
+    source: "WHO Model Formulary 2008, tramadol monograph"

@@ -1,0 +1,147 @@
+# The whole system on a laptop, with no Google account and no network.
+#
+# This is the demo path if the venue wifi fails, so it is kept honest rather
+# than convenient: named volumes, health checks, migrations as their own step,
+# and no credential with a value baked in. `docker compose up` must produce a
+# working kiosk-to-report flow or this file is broken.
+#
+# Local defaults are the mock ones — OCR_PROVIDER=mock serves cached results for
+# the fixture documents, ABHA_PROVIDER=mock stamps every response `"source":
+# "mock"` so a mocked government integration is never shown as live, and
+# STORAGE_BACKEND=local writes scans to a named volume. Nothing leaves the
+# machine.
+name: medikiosk
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: infra/docker/Dockerfile
+  environment: &app-env
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-medikiosk}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-medikiosk}
+    CLINICAL_CONTENT_DIR: /app/clinical
+    DOCUMENT_STORAGE_DIR: /app/backend/uploads
+    ENVIRONMENT: ${ENVIRONMENT:-local}
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    LOG_JSON: ${LOG_JSON:-false}
+    STORAGE_BACKEND: local
+    OCR_PROVIDER: ${OCR_PROVIDER:-mock}
+    REPAIR_PROVIDER: ${REPAIR_PROVIDER:-mock}
+    ABHA_PROVIDER: ${ABHA_PROVIDER:-mock}
+    # No broker locally: OCR runs as a background task in the API process, which
+    # is what makes this stack a complete pipeline offline.
+    DOCUMENT_QUEUE: inline
+    DEMO_MODE: ${DEMO_MODE:-false}
+    # `{"<token>": "<hospital_id>"}`. Compose refuses to start without it: a
+    # kiosk token with a default value is a kiosk token everyone knows.
+    KIOSK_TOKENS: ${KIOSK_TOKENS:?set KIOSK_TOKENS in .env}
+  volumes:
+    - uploads:/app/backend/uploads
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medikiosk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-medikiosk}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medikiosk} -d ${POSTGRES_DB:-medikiosk}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Migrations are a step, not a side effect of booting. This runs once, to
+  # completion, before anything serves traffic — the same ordering the cloud
+  # deployment enforces, so the local stack cannot develop a habit the cloud
+  # will not tolerate.
+  migrate:
+    <<: *app
+    command: ["migrate"]
+    restart: "no"
+
+  # The demo facility, the department list and the terminology tables. The
+  # seeder is idempotent, so a restart re-runs it harmlessly.
+  seed:
+    <<: *app
+    command: ["seed"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  api:
+    <<: *app
+    command: ["serve"]
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  # The OCR worker's *deployment shape*, available locally under
+  # `docker compose --profile worker up`.
+  #
+  # It is not in the default stack and does not need to be: with no broker, the
+  # API processes uploads in a FastAPI background task, which is what makes the
+  # laptop path complete offline. In the cloud that same work arrives as a
+  # Pub/Sub push to a second Cloud Run service running this image with
+  # PUBSUB_PUSH_ENABLED=true. Bringing it up here proves the image boots in that
+  # role and lets `POST /api/v1/worker/documents` be exercised by hand against a
+  # real database before anything is deployed.
+  worker:
+    <<: *app
+    command: ["serve"]
+    profiles: ["worker"]
+    environment:
+      <<: *app-env
+      PUBSUB_PUSH_ENABLED: "true"
+      # Optional here, mandatory in the cloud. Compose interpolates every
+      # service's variables whether or not its profile is active, so a `:?`
+      # required-variable here would break the default demo stack for people
+      # who will never run the worker. Left unset, the endpoint has no shared
+      # secret — acceptable only because this container is bound to localhost
+      # and holds no real data. `infra/gcp/40-deploy.sh` always sets it from
+      # Secret Manager.
+      PUBSUB_PUSH_TOKEN: ${PUBSUB_PUSH_TOKEN:-}
+    ports:
+      - "${WORKER_PORT:-8001}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  # Scans on local disk. In the cloud this is a GCS bucket with public access
+  # prevention and short-lived signed URLs; there is no S3-compatible store, so
+  # there is no MinIO container here. See docs/DECISIONS.md.
+  uploads:

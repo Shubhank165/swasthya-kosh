@@ -70,6 +70,20 @@ class ContentError(MediKioskError):
     code = "clinical_content_error"
 
 
+class ConfigurationError(MediKioskError):
+    """The deployment is wired wrong, and no request can succeed until it is fixed.
+
+    A 500, because it is the server's fault, but a *named* one. The case that
+    produced this class: a kiosk token in Secret Manager pointing at a hospital
+    id that was never seeded. Every ingest then failed on a foreign key
+    violation, and what reached the kiosk was a bare `Internal Server Error`
+    with the actual cause five frames deep in a database traceback.
+    """
+
+    status_code = 500
+    code = "configuration_error"
+
+
 class QueueError(MediKioskError):
     status_code = 409
     code = "queue_operation_rejected"
