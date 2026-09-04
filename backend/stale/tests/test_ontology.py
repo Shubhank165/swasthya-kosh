@@ -3,9 +3,20 @@
 from __future__ import annotations
 
 import pytest
+from app.domain.clinical.patient_state import PatientIntakeState
+from app.domain.ontology.expressions import (
+    ExpressionError,
+    parse_expression,
+)
+from app.domain.ontology.pathway import (
+    AnswerSpec,
+    Pathway,
+    PathwayError,
+    PathwayField,
+    PathwayRegistry,
+)
 
 from app.domain.clinical.enums import AnswerShape, FactStatus, Section
-from app.domain.clinical.patient_state import PatientIntakeState
 from app.domain.clinical.provenance import (
     CodedValue,
     Duration,
@@ -19,10 +30,6 @@ from app.domain.ontology.concepts import (
     ConceptRegistry,
     normalise_token,
 )
-from app.domain.ontology.expressions import (
-    ExpressionError,
-    parse_expression,
-)
 from app.domain.ontology.matching import (
     Candidate,
     fold,
@@ -31,13 +38,6 @@ from app.domain.ontology.matching import (
     similarity,
     transliterate,
     trigrams,
-)
-from app.domain.ontology.pathway import (
-    AnswerSpec,
-    Pathway,
-    PathwayError,
-    PathwayField,
-    PathwayRegistry,
 )
 from tests.conftest import make_fact
 
