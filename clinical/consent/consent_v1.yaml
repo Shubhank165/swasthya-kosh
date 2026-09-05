@@ -41,6 +41,12 @@ purposes:
   - code: raw_audio_retention
     required: false
     default_granted: false
+    # Kiosk only. The patient app has no microphone and never will (2/3 §1
+    # rule 1), so offering this purpose there would ask a patient to consent to
+    # the retention of audio the app is incapable of capturing — a consent
+    # record that describes something that did not happen is worse than no
+    # record, and this one would be produced for every app intake.
+    applies_to: [kiosk]
     label:
       en: "Keeping a recording of your voice"
       hi: "आपकी आवाज़ की रिकॉर्डिंग रखना"

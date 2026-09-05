@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, status
 
-from app.api.auth import RequireKioskOrStaff, RequireStaff
+from app.api.auth import RequireIntakeSubmitter, RequireStaff
 from app.api.deps import ClockDep, ConsentRepoDep, IdsDep
 from app.models.clinical import ConsentArtefact
 from app.schemas.api import ConsentOut, ConsentRequest
@@ -43,7 +43,7 @@ def _out(row: ConsentArtefact) -> ConsentOut:
     summary="Record a consent artefact",
 )
 async def record_consent(
-    principal: RequireKioskOrStaff,
+    principal: RequireIntakeSubmitter,
     repository: ConsentRepoDep,
     clock: ClockDep,
     ids: IdsDep,

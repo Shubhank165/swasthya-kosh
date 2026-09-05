@@ -14,10 +14,23 @@ clinical_source: >
   Concepts follow standard Ashtavidha/Dashavidha Pariksha vocabulary, restricted
   to patient-reportable items. Wording pending AIIA mentor review.
 section: ayurveda
+
+# `current_state: true` marks the questions asked again on a **return visit**.
+#
+# 2/3 §5 screen 8: the full set on a first visit, and the current-state subset
+# on return visits — digestion and appetite, sleep, bowel habit. The reasoning
+# is that Prakriti-adjacent items a patient reports about themselves do not
+# change between two visits a fortnight apart, but Agni, Nidra and Koshtha are
+# exactly what a Vaidya wants today's answer to.
+#
+# Which items belong in the subset is a clinical judgement and lives here, in
+# the content, rather than as a list in the app — the app asks the bundle which
+# questions to put and does not decide.
 matches_concepts: []
 fields:
   - concept: agni_appetite
     required: true
+    current_state: true
     priority: 10
     answer:
       type: single_choice
@@ -29,6 +42,7 @@ fields:
 
   - concept: koshtha_bowel
     required: true
+    current_state: true
     priority: 20
     answer:
       type: single_choice
@@ -39,6 +53,7 @@ fields:
 
   - concept: nidra_sleep
     required: true
+    current_state: true
     priority: 30
     answer:
       type: single_choice

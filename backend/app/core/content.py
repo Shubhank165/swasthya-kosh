@@ -25,6 +25,8 @@ from app.core.errors import ContentError
 from app.domain.documents.ingredients import IngredientIndex
 from app.domain.documents.interactions import InteractionError, InteractionTable
 from app.domain.ontology.concepts import ConceptRegistry
+from app.domain.questions.loader import load_questions
+from app.domain.questions.model import QuestionSet
 from app.domain.report.templates import TemplateError, TemplateRegistry, TemplateSet
 
 
@@ -128,6 +130,9 @@ class ClinicalContent:
     templates: TemplateRegistry
     consent: Mapping[str, Any]
     terminology_dir: Path
+    #: The question content the kiosk and the patient app both walk. Parsed and
+    #: compiled here, never executed here — see clinical/questions/README.md.
+    questions: QuestionSet
 
     def field_labels(self) -> dict[str, str]:
         """Field id -> display label, for the report builder.
@@ -170,6 +175,11 @@ def load_clinical_content(settings: Settings | None = None) -> ClinicalContent:
         ),
         consent=consent_raw,
         terminology_dir=settings.terminology_dir,
+        questions=load_questions(
+            settings.questions_dir,
+            content_version=settings.content_version,
+            languages=settings.question_languages,
+        ),
     )
     _validate(content)
     return content
