@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds only.
+
+  A backend running on a developer's laptop is reachable over plain HTTP on a
+  LAN address, and Android blocks cleartext by default above API 27 — which is
+  the correct default and stays in force for every build a patient installs.
+  This file lives under `src/debug/` so it cannot be merged into a release APK
+  even by accident.
+
+  It permits cleartext to everything rather than to a list of addresses because
+  the laptop's LAN address changes with the network, and a list that is wrong is
+  a list somebody edits under demo pressure.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

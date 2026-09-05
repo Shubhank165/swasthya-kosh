@@ -1,0 +1,277 @@
+{
+  "@@locale": "en",
+  "@@x-note": "UI chrome only. Clinical question prompts are NOT here — they come from the question bundle the backend serves, which is authored in clinical/questions/ and reviewed clinically. Never add a question prompt to this file.",
+  "appTitle": "MediKiosk",
+  "@appTitle": {
+    "description": "The app name shown on the launcher and the title bar."
+  },
+  "continueLabel": "Continue",
+  "@continueLabel": {
+    "description": ""
+  },
+  "backLabel": "Back",
+  "@backLabel": {
+    "description": ""
+  },
+  "answerDontKnow": "I don't know",
+  "@answerDontKnow": {
+    "description": "CLINICAL MEANING: records `unresolved`. Must NOT read as 'no'."
+  },
+  "answerSkip": "Skip this question",
+  "@answerSkip": {
+    "description": "CLINICAL MEANING: records `not_asked`. Must NOT read as 'no' or 'I don't know'."
+  },
+  "optYes": "Yes",
+  "@optYes": {
+    "description": "Answer to a yes/no/unknown question. Records `answered` with value true."
+  },
+  "optNo": "No",
+  "@optNo": {
+    "description": "Answer to a yes/no/unknown question. Records `answered` with value false."
+  },
+  "optNotSure": "Not sure",
+  "@optNotSure": {
+    "description": ""
+  },
+  "signInTitle": "Sign in",
+  "@signInTitle": {
+    "description": ""
+  },
+  "phoneLabel": "Mobile number",
+  "@phoneLabel": {
+    "description": ""
+  },
+  "sendCode": "Send code",
+  "@sendCode": {
+    "description": ""
+  },
+  "codeLabel": "Six-digit code",
+  "@codeLabel": {
+    "description": ""
+  },
+  "verifyCode": "Verify",
+  "@verifyCode": {
+    "description": ""
+  },
+  "signOut": "Sign out",
+  "@signOut": {
+    "description": ""
+  },
+  "chooseHospital": "Choose a hospital",
+  "@chooseHospital": {
+    "description": ""
+  },
+  "chooseDepartment": "Choose a department",
+  "@chooseDepartment": {
+    "description": ""
+  },
+  "consentTitle": "Your consent",
+  "@consentTitle": {
+    "description": ""
+  },
+  "consentRequiredHeading": "Needed to continue",
+  "@consentRequiredHeading": {
+    "description": ""
+  },
+  "consentOptionalHeading": "Optional",
+  "@consentOptionalHeading": {
+    "description": ""
+  },
+  "listenToThis": "Listen to this",
+  "@listenToThis": {
+    "description": ""
+  },
+  "stopListening": "Stop",
+  "@stopListening": {
+    "description": ""
+  },
+  "whoIsThisFor": "Who is this for?",
+  "@whoIsThisFor": {
+    "description": ""
+  },
+  "forMyself": "Myself",
+  "@forMyself": {
+    "description": ""
+  },
+  "forMyParent": "My parent",
+  "@forMyParent": {
+    "description": ""
+  },
+  "forMyChild": "My child",
+  "@forMyChild": {
+    "description": ""
+  },
+  "forSomeoneElse": "Someone else",
+  "@forSomeoneElse": {
+    "description": ""
+  },
+  "stillCorrectHeading": "Is this still correct?",
+  "@stillCorrectHeading": {
+    "description": ""
+  },
+  "chooseComplaint": "What brings you in today?",
+  "@chooseComplaint": {
+    "description": ""
+  },
+  "somethingElse": "Something else",
+  "@somethingElse": {
+    "description": ""
+  },
+  "sectionProgress": "Section {done} of {total}",
+  "@sectionProgress": {
+    "description": "",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "ayurvedaTitle": "A few questions about your daily routine",
+  "@ayurvedaTitle": {
+    "description": ""
+  },
+  "documentsTitle": "Old prescriptions and reports",
+  "@documentsTitle": {
+    "description": ""
+  },
+  "takePhoto": "Take a photo",
+  "@takePhoto": {
+    "description": ""
+  },
+  "chooseFromGallery": "Choose from gallery",
+  "@chooseFromGallery": {
+    "description": ""
+  },
+  "retakePhoto": "Take it again",
+  "@retakePhoto": {
+    "description": ""
+  },
+  "photoTooBlurry": "This photo is blurred. Please take it again.",
+  "@photoTooBlurry": {
+    "description": ""
+  },
+  "photoTooSmall": "This photo is too small to read. Please take it again.",
+  "@photoTooSmall": {
+    "description": ""
+  },
+  "photoLooksCropped": "Part of the page may be cut off. Please check.",
+  "@photoLooksCropped": {
+    "description": ""
+  },
+  "removeDocument": "Remove",
+  "@removeDocument": {
+    "description": ""
+  },
+  "statusUploading": "Sending",
+  "@statusUploading": {
+    "description": ""
+  },
+  "statusProcessing": "Being read",
+  "@statusProcessing": {
+    "description": ""
+  },
+  "statusDone": "Received",
+  "@statusDone": {
+    "description": ""
+  },
+  "reviewTitle": "Please check your answers",
+  "@reviewTitle": {
+    "description": ""
+  },
+  "editAnswer": "Change",
+  "@editAnswer": {
+    "description": ""
+  },
+  "submitIntake": "Send to the hospital",
+  "@submitIntake": {
+    "description": ""
+  },
+  "submittedTitle": "Sent",
+  "@submittedTitle": {
+    "description": ""
+  },
+  "referenceCodeLabel": "Your reference code",
+  "@referenceCodeLabel": {
+    "description": ""
+  },
+  "showAtRegistration": "Show this code at the registration desk.",
+  "@showAtRegistration": {
+    "description": ""
+  },
+  "urgentTitle": "Please seek medical care now.",
+  "@urgentTitle": {
+    "description": "Urgent-care screen heading. Never names a condition (2/3 §6)."
+  },
+  "urgentBody": "Based on your answers, you should be seen by a doctor straight away rather than waiting for your appointment.",
+  "@urgentBody": {
+    "description": "Urgent-care screen body. Tells the patient what to DO, never what they have."
+  },
+  "urgentAction": "Go to the nearest hospital emergency department, or call {number}.",
+  "@urgentAction": {
+    "description": "",
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "showNearestHospital": "Show me the nearest hospital",
+  "@showNearestHospital": {
+    "description": ""
+  },
+  "iUnderstand": "I understand",
+  "@iUnderstand": {
+    "description": ""
+  },
+  "savedOffline": "Saved on this phone. It will be sent when you are back online.",
+  "@savedOffline": {
+    "description": ""
+  },
+  "updateRequired": "Please update the app before starting.",
+  "@updateRequired": {
+    "description": ""
+  },
+  "tryAgain": "Try again",
+  "@tryAgain": {
+    "description": ""
+  },
+  "resumeDraft": "Continue where you left off",
+  "@resumeDraft": {
+    "description": ""
+  },
+  "draftTooOld": "This was started more than a week ago. Please start again.",
+  "@draftTooOld": {
+    "description": ""
+  },
+  "mockNotice": "Demo mode — this is not a live hospital connection.",
+  "@mockNotice": {
+    "description": ""
+  },
+  "consentNotTranslated": "The consent notice is not yet available in this language. Please choose English or हिन्दी to continue.",
+  "@consentNotTranslated": {
+    "description": "Shown when the consent notice has no text in the language the patient chose. It names the languages that do have one, in their own scripts, so it is readable by someone who cannot read the sentence around them."
+  },
+  "abhaTitle": "Link your ABHA (optional)",
+  "@abhaTitle": {
+    "description": "Heading of the optional ABHA linking screen. ABHA is never mandatory (2/3 §7.2)."
+  },
+  "abhaExplanation": "If you add it, the hospital can find your earlier visits. You can skip this and continue.",
+  "@abhaExplanation": {
+    "description": "What linking buys, and that it can be skipped. Must not imply the intake needs it."
+  },
+  "abhaAddressLabel": "ABHA address",
+  "@abhaAddressLabel": {
+    "description": "Field label for an ABHA address, of the form name@sbx."
+  },
+  "abhaNotFound": "We could not find that address. You can continue without it.",
+  "@abhaNotFound": {
+    "description": "Shown when the lookup returns nothing. Must read as \"carry on\", never as a failure the patient has to fix."
+  },
+  "skipForNow": "Skip",
+  "@skipForNow": {
+    "description": "Leaves the ABHA screen without linking. Distinct from answerSkip, which skips a clinical question and records not_asked."
+  }
+}

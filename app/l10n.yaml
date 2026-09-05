@@ -1,0 +1,9 @@
+# ARB files, one per language. `2/3 §14` requires all nine to carry every key
+# and a missing one to fail the build — `untranslated-messages-file` plus the
+# check in `test/l10n_completeness_test.dart` is what enforces that.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+untranslated-messages-file: l10n_untranslated.json
+nullable-getter: false

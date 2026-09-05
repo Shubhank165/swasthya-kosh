@@ -1,0 +1,125 @@
+{
+  "schema_version": "0.1",
+  "intake_id": "5c2f9a44-0000-4000-8000-00000000ab01",
+  "source": "app",
+  "kiosk_id": null,
+  "app_version": "1.0.0",
+  "hospital_id": "aiia-delhi",
+  "started_at": "2026-09-03T10:14:22.000Z",
+  "completed_at": "2026-09-03T10:21:05.000Z",
+  "status": "complete",
+  "language": "hi",
+  "language_locked_at_turn": null,
+  "reporter": "self",
+  "department_code": "kayachikitsa",
+  "patient_ref": {
+    "type": "phone",
+    "value": "a1b2c3d4e5f60718"
+  },
+  "turns": [
+    {
+      "turn_id": 1,
+      "question_id": "core_intake.chief_complaint",
+      "asked_text": "आज आप किस समस्या के लिए आए हैं?",
+      "transcript": null,
+      "asr_confidence": null,
+      "rms": null,
+      "bound_field": "chief_complaint",
+      "bound_value": "abdominal_pain",
+      "resolved": true
+    },
+    {
+      "turn_id": 2,
+      "question_id": "abdominal_pain.duration",
+      "asked_text": "यह दर्द कब से है?",
+      "transcript": null,
+      "asr_confidence": null,
+      "rms": null,
+      "bound_field": "duration",
+      "bound_value": {
+        "n": 3.0,
+        "unit": "day"
+      },
+      "resolved": true
+    },
+    {
+      "turn_id": 3,
+      "question_id": "abdominal_pain.severity",
+      "asked_text": "दर्द कितना तेज़ है?",
+      "transcript": null,
+      "asr_confidence": null,
+      "rms": null,
+      "bound_field": "severity",
+      "bound_value": 6.0,
+      "resolved": true
+    },
+    {
+      "turn_id": 4,
+      "question_id": "core_intake.tobacco",
+      "asked_text": "क्या आप तंबाकू का सेवन करते हैं?",
+      "transcript": null,
+      "asr_confidence": null,
+      "rms": null,
+      "bound_field": "tobacco",
+      "bound_value": null,
+      "resolved": false
+    },
+    {
+      "turn_id": 5,
+      "question_id": "core_intake.alcohol",
+      "asked_text": "क्या आप शराब पीते हैं?",
+      "transcript": null,
+      "asr_confidence": null,
+      "rms": null,
+      "bound_field": "alcohol",
+      "bound_value": null,
+      "resolved": false
+    }
+  ],
+  "fields": {
+    "chief_complaint": {
+      "value": "abdominal_pain",
+      "status": "answered",
+      "original_text": "पेट में दर्द",
+      "source_turn": 1
+    },
+    "duration": {
+      "value": {
+        "n": 3.0,
+        "unit": "day"
+      },
+      "status": "answered",
+      "original_text": "3 दिन",
+      "source_turn": 2
+    },
+    "severity": {
+      "value": 6.0,
+      "status": "answered",
+      "original_text": "6",
+      "source_turn": 3
+    },
+    "tobacco": {
+      "value": null,
+      "status": "refused",
+      "original_text": "यह नहीं बताना चाहता",
+      "source_turn": 4
+    },
+    "alcohol": {
+      "value": null,
+      "status": "unresolved",
+      "source_turn": 5
+    },
+    "pregnancy": {
+      "value": null,
+      "status": "not_applicable",
+      "not_applicable_because": "sex"
+    },
+    "breathlessness": {
+      "value": null,
+      "status": "not_asked"
+    }
+  },
+  "red_flags": [],
+  "engine_version": null,
+  "content_version": "questions-2026-09-01"
+}

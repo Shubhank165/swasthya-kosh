@@ -1,0 +1,509 @@
+/// One renderer per `answer_type` — 2/3 §4, §14, §15 item 12.
+///
+/// Every widget here is a pure function of a [Question] and a callback. They
+/// hold no clinical logic: which question is shown, whether it applies, and
+/// whether an answer fires a red flag are all the walker's business (§16).
+///
+/// Two rules apply to all of them:
+///
+/// **Tap over type, everywhere** (§14). Typing Devanagari or Tamil on a phone
+/// keyboard is genuinely painful, so free text appears only where the content
+/// says nothing else will do.
+///
+/// **Never invite voice input** (§1 rule 8, §16). If a patient taps the
+/// microphone on their own keyboard, that audio goes to Google or Apple. We
+/// cannot prevent it — but no element in this app suggests it, no field is
+/// labelled "speak", and no free-text field is presented as the easy path.
+library;
+
+import 'package:flutter/material.dart';
+
+import '../../content/answer.dart';
+import '../../content/bundle.dart';
+import '../../core/theme.dart';
+import '../../l10n/strings.dart';
+
+/// What a renderer hands back when the patient answers.
+typedef OnAnswered = void Function(AnswerValue value, String originalText);
+
+/// Builds the renderer for a question's answer type.
+///
+/// Returns `null` for [AnswerType.unknown]. The walker never offers such a
+/// question, so this is defence in depth rather than a path the UI takes — but
+/// returning `null` beats rendering an empty box the patient cannot get past.
+Widget? buildAnswerWidget({
+  required Question question,
+  required OnAnswered onAnswered,
+  Key? key,
+}) =>
+    switch (question.answerType) {
+      AnswerType.singleChoice => SingleChoiceAnswer(
+          key: key, question: question, onAnswered: onAnswered),
+      AnswerType.multiChoice => MultiChoiceAnswer(
+          key: key, question: question, onAnswered: onAnswered),
+      AnswerType.yesNoUnknown =>
+        YesNoAnswer(key: key, question: question, onAnswered: onAnswered),
+      AnswerType.number =>
+        NumberAnswer(key: key, question: question, onAnswered: onAnswered),
+      AnswerType.scale =>
+        ScaleAnswer(key: key, question: question, onAnswered: onAnswered),
+      AnswerType.duration =>
+        DurationAnswer(key: key, question: question, onAnswered: onAnswered),
+      AnswerType.date =>
+        DateAnswer(key: key, question: question, onAnswered: onAnswered),
+      AnswerType.freeText =>
+        FreeTextAnswer(key: key, question: question, onAnswered: onAnswered),
+      AnswerType.unknown => null,
+    };
+
+/// A tappable option row.
+///
+/// A full-width card rather than a radio button: 48dp is the floor, and a
+/// radio's hit area is the dot unless you are careful. The whole row is the
+/// target.
+class OptionTile extends StatelessWidget {
+  const OptionTile({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.selected = false,
+    this.icon,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool selected;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: Sizes.gap),
+        child: Material(
+          color: selected ? scheme.secondaryContainer : scheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 56),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 28),
+                    const SizedBox(width: 14),
+                  ],
+                  Expanded(
+                    child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
+                  ),
+                  if (selected) Icon(Icons.check, color: scheme.primary),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Human-readable text for an option code.
+///
+/// Option codes are content (`sudden`, `to_left_arm`), and the bundle carries
+/// no per-option translations. Rather than invent them — §16 — the code is
+/// de-underscored and sentence-cased for display, and the *code* is what is
+/// recorded. A content change that adds option labels would replace this
+/// function and nothing else.
+String optionLabel(String code) {
+  final words = code.replaceAll('_', ' ').trim();
+  if (words.isEmpty) return code;
+  return words[0].toUpperCase() + words.substring(1);
+}
+
+class SingleChoiceAnswer extends StatelessWidget {
+  const SingleChoiceAnswer({
+    super.key,
+    required this.question,
+    required this.onAnswered,
+  });
+
+  final Question question;
+  final OnAnswered onAnswered;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = question.options ?? const [];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final option in options)
+          OptionTile(
+            key: Key('option.$option'),
+            label: optionLabel(option),
+            onTap: () => onAnswered(CodedValue(option), optionLabel(option)),
+          ),
+      ],
+    );
+  }
+}
+
+class MultiChoiceAnswer extends StatefulWidget {
+  const MultiChoiceAnswer({
+    super.key,
+    required this.question,
+    required this.onAnswered,
+  });
+
+  final Question question;
+  final OnAnswered onAnswered;
+
+  @override
+  State<MultiChoiceAnswer> createState() => _MultiChoiceAnswerState();
+}
+
+class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
+  final _chosen = <String>{};
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    final options = widget.question.options ?? const [];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final option in options)
+          OptionTile(
+            key: Key('option.$option'),
+            label: optionLabel(option),
+            selected: _chosen.contains(option),
+            onTap: () => setState(() {
+              if (!_chosen.remove(option)) _chosen.add(option);
+            }),
+          ),
+        const SizedBox(height: Sizes.gap),
+        FilledButton(
+          key: const Key('answer.confirm'),
+          // Disabled while nothing is chosen. An empty multi-select submitted
+          // as an answer would record "none of these" — which is a clinical
+          // claim the patient did not make. If they mean none, the content
+          // offers a `none` option; if they cannot say, "I don't know" is there.
+          onPressed: _chosen.isEmpty
+              ? null
+              : () {
+                  final chosen = _chosen.toList()..sort();
+                  widget.onAnswered(
+                    CodedListValue(chosen),
+                    chosen.map(optionLabel).join(', '),
+                  );
+                },
+          child: Text(strings.continueLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class YesNoAnswer extends StatelessWidget {
+  const YesNoAnswer({super.key, required this.question, required this.onAnswered});
+
+  final Question question;
+  final OnAnswered onAnswered;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    // Only yes and no. The third arm of `yes_no_unknown` is the shared
+    // "I don't know" affordance, which every question carries anyway —
+    // rendering it twice would offer two buttons that record the same status
+    // and invite the patient to wonder how they differ.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OptionTile(
+          key: const Key('option.yes'),
+          label: strings.optYes,
+          onTap: () => onAnswered(const BoolValue(true), strings.optYes),
+        ),
+        OptionTile(
+          key: const Key('option.no'),
+          label: strings.optNo,
+          onTap: () => onAnswered(const BoolValue(false), strings.optNo),
+        ),
+      ],
+    );
+  }
+}
+
+class NumberAnswer extends StatefulWidget {
+  const NumberAnswer({super.key, required this.question, required this.onAnswered});
+
+  final Question question;
+  final OnAnswered onAnswered;
+
+  @override
+  State<NumberAnswer> createState() => _NumberAnswerState();
+}
+
+class _NumberAnswerState extends State<NumberAnswer> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          key: const Key('answer.number'),
+          controller: _controller,
+          // A numeric keypad, not a full keyboard: fewer keys, larger targets,
+          // and no microphone key on most Android IMEs (§1 rule 8).
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: Theme.of(context).textTheme.bodyLarge,
+          decoration: InputDecoration(suffixText: widget.question.unit),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: Sizes.gap),
+        FilledButton(
+          key: const Key('answer.confirm'),
+          onPressed: _value == null
+              ? null
+              : () => widget.onAnswered(
+                    NumberValue(_value!, unit: widget.question.unit),
+                    _controller.text.trim(),
+                  ),
+          child: Text(strings.continueLabel),
+        ),
+      ],
+    );
+  }
+
+  double? get _value => double.tryParse(_controller.text.trim());
+}
+
+class ScaleAnswer extends StatefulWidget {
+  const ScaleAnswer({super.key, required this.question, required this.onAnswered});
+
+  final Question question;
+  final OnAnswered onAnswered;
+
+  @override
+  State<ScaleAnswer> createState() => _ScaleAnswerState();
+}
+
+class _ScaleAnswerState extends State<ScaleAnswer> {
+  @override
+  Widget build(BuildContext context) {
+    final min = (widget.question.minimum ?? 0).round();
+    final max = (widget.question.maximum ?? 10).round();
+    // Numbered buttons rather than a slider. A slider requires a drag, reports
+    // a value the patient did not deliberately choose if they nudge it, and is
+    // near-unusable with a screen reader or a tremor.
+    return Wrap(
+      spacing: Sizes.gap,
+      runSpacing: Sizes.gap,
+      children: [
+        for (var value = min; value <= max; value++)
+          SizedBox(
+            width: 56,
+            height: 56,
+            child: OutlinedButton(
+              key: Key('scale.$value'),
+              onPressed: () => widget.onAnswered(
+                ScaleValue(value.toDouble()),
+                '$value',
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(Sizes.minTouchTarget, Sizes.minTouchTarget),
+              ),
+              child: Text('$value'),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class DurationAnswer extends StatefulWidget {
+  const DurationAnswer({super.key, required this.question, required this.onAnswered});
+
+  final Question question;
+  final OnAnswered onAnswered;
+
+  @override
+  State<DurationAnswer> createState() => _DurationAnswerState();
+}
+
+class _DurationAnswerState extends State<DurationAnswer> {
+  final _controller = TextEditingController();
+  String _unit = 'day';
+
+  /// The units the backend's `_duration_unit` recognises. Anything else would
+  /// coerce to a plain quantity and lose the fact that it is a duration.
+  static const _units = ['hour', 'day', 'week', 'month', 'year'];
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    final n = double.tryParse(_controller.text.trim());
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          key: const Key('answer.duration_n'),
+          controller: _controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: false),
+          style: Theme.of(context).textTheme.bodyLarge,
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: Sizes.gap),
+        for (final unit in _units)
+          OptionTile(
+            key: Key('duration.$unit'),
+            label: optionLabel(unit),
+            selected: _unit == unit,
+            onTap: () => setState(() => _unit = unit),
+          ),
+        const SizedBox(height: Sizes.gap),
+        FilledButton(
+          key: const Key('answer.confirm'),
+          onPressed: n == null
+              ? null
+              : () => widget.onAnswered(
+                    DurationValue(n: n, unit: _unit),
+                    '${_controller.text.trim()} $_unit',
+                  ),
+          child: Text(strings.continueLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class DateAnswer extends StatefulWidget {
+  const DateAnswer({super.key, required this.question, required this.onAnswered});
+
+  final Question question;
+  final OnAnswered onAnswered;
+
+  @override
+  State<DateAnswer> createState() => _DateAnswerState();
+}
+
+class _DateAnswerState extends State<DateAnswer> {
+  DateTime? _chosen;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    final now = DateTime.now();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton(
+          key: const Key('answer.date_picker'),
+          onPressed: () async {
+            final picked = await showDatePicker(
+              context: context,
+              firstDate: DateTime(now.year - 100),
+              lastDate: now,
+              initialDate: _chosen ?? now,
+            );
+            if (picked != null) setState(() => _chosen = picked);
+          },
+          child: Text(_chosen == null
+              ? strings.continueLabel
+              : _chosen!.toIso8601String().split('T').first),
+        ),
+        const SizedBox(height: Sizes.gap),
+        FilledButton(
+          key: const Key('answer.confirm'),
+          onPressed: _chosen == null
+              ? null
+              : () {
+                  final iso = _chosen!.toIso8601String().split('T').first;
+                  widget.onAnswered(DateValue(iso), iso);
+                },
+          child: Text(strings.continueLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class FreeTextAnswer extends StatefulWidget {
+  const FreeTextAnswer({super.key, required this.question, required this.onAnswered});
+
+  final Question question;
+  final OnAnswered onAnswered;
+
+  @override
+  State<FreeTextAnswer> createState() => _FreeTextAnswerState();
+}
+
+class _FreeTextAnswerState extends State<FreeTextAnswer> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          key: const Key('answer.free_text'),
+          controller: _controller,
+          maxLines: 4,
+          style: Theme.of(context).textTheme.bodyLarge,
+          // No hint text suggesting dictation, and no voice affordance of any
+          // kind. §1 rule 8: if the patient taps their keyboard's microphone
+          // that audio goes to Google or Apple, and while we cannot stop it,
+          // nothing here invites it.
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: Sizes.gap),
+        FilledButton(
+          key: const Key('answer.confirm'),
+          onPressed: _controller.text.trim().isEmpty
+              ? null
+              : () {
+                  final text = _controller.text.trim();
+                  widget.onAnswered(TextValue(text), text);
+                },
+          child: Text(strings.continueLabel),
+        ),
+      ],
+    );
+  }
+}

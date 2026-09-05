@@ -1,0 +1,73 @@
+name: medikiosk_app
+description: >
+  MediKiosk patient app — touch-only pre-consultation intake for AYUSH hospital
+  OPDs. Walks the same question content the kiosk's Jetson walks and produces
+  the same versioned record.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.19.0
+
+  # State. Riverpod, per 2/3 §13.
+  flutter_riverpod: ^2.5.1
+
+  # Networking, with an auth interceptor and retry.
+  dio: ^5.4.3+1
+
+  # Local database, encrypted at rest (§10). Drift over SQLCipher.
+  drift: ^2.18.0
+  # SQLCipher only, and deliberately **not** `sqlite3_flutter_libs` beside it.
+  # Both packages register the same `Sqlite3FlutterLibsPlugin` class, so having
+  # both fails the dex merge with "type is defined multiple times" — and if it
+  # ever linked, the app would carry two SQLite builds and the first connection
+  # would decide which one a patient's health answers are written with. This
+  # package ships the encrypted build, which is the one §10 requires.
+  sqlcipher_flutter_libs: ^0.6.1
+  # Imported directly by storage/database.dart to point sqlite3 at the
+  # SQLCipher build before the first connection opens.
+  sqlite3: ^2.4.0
+  path_provider: ^2.1.3
+  path: ^1.9.0
+
+  # The encryption key lives in Keychain / Keystore, never in the database and
+  # never in shared preferences (§7.1, §10).
+  flutter_secure_storage: ^9.2.2
+
+  go_router: ^14.1.4
+
+  # Document capture and preparation (§8). `image` does the downscale and the
+  # EXIF strip; `camera` is deliberately absent — image_picker hands off to the
+  # OS camera app, so this app never holds a camera permission of its own.
+  image_picker: ^1.1.2
+  image: ^4.2.0
+
+  # Consent text read aloud (§11). Output only. There is no speech *input*
+  # package in this file and there must never be one — see §1 and §16.
+  flutter_tts: ^4.0.2
+
+  collection: ^1.18.0
+  crypto: ^3.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  integration_test:
+    sdk: flutter
+  drift_dev: ^2.18.0
+  build_runner: ^2.4.11
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+  generate: true
+  assets:
+    - assets/bundle/
