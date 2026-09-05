@@ -13,7 +13,14 @@ from dataclasses import dataclass
 from app.adapters.abha.providers import MockABHAProvider, SandboxABHAProvider, build_provider
 from app.adapters.llm.mock import MockRepairProvider
 from app.adapters.ocr.mock import MockOCRProvider
-from app.adapters.protocols import ABHAProvider, ObjectStore, OCRProvider, RepairProvider
+from app.adapters.otp.senders import MockOTPSender, SMSOTPSender, build_sender
+from app.adapters.protocols import (
+    ABHAProvider,
+    ObjectStore,
+    OCRProvider,
+    OTPSender,
+    RepairProvider,
+)
 from app.adapters.storage.stores import GCSObjectStore, LocalObjectStore, build_store
 from app.core.config import Settings
 from app.core.logging import get_logger
@@ -29,6 +36,7 @@ class Providers:
     repair: RepairProvider | None
     abha: ABHAProvider
     storage: ObjectStore
+    otp: OTPSender
 
     def describe(self) -> dict[str, str]:
         """What is live. Safe to serve from `/readyz`."""
@@ -37,6 +45,7 @@ class Providers:
             "repair": self.repair.name if self.repair is not None else "disabled",
             "abha": self.abha.name,
             "storage": self.storage.name,
+            "otp": self.otp.name,
         }
 
 
@@ -77,6 +86,10 @@ def build_storage(settings: Settings) -> LocalObjectStore | GCSObjectStore:
     return build_store(settings)
 
 
+def build_otp(settings: Settings) -> MockOTPSender | SMSOTPSender:
+    return build_sender(settings)
+
+
 def build_providers(settings: Settings) -> Providers:
     """Everything, from config."""
     providers = Providers(
@@ -84,6 +97,7 @@ def build_providers(settings: Settings) -> Providers:
         repair=build_repair(settings),
         abha=build_abha(settings),
         storage=build_storage(settings),
+        otp=build_otp(settings),
     )
     logger.info("providers_selected", **providers.describe())
     return providers

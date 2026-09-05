@@ -167,7 +167,13 @@ class TestUpgradeFromEmpty:
                 ]
         finally:
             engine.dispose()
-        assert versions == ["0001_baseline"]
+        # Derived, not hardcoded. A test that names the head revision has to be
+        # edited every time a migration is added, and the edit is indistinguishable
+        # from someone silencing a genuine failure.
+        from alembic.script import ScriptDirectory
+
+        head = ScriptDirectory.from_config(_alembic_config(migrated)).get_current_head()
+        assert versions == [head]
 
 
 class TestSeedingTheMigratedDatabase:

@@ -79,3 +79,21 @@ class ObjectStore(Protocol):
     async def signed_url(self, key: str, *, ttl_seconds: int) -> str: ...
 
     async def delete(self, key: str) -> None: ...
+
+
+class OTPSender(Protocol):
+    """Delivers a one-time code to a phone — 2/3 §7.1.
+
+    Behind a protocol like every other outside-the-process dependency, so the
+    demo and the whole test suite run without an SMS gateway account and without
+    a rupee of spend.
+    """
+
+    name: str
+    #: True when the sender does not actually deliver anything, so the caller
+    #: may return the code in the response for a local demo. `PatientAuthService`
+    #: additionally refuses to do that outside development, so a misconfigured
+    #: production deployment cannot leak live codes through the API.
+    reveals_code: bool
+
+    async def send(self, *, phone: str, code: str) -> None: ...

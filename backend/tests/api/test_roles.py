@@ -38,11 +38,21 @@ EXPECTED: dict[tuple[str, str], set[Role]] = {
     # The kiosk. Narrow on purpose: a device in a waiting room is physically
     # accessible to anyone standing next to it, so it may submit and upload and
     # nothing else.
-    ("POST", "/api/v1/intakes/ingest"): {Role.KIOSK, Role.STAFF},
-    ("POST", "/api/v1/intakes/{intake_id}/documents"): {Role.KIOSK, Role.STAFF},
-    ("POST", "/api/v1/intakes/{intake_id}/documents/results"): {Role.KIOSK, Role.STAFF},
+    # Submitting an intake: a kiosk in the corridor, a staff member at a
+    # counter, or a patient on their own phone before they travel (2/3 §9).
+    ("POST", "/api/v1/intakes/ingest"): {Role.KIOSK, Role.STAFF, Role.PATIENT},
+    ("POST", "/api/v1/intakes/{intake_id}/documents"): {
+        Role.KIOSK, Role.STAFF, Role.PATIENT
+    },
+    ("POST", "/api/v1/intakes/{intake_id}/documents/results"): {
+        Role.KIOSK, Role.STAFF, Role.PATIENT
+    },
+    ("POST", "/api/v1/consent"): {Role.KIOSK, Role.STAFF, Role.PATIENT},
     ("POST", "/api/v1/patients/resolve"): {Role.KIOSK, Role.STAFF},
-    ("POST", "/api/v1/consent"): {Role.KIOSK, Role.STAFF},
+    # The patient app, reading its own records and nothing else. Note there is
+    # no path parameter: the patient comes from the session token.
+    ("POST", "/api/v1/patients/me/abha"): {Role.PATIENT},
+    ("GET", "/api/v1/patients/me/history"): {Role.PATIENT},
     # Clinical reads. Staff and above.
     ("GET", "/api/v1/intakes/{intake_id}"): {Role.STAFF},
     ("GET", "/api/v1/intakes/{intake_id}/report"): {Role.STAFF},
@@ -67,6 +77,28 @@ EXPECTED: dict[tuple[str, str], set[Role]] = {
 #: Routes that are deliberately open. Each one is here because it must answer
 #: before a caller has credentials, and none of them touches patient data.
 UNGUARDED: set[tuple[str, str]] = {
+    # The question bundle. It holds no patient data — it is the questions an OPD
+    # asks — and the app must render a sign-in screen in the patient's own
+    # language before the patient has signed in (2/3 §4).
+    ("GET", "/api/v1/content/bundle"),
+    ("GET", "/api/v1/content/bundle/version"),
+    # The consent notice, for the same reason and more sharply: a patient must
+    # be able to read what they are agreeing to before they agree to anything,
+    # and requiring a credential to fetch it would mean consent is asked for
+    # after the app already holds an identifier (2/3 §11).
+    ("GET", "/api/v1/content/consent"),
+    # The hospital picker, which is screen 2 and precedes any credential. A
+    # hospital's name, location and department list is what the signboard says.
+    ("GET", "/api/v1/hospitals"),
+    # Sign-in itself. These are how a caller acquires a credential, so they
+    # cannot require one — which makes them the only writable surface reachable
+    # with no token at all. The service rate-limits per number and returns a
+    # uniform failure so they cannot be used to enumerate patients (2/3 §7.1).
+    ("POST", "/api/v1/auth/otp/request"),
+    ("POST", "/api/v1/auth/otp/verify"),
+    # Always 204, guarded or not: refusing an invalid token would report whether
+    # it was valid, and the app wipes its local state either way (2/3 §10).
+    ("POST", "/api/v1/auth/otp/sign-out"),
     ("GET", "/healthz"),
     ("GET", "/readyz"),
     ("GET", "/docs"),

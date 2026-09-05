@@ -57,6 +57,10 @@ def settings(tmp_path: Path) -> Settings:
         demo_mode=False,
         log_json=False,
         kiosk_tokens={"test-kiosk-token": HOSPITAL_ID},
+        # Not a secret — this is a test pepper. Its presence is what matters:
+        # `phone_ref()` refuses to run without one rather than falling back to a
+        # plain digest, so every patient-app test would fail closed without it.
+        patient_ref_pepper="test-pepper-not-a-secret",
     )
 
 

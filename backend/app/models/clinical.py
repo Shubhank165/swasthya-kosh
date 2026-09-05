@@ -478,10 +478,74 @@ class TerminologyMapping(Base):
     )
 
 
-#: Tables that are reference data or the tenant list itself, and so are exempt
-#: from the tenant filter. Everything not named here must carry `hospital_id`
-#: and must be queried with it — `tests/safety/test_tenancy.py` enumerates the
-#: metadata and fails on any table that slipped through.
+class OTPChallenge(Base, TimestampMixin):
+    """One outstanding phone verification — 2/3 §7.1.
+
+    Not hospital-scoped, because a patient signs in before they choose a
+    hospital, and a person's phone is not any hospital's property.
+
+    **No plaintext phone number and no plaintext code is stored.** The phone is
+    a peppered HMAC and the code is hashed, so this table leaking tells an
+    attacker neither who was signing in nor what to type. That matters more here
+    than in most auth tables: the population is patients of an AYUSH hospital,
+    and the mere fact that a number appears is itself health-adjacent.
+    """
+
+    __tablename__ = "otp_challenges"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    phone_ref: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    code_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: Set when the challenge is spent — verified, expired out, or burned by too
+    #: many wrong attempts. Kept rather than deleted so a burst of failures
+    #: against one number is visible.
+    consumed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+
+
+class PatientSession(Base, TimestampMixin):
+    """A signed-in patient app — 2/3 §7.1.
+
+    The token is stored as a hash. A session table that holds usable tokens is a
+    table whose backup is a set of live credentials.
+    """
+
+    __tablename__ = "patient_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    phone_ref: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+
+
+#: Tables that do not belong to any one hospital, and so are exempt from the
+#: tenant filter. Everything not named here must carry `hospital_id` and must be
+#: queried with it — `tests/safety/test_tenancy.py` enumerates the metadata and
+#: fails on any table that slipped through.
+#:
+#: Two kinds of thing qualify, and the distinction matters:
+#:
+#: - **Reference data and the tenant list.** `hospitals` is the tenant list
+#:   itself; the terminology tables are code systems, which no hospital owns.
+#: - **Patient identity, which belongs to the patient.** A person signs into
+#:   the app before choosing a hospital, so `otp_challenges` and
+#:   `patient_sessions` cannot be scoped to one — and scoping them to the
+#:   hospital a patient later picks would mean a second sign-in per hospital.
+#:   Neither table holds a plaintext phone number, a code or a usable token:
+#:   the phone is a peppered HMAC, and the rest are hashes. That is what makes
+#:   the exemption defensible rather than merely necessary.
+#:
+#: Nothing clinical is ever exempt. An intake, a fact, a document and a report
+#: all carry `hospital_id`.
 TENANT_EXEMPT_TABLES: frozenset[str] = frozenset(
-    {"hospitals", "terminology_concepts", "terminology_mappings", "alembic_version"}
+    {
+        "hospitals",
+        "terminology_concepts",
+        "terminology_mappings",
+        "alembic_version",
+        "otp_challenges",
+        "patient_sessions",
+    }
 )

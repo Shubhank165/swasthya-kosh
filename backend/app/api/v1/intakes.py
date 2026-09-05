@@ -6,7 +6,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Query, status
 
-from app.api.auth import RequireKioskOrStaff, RequirePhysician, RequireStaff
+from app.api.auth import RequireIntakeSubmitter, RequirePhysician, RequireStaff
 from app.api.deps import (
     IdempotencyDep,
     IngestServiceDep,
@@ -33,7 +33,7 @@ router = APIRouter(prefix="/intakes", tags=["intakes"])
     summary="Receive a completed intake from a kiosk",
 )
 async def ingest(
-    principal: RequireKioskOrStaff,
+    principal: RequireIntakeSubmitter,
     service: IngestServiceDep,
     guard: IdempotencyDep,
     payload: Annotated[dict[str, Any], Body()],

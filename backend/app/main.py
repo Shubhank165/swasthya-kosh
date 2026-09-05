@@ -17,7 +17,19 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.api.deps import get_providers
-from app.api.v1 import consent, documents, fhir, intakes, patients, realtime, terminology, worker
+from app.api.v1 import (
+    consent,
+    content,
+    documents,
+    fhir,
+    hospitals,
+    intakes,
+    patient_auth,
+    patients,
+    realtime,
+    terminology,
+    worker,
+)
 from app.api.v1 import worklist as worklist_api
 from app.core.config import get_settings
 from app.core.content import get_clinical_content
@@ -157,6 +169,13 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=200 if ready else 503, content=body)
 
     prefix = settings.api_prefix
+    # Open routes first, and grouped, so "what can be reached without a
+    # credential" is one place in this file rather than a property you work out
+    # by reading every router.
+    app.include_router(content.router, prefix=prefix)
+    app.include_router(hospitals.router, prefix=prefix)
+    app.include_router(patient_auth.router, prefix=prefix)
+
     app.include_router(intakes.router, prefix=prefix)
     app.include_router(documents.router, prefix=prefix)
     app.include_router(documents.content_router, prefix=prefix)

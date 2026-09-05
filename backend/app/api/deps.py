@@ -44,6 +44,7 @@ from app.repositories.terminology import TerminologyRepository
 from app.services.documents import DocumentService
 from app.services.identity import IdentityService
 from app.services.ingest import IngestService
+from app.services.patient_auth import PatientAuthService
 from app.services.reports import ReportService
 from app.services.terminology import TerminologyService
 from app.services.worklist import WorklistService
@@ -318,6 +319,28 @@ async def get_document_dispatcher(
 
 
 DocumentDispatcherDep = Annotated[DocumentDispatcher, Depends(get_document_dispatcher)]
+
+
+async def get_patient_auth_service(
+    session: SessionDep,
+    settings: SettingsDep,
+    providers: ProvidersDep,
+    clock: ClockDep,
+    ids: IdsDep,
+) -> PatientAuthService:
+    """Sign-in, built without a principal.
+
+    There is no caller identity yet — acquiring one is what these routes are
+    for — so this deliberately does not depend on `PrincipalDep`. Depending on
+    it would make authentication require authentication.
+    """
+    return PatientAuthService(
+        session, settings=settings, sender=providers.otp, clock=clock, ids=ids
+    )
+
+
+PatientAuthServiceDep = Annotated[PatientAuthService, Depends(get_patient_auth_service)]
+
 
 
 

@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Query, Response, UploadFile, status
 
-from app.api.auth import RequireKioskOrStaff, RequireStaff
+from app.api.auth import RequireIntakeSubmitter, RequireStaff
 from app.api.deps import DocumentDispatcherDep, DocumentServiceDep, SettingsDep
 from app.core.errors import NotFoundError
 from app.core.logging import get_logger
@@ -28,7 +28,7 @@ content_router = APIRouter(prefix="/documents", tags=["documents"])
 )
 async def upload_document(
     intake_id: str,
-    principal: RequireKioskOrStaff,
+    principal: RequireIntakeSubmitter,
     service: DocumentServiceDep,
     dispatcher: DocumentDispatcherDep,
     file: Annotated[UploadFile, File()],
@@ -76,7 +76,7 @@ async def upload_document(
 )
 async def accept_results(
     intake_id: str,
-    principal: RequireKioskOrStaff,
+    principal: RequireIntakeSubmitter,
     service: DocumentServiceDep,
     request: DocumentResultsRequest,
 ) -> DocumentOut:

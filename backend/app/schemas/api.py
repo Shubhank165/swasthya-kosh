@@ -155,6 +155,18 @@ class ResolveRequest(ApiModel):
     value: str | None = None
 
 
+class ABHALinkRequest(ApiModel):
+    #: An ABHA address, `name@sbx`. Never required: §7.2 makes linking optional
+    #: and the app works with a phone number alone.
+    #:
+    #: Constrained here rather than checked in the route, because an empty value
+    #: reaches `PatientRef` — which requires one for a non-guest reference — and
+    #: raises there as a 500. A malformed address is the caller's mistake and
+    #: deserves a 422; it is not an ABHA outage and must not be confused with
+    #: one, which answers `verified: false` and lets the intake continue.
+    abha_address: str = Field(min_length=1, max_length=128)
+
+
 class ResolveResponse(ApiModel):
     ref: dict[str, Any]
     patient_id: str | None = None
@@ -260,3 +272,53 @@ class MetricsOut(ApiModel):
     repaired: int = 0
     needs_manual_review: int = 0
     repair_rate: float = 0.0
+
+
+# --- patient app (2/3 §7, §12) -----------------------------------------------
+
+
+class OTPRequestBody(ApiModel):
+    phone: str
+
+
+class OTPRequestResponse(ApiModel):
+    challenge_id: str
+    expires_at: str
+    #: Present only when the mock sender is in use *and* the environment is not
+    #: production. It is how a demo on a laptop with no signal completes a
+    #: sign-in; `PatientAuthService` refuses to populate it otherwise, so this
+    #: field cannot become a live-code leak by configuration alone.
+    code: str | None = None
+    delivery: str
+
+
+class OTPVerifyBody(ApiModel):
+    challenge_id: str
+    code: str
+
+
+class PatientSessionResponse(ApiModel):
+    token: str
+    expires_at: str
+    #: The opaque reference this patient's records are keyed by. Returned so the
+    #: app can tell two accounts apart in its own storage; it is a peppered HMAC
+    #: and reverses to nothing.
+    patient_ref: str
+
+
+class DepartmentOut(ApiModel):
+    code: str
+    display: str
+
+
+class HospitalOut(ApiModel):
+    hospital_id: str
+    display_name: str
+    location: str | None = None
+    timezone: str
+    default_language: str
+    departments: list[DepartmentOut] = Field(default_factory=list)
+
+
+class HospitalListResponse(ApiModel):
+    hospitals: list[HospitalOut] = Field(default_factory=list)

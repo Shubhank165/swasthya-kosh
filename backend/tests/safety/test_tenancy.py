@@ -53,12 +53,18 @@ class TestTheSchemaSupportsIt:
             f"{unscoped_tables}"
         )
 
-    def test_exemptions_are_reference_data_only(self) -> None:
+    def test_exemptions_are_what_they_claim_to_be(self) -> None:
         """The exemption set holds what it claims to hold.
 
-        `hospitals` is the tenant list; the terminology tables are code systems,
-        which do not belong to a hospital. Anything else appearing here would be
-        patient data quietly excused from scoping.
+        Two kinds of thing qualify. `hospitals` is the tenant list and the
+        terminology tables are code systems, which no hospital owns. The two
+        patient-auth tables are the second kind: a person signs into the app
+        before choosing a hospital, so their sign-in cannot be scoped to one.
+
+        Anything else appearing here would be clinical data quietly excused from
+        scoping, which is why this is asserted as an exact set rather than a
+        subset — adding a table to the exemption list has to be a visible edit
+        in a file called `test_tenancy.py`.
         """
         assert frozenset(
             {
@@ -66,8 +72,29 @@ class TestTheSchemaSupportsIt:
                 "terminology_concepts",
                 "terminology_mappings",
                 "alembic_version",
+                "otp_challenges",
+                "patient_sessions",
             }
         ) == TENANT_EXEMPT_TABLES
+
+    def test_no_exempt_table_holds_a_plaintext_identifier(self) -> None:
+        """The patient-auth exemptions are only defensible because they are opaque.
+
+        `otp_challenges` and `patient_sessions` sit outside the tenant guard, so
+        a query bug cannot be caught there. What makes that acceptable is that
+        neither holds a phone number, a code or a usable token — the phone is a
+        peppered HMAC and the rest are hashes.
+
+        This asserts the column names that would betray a regression: somebody
+        adding `phone` or `token` to either table for debugging convenience.
+        """
+        forbidden = {"phone", "phone_number", "msisdn", "code", "token", "otp"}
+        for name in ("otp_challenges", "patient_sessions"):
+            columns = set(Base.metadata.tables[name].columns.keys())
+            assert not (columns & forbidden), (
+                f"{name} has a plaintext identifier column: "
+                f"{sorted(columns & forbidden)}"
+            )
 
     def test_the_tenant_column_is_indexed_everywhere(self) -> None:
         """Every scoped query filters on it, so every scoped table indexes it."""

@@ -110,6 +110,11 @@ class PatientRefType(StrEnum):
     HOSPITAL_ID = "hospital_id"
     #: A matching aid only. The whole number is never stored.
     AADHAAR_LAST4 = "aadhaar_last4"
+    #: How the patient app identifies a patient. The stored value is a peppered
+    #: HMAC of the number, never the number: a plain hash of a ten-digit phone
+    #: is brute-forced in seconds, so a bare digest would be the phone book with
+    #: extra steps.
+    PHONE = "phone"
     GUEST = "guest"
 
 

@@ -130,6 +130,24 @@ class Settings(BaseSettings):
     #: Off in any environment that holds real data.
     allow_header_auth: bool = True
 
+    # --- patient app ---------------------------------------------------------
+    #: Server-side pepper for patient phone references. Without it a stored
+    #: reference is a plain digest of a ten-digit number, which is reversible by
+    #: exhaustive search in seconds — so this is not optional in any environment
+    #: holding real patients, and `/readyz` reports it missing.
+    patient_ref_pepper: str | None = None
+    #: `mock` or `sms`. The mock returns the code in the response body in
+    #: non-production environments and never sends anything.
+    otp_provider: str = "mock"
+    otp_ttl_seconds: int = 300
+    #: Wrong-code attempts before the challenge is burned. Low, because a
+    #: six-digit code with unlimited attempts is a four-hour brute force.
+    otp_max_attempts: int = 5
+    #: Challenges per phone per hour. Rate limiting an OTP endpoint is what
+    #: stops it being used as a free SMS cannon aimed at a stranger.
+    otp_max_per_hour: int = 5
+    patient_session_ttl_hours: int = 720
+
     # --- observability -------------------------------------------------------
     log_level: str = "INFO"
     log_json: bool = True
@@ -166,6 +184,14 @@ class Settings(BaseSettings):
             raise ValueError(f"document_queue must be one of {sorted(allowed)}")
         return value
 
+    @field_validator("otp_provider")
+    @classmethod
+    def _validate_otp_provider(cls, value: str) -> str:
+        allowed = {"mock", "sms"}
+        if value not in allowed:
+            raise ValueError(f"otp_provider must be one of {sorted(allowed)}")
+        return value
+
     @field_validator("abha_provider")
     @classmethod
     def _validate_abha_provider(cls, value: str) -> str:
@@ -187,6 +213,22 @@ class Settings(BaseSettings):
         if not value:
             raise ValueError("at least one report language is required")
         return value
+
+    #: The question content version this deployment serves. The Jetson, the
+    #: patient app and this backend must agree on it: it is stamped into every
+    #: record's provenance, so "which questions produced this answer" is
+    #: answerable months later.
+    content_version: str = "questions-2026-09-01"
+    #: Languages the question bundle advertises. Distinct from
+    #: `report_languages`: a prompt and a report line are different artefacts,
+    #: reviewed separately, and a language may have one without the other.
+    #: The loader refuses to start if any question lacks a prompt in one of
+    #: these, so adding a language here is a commitment to translate.
+    question_languages: list[str] = Field(default_factory=lambda: ["en", "hi"])
+
+    @property
+    def questions_dir(self) -> Path:
+        return self.clinical_content_dir / "questions"
 
     @property
     def terminology_dir(self) -> Path:
