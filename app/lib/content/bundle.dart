@@ -277,7 +277,15 @@ class ContentBundle {
   /// an intake and tell the user to update. **Do not attempt partial
   /// compatibility** — a record that is half of a newer contract is a record
   /// the backend will either reject or, worse, accept and misread.
-  static const supportedSchemaVersions = {'0.1'};
+  ///
+  /// 0.2 was added to the backend and the bundle advertises the newest version
+  /// the backend accepts, so this set staying at `{'0.1'}` disabled Continue on
+  /// the first screen against any current deployment — the refusal working
+  /// exactly as designed, on a bundle the app could in fact produce. It is here
+  /// now because the app emits `carried_forward`, which is the whole of what
+  /// 0.2 adds; adding a version to this set without the field it introduces is
+  /// the partial compatibility the paragraph above forbids.
+  static const supportedSchemaVersions = {'0.1', '0.2'};
 
   /// The bundle formats this app can read.
   static const supportedBundleFormats = {'1'};

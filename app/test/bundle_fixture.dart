@@ -19,11 +19,16 @@ ContentBundle bundleWith({
   List<String> ayurveda = const [],
   List<String> ayurvedaCurrentState = const [],
   List<String> sections = const ['chief_complaint', 'hpi', 'red_flag_screen'],
+  // What a current backend actually serves: `GET /content/bundle` advertises
+  // the newest contract the backend accepts, and that has been 0.2 since the
+  // carry-forward work landed. The fixture said 0.1 for long enough that the
+  // suite was green against a payload shape no deployment was asking for.
+  String schemaVersion = '0.2',
 }) {
   return ContentBundle.parse(jsonEncode({
     'bundle_format': '1',
     'content_version': 'test',
-    'schema_version': '0.1',
+    'schema_version': schemaVersion,
     'languages': ['en', 'hi'],
     'sections': sections,
     'core': core,

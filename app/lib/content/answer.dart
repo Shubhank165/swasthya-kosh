@@ -171,6 +171,42 @@ AnswerValue? answerValueFromDraft(String? kind, Object? json, {String? unit}) {
 }
 
 /// What the walker records for one question.
+/// Where a fact came from, when it did not come from this interview.
+///
+/// Schema 0.2. A returning patient who says "yes, still correct" has confirmed
+/// something the hospital already held; they have not answered a question
+/// today. Recording that as a plain `answered` field with no `asked_text` says
+/// the interview asked something it never asked, and leaves a physician unable
+/// to tell a fresh answer from a year-old one the patient nodded at.
+class CarriedForward {
+  const CarriedForward({
+    required this.fromIntakeId,
+    required this.originallyRecorded,
+    this.confirmedToday,
+  });
+
+  factory CarriedForward.fromDraftJson(Map<String, dynamic> json) => CarriedForward(
+        fromIntakeId: json['from_intake_id'] as String,
+        originallyRecorded: json['originally_recorded'] as String,
+        confirmedToday: json['confirmed_today'] as bool?,
+      );
+
+  final String fromIntakeId;
+
+  /// ISO date. When the hospital first recorded this, not when it was carried.
+  final String originallyRecorded;
+
+  /// `null` means the patient was not asked about it today — which is not the
+  /// same as being asked and saying nothing.
+  final bool? confirmedToday;
+
+  Map<String, dynamic> toJson() => {
+        'from_intake_id': fromIntakeId,
+        'originally_recorded': originallyRecorded,
+        if (confirmedToday != null) 'confirmed_today': confirmedToday,
+      };
+}
+
 class Answer {
   const Answer({
     required this.questionId,
@@ -181,6 +217,7 @@ class Answer {
     this.askedText,
     this.language,
     this.notApplicableBecause,
+    this.carriedForward,
   });
 
   final String questionId;
@@ -200,6 +237,10 @@ class Answer {
   /// Why a precondition ruled this out. Recorded rather than omitted, so
   /// "not applicable" is a statement rather than an absence.
   final String? notApplicableBecause;
+
+  /// Set only on a fact confirmed from an earlier visit — see [CarriedForward].
+  /// Emitted only against schema 0.2 and later; 0.1 forbids the key.
+  final CarriedForward? carriedForward;
 
   /// Read one entry back out of a saved draft — §5 resume, §15 item 7.
   ///
@@ -224,6 +265,11 @@ class Answer {
         askedText: json['asked_text'] as String?,
         language: json['language'] as String?,
         notApplicableBecause: json['not_applicable_because'] as String?,
+        carriedForward: json['carried_forward'] == null
+            ? null
+            : CarriedForward.fromDraftJson(
+                json['carried_forward'] as Map<String, dynamic>,
+              ),
       );
 
   bool get isSettled => status == FieldStatus.answered;
@@ -247,6 +293,7 @@ class Answer {
         askedText: askedText,
         language: language,
         notApplicableBecause: notApplicableBecause,
+        carriedForward: carriedForward,
       );
 
   /// One entry of the record's `fields` map — 2/3 §9.
@@ -254,7 +301,11 @@ class Answer {
   /// `value` is present as an explicit null for every unsettled status rather
   /// than omitted: the contract keeps one shape, and a reader must never have
   /// to infer a status from a missing key.
-  Map<String, dynamic> toFieldJson({int? sourceTurn}) => {
+  /// `carriedForward` is emitted only when [schemaVersion] is 0.2 or later.
+  /// The 0.1 contract sets `extra="forbid"`, so sending the key to a backend
+  /// that predates it fails the whole payload into `needs_manual_review` — and
+  /// silently, because ingest answers an unparseable payload with a 200.
+  Map<String, dynamic> toFieldJson({int? sourceTurn, String? schemaVersion}) => {
         'value': status == FieldStatus.answered ? value?.toJson() : null,
         'status': status.wire,
         if (value?.unitHint != null) 'unit': value!.unitHint,
@@ -262,6 +313,8 @@ class Answer {
         if (sourceTurn != null) 'source_turn': sourceTurn,
         if (notApplicableBecause != null)
           'not_applicable_because': notApplicableBecause,
+        if (carriedForward != null && schemaVersion != null && schemaVersion != '0.1')
+          'carried_forward': carriedForward!.toJson(),
       };
 
   /// The debug/draft shape. Not the wire format — see [toFieldJson].
@@ -277,5 +330,6 @@ class Answer {
         'language': language,
         if (notApplicableBecause != null)
           'not_applicable_because': notApplicableBecause,
+        if (carriedForward != null) 'carried_forward': carriedForward!.toJson(),
       };
 }

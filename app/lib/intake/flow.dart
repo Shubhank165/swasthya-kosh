@@ -524,8 +524,14 @@ class IntakeFlow extends ChangeNotifier {
   ///
   /// The seeded entry carries no `asked_text`, so it produces no turn — the
   /// record says the field is answered and that nothing in this interview
-  /// asked it, which is exactly what happened. See `DECISIONS.md` for the
-  /// contract gap that leaves.
+  /// asked it, which is exactly what happened.
+  ///
+  /// It also carries `carried_forward`, which closes the gap `DECISIONS.md`
+  /// recorded when this was written: "answered, and nothing asked it" is true
+  /// but says nothing about *where the answer came from*, and a physician
+  /// cannot tell a fresh answer from a year-old one the patient nodded at.
+  /// `confirmed_today` is true here because that is the only path that seeds —
+  /// "no longer correct" and "not sure" both fall through to being asked.
   static Map<String, Answer> _seed(
     ContentBundle bundle,
     String language,
@@ -548,6 +554,18 @@ class IntakeFlow extends ChangeNotifier {
         value: TextValue(fact.value),
         originalText: fact.label,
         language: language,
+        // Both parts or neither. `originally_recorded` is a required `date` in
+        // 0.2, so an empty string fails the whole payload — and fails it
+        // silently, because ingest answers an unparseable payload with a 200.
+        // A confirmed fact with no usable provenance is still a confirmed
+        // fact; it just cannot say which visit it came from.
+        carriedForward: fact.fromIntakeId.isEmpty || fact.originallyRecorded.isEmpty
+            ? null
+            : CarriedForward(
+                fromIntakeId: fact.fromIntakeId,
+                originallyRecorded: fact.originallyRecorded,
+                confirmedToday: true,
+              ),
       );
     }
     return seeded;
@@ -570,6 +588,8 @@ class ConfirmedFact {
     required this.fieldId,
     required this.label,
     required this.value,
+    required this.fromIntakeId,
+    required this.originallyRecorded,
   });
 
   final String fieldId;
@@ -577,4 +597,11 @@ class ConfirmedFact {
   /// What the patient was shown — "Diabetes", "Metformin 500mg".
   final String label;
   final String value;
+
+  /// The earlier intake this came from, and when it was recorded there. Both
+  /// travel into the record so a physician reading "diabetes" can see it was
+  /// confirmed today and first written down some time ago, rather than being
+  /// told the interview asked about it.
+  final String fromIntakeId;
+  final String originallyRecorded;
 }

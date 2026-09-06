@@ -177,6 +177,15 @@ class _ReturningPatientGateState extends ConsumerState<ReturningPatientGate> {
                   fieldId: fact.fieldId,
                   label: fact.label,
                   value: fact.value,
+                  fromIntakeId: fact.intakeId,
+                  // The date the hospital's record was last confirmed by a
+                  // physician, which is the date the patient was just shown and
+                  // asked about. The app is not told when the fact was first
+                  // written down; verification is the older date it does know,
+                  // and claiming a more precise one would be inventing it.
+                  originallyRecorded: fact.verifiedAt == null
+                      ? ''
+                      : fact.verifiedAt!.toIso8601String().substring(0, 10),
                 ),
           ]),
         );

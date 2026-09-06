@@ -31,7 +31,8 @@ import 'fake_api.dart';
 import 'test_sqlite.dart';
 
 /// Chest pain plus breathlessness, which is the rule the brief opens §6 with.
-ContentBundle cardiacBundle() => bundleWith(
+ContentBundle cardiacBundle({String schemaVersion = '0.2'}) => bundleWith(
+      schemaVersion: schemaVersion,
       sections: const ['chief_complaint', 'hpi', 'ayurveda'],
       questions: [
         question(
@@ -464,7 +465,13 @@ void main() {
   group('the returning-patient check', () {
     test('a confirmed fact is not asked again', () async {
       final flow = await begin(confirmed: const [
-        ConfirmedFact(fieldId: 'dyspnoea', label: 'Breathlessness', value: 'yes'),
+        ConfirmedFact(
+          fieldId: 'dyspnoea',
+          label: 'Breathlessness',
+          value: 'yes',
+          fromIntakeId: 'intake-earlier-visit',
+          originallyRecorded: '2026-03-01',
+        ),
       ]);
       await flow.answer(const CodedValue('chest_pain'), 'Chest pain');
 
@@ -472,11 +479,26 @@ void main() {
       expect(flow.answers['dyspnoea']!.status, FieldStatus.answered);
       expect(flow.answers['dyspnoea']!.originalText, 'Breathlessness');
       expect(flow.question?.questionId, isNot('dyspnoea'));
+
+      // Answered, and answered *elsewhere*. Without this the record says the
+      // patient answered a question today that nobody put to them, and a
+      // physician cannot tell it from a fresh answer.
+      final carried = flow.answers['dyspnoea']!.carriedForward;
+      expect(carried, isNotNull);
+      expect(carried!.fromIntakeId, 'intake-earlier-visit');
+      expect(carried.originallyRecorded, '2026-03-01');
+      expect(carried.confirmedToday, isTrue);
     });
 
     test('a confirmed fact produces no turn, because none was put', () async {
       final flow = await begin(confirmed: const [
-        ConfirmedFact(fieldId: 'duration', label: 'Three days', value: '3'),
+        ConfirmedFact(
+          fieldId: 'duration',
+          label: 'Three days',
+          value: '3',
+          fromIntakeId: 'intake-earlier-visit',
+          originallyRecorded: '2026-03-01',
+        ),
       ]);
       await flow.answer(const CodedValue('fever'), 'Fever');
       await flow.answer(const BoolValue(true), 'Yes'); // the Ayurveda question
@@ -492,6 +514,69 @@ void main() {
         reason: 'inventing a turn would claim the patient was shown a question',
       );
       expect(((body['fields'] as Map)['duration'] as Map)['source_turn'], isNull);
+
+      // 0.2's whole addition, on the wire.
+      expect(
+        ((body['fields'] as Map)['duration'] as Map)['carried_forward'],
+        {
+          'from_intake_id': 'intake-earlier-visit',
+          'originally_recorded': '2026-03-01',
+          'confirmed_today': true,
+        },
+      );
+    });
+
+    test('a 0.1 bundle never receives the 0.2 key', () async {
+      // 0.1 sets `extra="forbid"`, so a `carried_forward` sent to a backend
+      // that predates it fails the whole payload — and silently, because ingest
+      // answers an unparseable payload with a 200 and the app checks the status
+      // code. That is the defect that stored every app intake as
+      // `needs_manual_review` for a fortnight; this is the guard against the
+      // same shape of mistake in the other direction.
+      final flow = await begin(
+        bundle: cardiacBundle(schemaVersion: '0.1'),
+        confirmed: const [
+          ConfirmedFact(
+            fieldId: 'duration',
+            label: 'Three days',
+            value: '3',
+            fromIntakeId: 'intake-earlier-visit',
+            originallyRecorded: '2026-03-01',
+          ),
+        ],
+      );
+      await flow.answer(const CodedValue('fever'), 'Fever');
+      await flow.answer(const BoolValue(true), 'Yes');
+      flow.continueToReview();
+      await flow.submit();
+
+      final ingest = backend.calls.firstWhere((c) => c.path.contains('/ingest'));
+      final body = ingest.body! as Map<String, dynamic>;
+      expect(body['schema_version'], '0.1');
+      final duration = (body['fields'] as Map)['duration'] as Map;
+      expect(duration.containsKey('carried_forward'), isFalse);
+      // The fact itself still travels. What is dropped is the provenance the
+      // older contract has no place for, not the answer.
+      expect(duration['status'], 'answered');
+    });
+
+    test('a fact with no usable provenance is still carried, without the key',
+        () async {
+      // `verified_at` unparseable means the app does not know when the hospital
+      // recorded this. 0.2 requires a real date, so the choice is between
+      // dropping the provenance and failing the intake; the answer the patient
+      // just confirmed is worth more than the note about where it came from.
+      final flow = await begin(confirmed: const [
+        ConfirmedFact(
+          fieldId: 'duration',
+          label: 'Three days',
+          value: '3',
+          fromIntakeId: 'intake-earlier-visit',
+          originallyRecorded: '',
+        ),
+      ]);
+      expect(flow.answers['duration']!.status, FieldStatus.answered);
+      expect(flow.answers['duration']!.carriedForward, isNull);
     });
 
     test('a carried fact the bundle no longer asks is left alone', () async {
@@ -499,7 +584,13 @@ void main() {
       // restate, and inventing a field for it would put an answer in the
       // record against a question that does not exist.
       final flow = await begin(confirmed: const [
-        ConfirmedFact(fieldId: 'gone_from_bundle', label: 'x', value: 'y'),
+        ConfirmedFact(
+          fieldId: 'gone_from_bundle',
+          label: 'x',
+          value: 'y',
+          fromIntakeId: 'intake-earlier-visit',
+          originallyRecorded: '2026-03-01',
+        ),
       ]);
       expect(flow.answers.containsKey('gone_from_bundle'), isFalse);
     });

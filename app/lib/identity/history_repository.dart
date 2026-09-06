@@ -24,6 +24,7 @@ class CarriedFact {
     required this.label,
     required this.value,
     required this.section,
+    required this.intakeId,
     this.verifiedAt,
   });
 
@@ -32,6 +33,7 @@ class CarriedFact {
         label: json['label'] as String? ?? json['field_id'] as String,
         value: json['value']?.toString() ?? '',
         section: json['section'] as String? ?? 'history',
+        intakeId: json['intake_id'] as String? ?? '',
         verifiedAt: DateTime.tryParse(json['verified_at']?.toString() ?? ''),
       );
 
@@ -39,6 +41,11 @@ class CarriedFact {
   final String label;
   final String value;
   final String section;
+
+  /// The intake this fact was recorded in. Carried so that confirming it in a
+  /// later intake can say *which* earlier visit it came from rather than
+  /// presenting it as something answered today (schema 0.2).
+  final String intakeId;
 
   /// When a physician verified it. Shown to the patient as the date their
   /// record was last confirmed, which is the only way "still correct?" is a

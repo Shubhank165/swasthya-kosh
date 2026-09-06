@@ -107,7 +107,10 @@ class IntakeRecordBuilder {
           'resolved': answer.status == FieldStatus.answered,
         });
       }
-      fields[answer.fieldId] = answer.toFieldJson(sourceTurn: sourceTurn);
+      fields[answer.fieldId] = answer.toFieldJson(
+        sourceTurn: sourceTurn,
+        schemaVersion: bundle.schemaVersion,
+      );
     }
 
     return {
