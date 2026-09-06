@@ -161,10 +161,11 @@ showed it unverified.
   "never wrong".
 - **iOS.** Unverified, and it stays that way without a Mac. Android-only is a
   reasonable scope statement; implying iOS works is not.
-- **The Vertex ML processing region.** Still unconfirmed. The adapters fail
-  closed, so nothing ships without it. It does not block the kiosk demo — the
-  Jetson reads documents locally — and it blocks only documents uploaded from the
-  app, which is a smaller and disclosable surface.
+- **The Vertex ML processing region.** Still unconfirmed, and the models are now
+  on anyway in the `medikiosk-sih-2026` deployment — deliberately, on a project
+  holding synthetic documents and no patient. `VERTEX_ZDR_ENABLED=true` is an
+  operator's assertion, not evidence, and decision 31 now says so with a date.
+  Real patient data still waits on the written answer.
 
 ---
 
@@ -175,3 +176,50 @@ red-flag criteria and question order, the nine-language question translations,
 and the app's urgent-care wording and emergency number. Every rule still carries
 `clinical_source: pending`. A Vaidya and an AIIA mentor close these; an engineer
 cannot.
+
+---
+
+## The models are on, and what that took
+
+`/readyz` on the deployed API had been reporting `"ocr": "mock", "repair":
+"mock"` since the day it went up, and nobody had read it. Not a blocker and not
+a residency problem: `40-deploy.sh` never set either variable, so both took
+their safe default. Decision 65 covers the shape of the fix — five knobs, mocks
+still the default, and ZDR a separate switch that `config.sh` refuses to deploy
+without.
+
+**Both adapters have now run against a real project**, `asia-south1`, on a
+Gemini Flash model — the first time either has, since they are excluded from
+coverage and CI has no credentials for them. `backend/scripts/smoke_vertex.py`
+is what runs them: a synthetic prescription in, six items with bounding boxes
+and per-item confidence out, then a payload that fails the 0.2 contract in three
+ways, repaired, with `"maybe two weeks, could be more"` still sitting there
+unresolved.
+
+It found two defects, in two calls.
+
+| Defect | What it would have done |
+|---|---|
+| **`document_date: "04/09/2026"`** — the date as printed, against a `date` field. Pydantic raised out of the adapter, and nothing catches it | The row is already `processing`, so the Pub/Sub push 500s, burns all five delivery attempts and dead-letters a document a person could have read. Now: ISO-only, dropped if not, and any validation failure is a `REJECTED` verdict rather than an exception (decision 67) |
+| **Repair invented `intake_id` and `hospital_id`** to satisfy required fields it had not been given | `ingest` sets `hospital_id` from the kiosk token *before* repair, so a changed one re-files the record under whatever the model wrote, past a tenancy guard that sees nothing wrong. `IDENTITY_KEYS` now throws the repair away rather than retrying (decision 66) |
+
+The second is the one worth dwelling on. The repair instruction forbids
+inventing, in capitals, twice. The model invented anyway — not maliciously and
+not even unreasonably: the schema said the field was required and it had no
+value to put there. That is the whole argument for re-validating a model's
+output at the boundary rather than trusting the prompt, and it is now applied to
+the four fields where invention does the most damage.
+
+Provisioning also had one thing wrong, on the same reasoning that "only the
+worker calls Vertex": true of OCR, false of repair, which runs on the API during
+ingest. `40-deploy.sh` grants the API service account `roles/aiplatform.user`
+when repair is Vertex, and only then.
+
+Deployed shape:
+
+```
+project   medikiosk-sih-2026        region  asia-south1
+image     medikiosk:50b8895         schema  at head
+ocr       gemini                    repair  vertex
+storage   gcs                       queue   pubsub (push -> worker)
+```

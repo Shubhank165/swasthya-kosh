@@ -822,6 +822,23 @@ with a date and a source.
 guards deliberately fail closed so that shipping without the answer is
 impossible rather than merely inadvisable.
 
+**2026-09-06, and this is the part to read before pointing anything at a
+patient.** The models are now on in the `medikiosk-sih-2026` deployment —
+`OCR_PROVIDER=gemini`, `REPAIR_PROVIDER=vertex`, both on a Gemini Flash model in
+`asia-south1`. The three questions above are still unanswered. Nothing was
+verified; a flag was set, on purpose, by a person, for a project holding
+synthetic documents and no patient.
+
+`VERTEX_ZDR_ENABLED=true` is that person's assertion. It is not evidence, and no
+code here can turn it into evidence — which is exactly why it is a separate flag
+from the provider, and why `infra/gcp/config.sh` refuses a deploy that selects a
+cloud provider without setting it explicitly. The deploy prints the assertion
+back on every run that uses it.
+
+The demo posture is: synthetic documents, a seeded facility, no real patient
+record. Real data waits on (a), (b) and (c), written down here with a date and a
+source.
+
 ## 32. Clinical content pending review
 
 Engineer-authored, each file saying so in its own header, and none of it
@@ -984,3 +1001,93 @@ does, and no test catches either.
   `max-instances 10`; a WebSocket client connected to one instance does not see
   events published on another. This is invisible in the demo and would need a
   broker-backed bus before a multi-instance dashboard is real.
+
+## 65. The model is configuration, and turning it on is two decisions
+
+The cloud deployment ran `ocr: mock, repair: mock` from the day it went up, and
+not because anybody chose the mocks: `40-deploy.sh` never set either variable,
+so both took their default and the only thing that said so was `/readyz`, which
+nobody was reading. "The ML doesn't work" turned out to be two environment
+variables that were never passed.
+
+The fix could have been one line in the deploy script. It is instead five
+variables and a guard, for two reasons.
+
+**A deployment that reaches a model by default is a deployment nobody decided to
+make.** `OCR_PROVIDER` and `REPAIR_PROVIDER` still default to the mocks. Turning
+them on is something you type.
+
+**Residency and the provider are separate switches on purpose.** Selecting a
+cloud provider without `VERTEX_ZDR_ENABLED=true` fails in `config.sh`, before an
+image is built — not at container start, where the failure is a crash-looping
+revision somebody debugs at a venue. The adapters already refuse to construct
+without it (decision 31); this moves the same refusal to the earliest point that
+can hold it. Two switches means nobody turns a model on without also making the
+claim that the model is allowed to see the data.
+
+And there is still no model id in this repository. `OCR_MODEL_ID` and
+`REPAIR_MODEL_ID` are required when the provider is a cloud one and are passed
+on the deploy command, so which model read a prescription is a deployment fact
+with a name attached rather than a commit nobody reviewed.
+
+One thing provisioning had wrong, found while wiring this: `00-provision.sh`
+grants `roles/aiplatform.user` to the worker only, on the reasoning that "only
+the worker calls Vertex". That is true of OCR and false of repair — repair runs
+on the API, during ingest, before the response, with no document involved.
+`40-deploy.sh` now grants it to the API service account when repair is Vertex,
+and only then.
+
+## 66. Repair may not rewrite the record's identity
+
+The first live call to Vertex was handed a payload missing `intake_id` and
+`hospital_id`, both required by the contract. The model obeyed the schema and
+disobeyed the instruction: `"unknown_intake_id"`, `"unknown_hospital_id"`. The
+result validated, so `attempt()` accepted it.
+
+That is worse than a failed repair, twice over. `ingest` sets `hospital_id` from
+the kiosk token *before* repair runs, so a model that changes it re-files the
+record under whatever it wrote — and the tenancy guard cannot catch that,
+because the value is internally consistent and simply wrong. A changed
+`intake_id` is decision 61 from the other end: the record is accepted under an
+id the kiosk does not have, and every document and consent artefact that follows
+404s against a record that exists.
+
+`IDENTITY_KEYS` in `app/services/repair.py` is the guard, and it refuses rather
+than retries. A model that rewrote the record's identity once is not more
+trustworthy on the second pass, and the payload is stored raw either way:
+`needs_manual_review` on a record nobody can mis-file beats a repaired record
+filed under an invented id.
+
+Absent counts as well as changed. A payload with no `kiosk_id` came from
+somewhere that did not say which kiosk; a repaired one that names a kiosk is a
+provenance claim nobody made.
+
+The repair instruction already forbids inventing. **An instruction is not a
+guarantee** — that is the stated reason the caller re-validates the model's
+output at all, and this is the same reasoning applied to the four fields where
+invention does the most damage.
+
+## 67. A transcribed date is not a date
+
+The same first call returned `document_date: "04/09/2026"` — the date as printed,
+which is what "transcribe only" asks for everywhere else in that contract.
+`DocumentExtraction.document_date` is a `date`, so pydantic raised out of the
+adapter, and nothing catches it: the row is already `processing`, so the Pub/Sub
+push 500s and burns all five delivery attempts before dead-lettering a document
+a person could have looked at immediately.
+
+The date is dropped, not parsed. `04/09/2026` is 4 September to an Indian clerk
+and 9 April to an American parser, and resolving that ambiguity on a patient's
+behalf is the thing this codebase refuses to do everywhere else — repair does
+not, the walker does not. The printed date is still in `page_text` exactly as it
+appears, so a physician loses nothing they could read; what is lost is a
+structured date nobody could have trusted.
+
+The instruction and the response schema now both say ISO 8601 and say to omit an
+ambiguous date, so the drop should be rare. It is still there, because the
+instruction is not a guarantee.
+
+Separately, and more important than the date: **a response that fails validation
+is now a `REJECTED` verdict rather than an exception.** An unparseable response
+already behaved that way; a parseable-but-off-contract one did not. A rejected
+document is visible to a human. A stuck one is not.

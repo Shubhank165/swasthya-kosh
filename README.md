@@ -68,6 +68,24 @@ make provision    # idempotent; safe to re-run after it fails partway
 make deploy       # check → build → migrate → deploy, in that order
 ```
 
+That deploys with the mock providers, which is the default and stays the
+default: a deployment that reaches a model without anybody typing so is a
+deployment nobody decided to make. To run the real ones, name them and the
+models, and assert the residency claim:
+
+```bash
+OCR_PROVIDER=gemini    OCR_MODEL_ID=<model> \
+REPAIR_PROVIDER=vertex REPAIR_MODEL_ID=<model> \
+VERTEX_ZDR_ENABLED=true \
+make deploy
+```
+
+The model ids are not in this repository and are refused if missing.
+`VERTEX_ZDR_ENABLED` is refused if a cloud provider is selected without it, in
+`infra/gcp/config.sh`, before an image is built — and setting it is an assertion
+you are making about the project, which nothing here can verify. Read the
+section below first.
+
 `infra/gcp/README.md` has the detail, including the one manual step (the kiosk
 tokens secret) and the residency question that must be answered before any
 cloud model is switched on.
@@ -241,6 +259,17 @@ rest — stays in region for the model in use.
 **That question is open and has to be answered in writing before either provider
 is enabled anywhere near real patient data.** It is decision 31 in
 `docs/DECISIONS.md`, and it is a decision for the team.
+
+The demo deployment runs both providers anyway, deliberately, on a project
+holding synthetic documents and no patient record. That is a defensible posture
+for a demo and not one for a hospital, and the difference is the sentence above,
+not a flag.
+
+`backend/scripts/smoke_vertex.py` drives both adapters against a real project by
+hand. `make check` does not run it and CI has no credentials for it — which is
+why it is worth running: the two calls it took to get working found a document
+that would have dead-lettered on a printed date, and a repair that invented the
+record's `intake_id`. Decisions 66 and 67.
 
 ## What can and cannot be claimed
 
