@@ -203,6 +203,38 @@ void main() {
       expect(await db.documentsFor('intake-1'), isEmpty);
     });
 
+    test('are addressed to the id the hospital chose, not the local one', () async {
+      // The bug the app's live end-to-end test found, and the reason there now
+      // is one. The backend re-keys an intake whose id is not a UUID — this app
+      // sends `intake-<hex>` — so a document posted to the local id 404s. It
+      // 404s *after* the record has been accepted, so the patient is shown a
+      // successful submission and the doctor never sees the prescription.
+      await seedDraft('intake-1');
+      await seedDocument('intake-1', 'doc-1');
+      await queue.enqueue(intakeId: 'intake-1', payload: record('intake-1'));
+      await queue.submitNow('intake-1');
+
+      final upload = backend.calls.firstWhere((c) => c.path.contains('/documents'));
+      expect(upload.path, '/intakes/server-side-id/documents');
+      expect(upload.path, isNot(contains('intake-1')));
+    });
+
+    test('a retry days later still knows the hospital id', () async {
+      // The response that carried it is long gone by then, so it has to have
+      // been written down. It is on the receipt.
+      backend.offline.add('/documents');
+      await seedDraft('intake-1');
+      await seedDocument('intake-1', 'doc-1');
+      await queue.enqueue(intakeId: 'intake-1', payload: record('intake-1'));
+      await queue.submitNow('intake-1');
+      expect((await db.receiptFor('intake-1'))!.serverIntakeId, 'server-side-id');
+
+      backend.offline.clear();
+      await queue.flush(attempts: 1);
+      final upload = backend.calls.lastWhere((c) => c.path.contains('/documents'));
+      expect(upload.path, '/intakes/server-side-id/documents');
+    });
+
     test('a photo that will not upload keeps the intake alive', () async {
       backend.offline.add('/documents');
       await seedDraft('intake-1');
@@ -245,7 +277,11 @@ void main() {
 
       final consent = backend.calls.firstWhere((c) => c.path.contains('/consent'));
       final body = jsonDecode(jsonEncode(consent.body)) as Map<String, dynamic>;
-      expect(body['intake_id'], 'intake-1');
+      // The id the hospital filed the intake under, not the one this phone
+      // made up. The backend re-keys a non-UUID intake id, so an artefact filed
+      // against the local id references an intake that does not exist —
+      // silently, because the artefact endpoint does not check.
+      expect(body['intake_id'], 'server-side-id');
       expect(body['notice_text'], 'the notice as shown');
       // Refused is named, not inferred from absence: "refused" and "never
       // offered" are different things to a regulator.

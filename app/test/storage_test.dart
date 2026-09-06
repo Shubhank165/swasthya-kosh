@@ -143,6 +143,10 @@ void main() {
         'reference_code',
         'hospital_name',
         'submitted_at',
+        // An identifier the hospital chose, kept so a document uploaded days
+        // later can still be addressed to the right intake. Not clinical: it
+        // is an opaque id, exactly like `intake_id` beside it.
+        'server_intake_id',
       });
     });
   });

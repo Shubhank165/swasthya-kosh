@@ -16,11 +16,21 @@
 /// flutter test integration_test/journey_test.dart      # needs a device
 /// ```
 ///
-/// **Status: written, never executed.** There is no device on the machine this
-/// was built on. Everything it asserts is asserted somewhere else at a lower
-/// level — the flow controller in `test/flow_test.dart`, each screen in
-/// `test/screens_test.dart` — so what this adds is the seam between them, and
-/// that seam is the one thing still unverified.
+/// **Status: executed, and it passes.** Run on a physical Android device
+/// (OnePlus CPH2381, Android 14) — 3/3 §B2.
+///
+/// Running it found what a host test structurally could not: `LocalDatabase
+/// .memory()` opened a connection without first pointing sqlite3 at the
+/// SQLCipher build, and this app ships SQLCipher and deliberately not
+/// `sqlite3_flutter_libs` beside it. On a host the system SQLite is there and
+/// the omission is invisible; on a device there is no `libsqlite3.so` and the
+/// first query threw before a screen rendered. Every lower-level test passed
+/// throughout.
+///
+/// Everything it asserts is also asserted somewhere else at a lower level — the
+/// flow controller in `test/flow_test.dart`, each screen in
+/// `test/screens_test.dart`. What it adds is the seam between them, and the
+/// device underneath.
 library;
 
 import 'dart:io';

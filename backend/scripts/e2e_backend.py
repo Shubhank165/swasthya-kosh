@@ -42,6 +42,12 @@ def configure(database_url: str) -> None:
             "ALLOW_HEADER_AUTH": "true",
             "DEMO_MODE": "false",
             "KIOSK_TOKENS": json.dumps({KIOSK_TOKEN: HOSPITAL_ID}),
+            # The app's phone sign-in refuses to run without it, correctly: a
+            # patient reference is a peppered HMAC, and without a pepper it
+            # would be a plain digest of a ten-digit number — reversible by
+            # exhaustive search, which is the phone book with extra steps. A
+            # throwaway value for a throwaway database.
+            "PATIENT_REF_PEPPER": "e2e-only-not-a-secret",
             "LOG_JSON": "false",
             "LOG_LEVEL": "warning",
         }

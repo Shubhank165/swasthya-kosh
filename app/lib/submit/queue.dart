@@ -30,6 +30,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' show Value;
 
 import '../consent/consent_repository.dart';
 import '../core/api.dart';
@@ -184,7 +185,12 @@ class SubmissionQueue {
     // 1. Has this already been accepted? A receipt means yes, and re-posting
     //    would be safe but pointless — go straight to finishing the cleanup
     //    that a previous pass did not get to.
-    final alreadyAccepted = await _db.receiptFor(draft.intakeId) != null;
+    final existing = await _db.receiptFor(draft.intakeId);
+    final alreadyAccepted = existing != null;
+    // The id the hospital filed this under. It is the local one until ingest
+    // says otherwise, and a receipt written by an earlier pass is where it
+    // comes from on a retry.
+    var serverIntakeId = existing?.serverIntakeId ?? draft.intakeId;
 
     if (!alreadyAccepted) {
       // 2. Post the record, with the key the intake was born with.
@@ -215,23 +221,39 @@ class SubmissionQueue {
 
       // 3. Accepted. Write the receipt before anything else, because from here
       //    on a crash must not cause a second post.
+      //
+      //    The response's `intake_id` is the authority on where this intake
+      //    lives, and it is **not always the one we sent**: the contract asks
+      //    for a UUID, and where a client sends something else the backend
+      //    derives a stable UUID rather than throwing away a finished
+      //    interview. Everything posted after this point — the consent
+      //    artefact, the photographed prescription — has to address the intake
+      //    by the id the hospital has. Addressing it by the local one 404s, and
+      //    it 404s *after* the record has been accepted, so the patient sees a
+      //    successful submission and the doctor never sees the prescription.
+      serverIntakeId = response.data?['intake_id'] as String? ?? draft.intakeId;
       await _db.saveReceipt(ReceiptsCompanion.insert(
         intakeId: draft.intakeId,
         referenceCode: referenceCodeFor(draft.intakeId),
         hospitalName: draft.hospitalName ?? draft.hospitalId,
         submittedAt: _clock(),
+        serverIntakeId: Value(serverIntakeId),
       ));
     }
 
     // 4. File the consent artefact, now that the intake it references exists.
     //    Before the documents, because a document processed under a consent
     //    that was never filed is the ordering §11 cannot tolerate.
-    if (consent != null && !await _fileConsent(draft.intakeId, consent)) {
+    if (consent != null && !await _fileConsent(serverIntakeId, consent)) {
       return Delivery.accepted;
     }
 
-    // 5. Send the documents, while their files are still on disk.
-    final documentsDone = await _uploadDocuments(draft.intakeId);
+    // 5. Send the documents, while their files are still on disk. Read from
+    //    the local table by the local id; posted to the hospital's id.
+    final documentsDone = await _uploadDocuments(
+      localIntakeId: draft.intakeId,
+      serverIntakeId: serverIntakeId,
+    );
     if (!documentsDone) {
       // Accepted, but the prescription photo has not arrived yet. Keeping the
       // draft row alive keeps the files alive with it; §10's "delete on submit"
@@ -272,9 +294,12 @@ class SubmissionQueue {
   /// Failures here are not fatal to the submission — the record is already at
   /// the hospital, and a document that never uploads is a missing attachment
   /// rather than a missing intake.
-  Future<bool> _uploadDocuments(String intakeId) async {
+  Future<bool> _uploadDocuments({
+    required String localIntakeId,
+    required String serverIntakeId,
+  }) async {
     var allDone = true;
-    for (final document in await _db.documentsFor(intakeId)) {
+    for (final document in await _db.documentsFor(localIntakeId)) {
       final file = File(document.filePath);
       if (!file.existsSync()) {
         // The file is gone — a device cleaner, or a purge that half ran. The
@@ -285,7 +310,7 @@ class SubmissionQueue {
       }
       try {
         final response = await _api.post<Map<String, dynamic>>(
-          '/intakes/$intakeId/documents',
+          '/intakes/$serverIntakeId/documents',
           body: FormData.fromMap({
             'kind': document.kind,
             'file': await MultipartFile.fromFile(file.path),

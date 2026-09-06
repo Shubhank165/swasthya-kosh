@@ -1110,9 +1110,15 @@ class $ReceiptsTable extends Receipts with TableInfo<$ReceiptsTable, Receipt> {
   late final GeneratedColumn<DateTime> submittedAt = GeneratedColumn<DateTime>(
       'submitted_at', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _serverIntakeIdMeta =
+      const VerificationMeta('serverIntakeId');
+  @override
+  late final GeneratedColumn<String> serverIntakeId = GeneratedColumn<String>(
+      'server_intake_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns =>
-      [intakeId, referenceCode, hospitalName, submittedAt];
+      [intakeId, referenceCode, hospitalName, submittedAt, serverIntakeId];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1153,6 +1159,12 @@ class $ReceiptsTable extends Receipts with TableInfo<$ReceiptsTable, Receipt> {
     } else if (isInserting) {
       context.missing(_submittedAtMeta);
     }
+    if (data.containsKey('server_intake_id')) {
+      context.handle(
+          _serverIntakeIdMeta,
+          serverIntakeId.isAcceptableOrUnknown(
+              data['server_intake_id']!, _serverIntakeIdMeta));
+    }
     return context;
   }
 
@@ -1170,6 +1182,8 @@ class $ReceiptsTable extends Receipts with TableInfo<$ReceiptsTable, Receipt> {
           .read(DriftSqlType.string, data['${effectivePrefix}hospital_name'])!,
       submittedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}submitted_at'])!,
+      serverIntakeId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}server_intake_id']),
     );
   }
 
@@ -1184,11 +1198,26 @@ class Receipt extends DataClass implements Insertable<Receipt> {
   final String referenceCode;
   final String hospitalName;
   final DateTime submittedAt;
+
+  /// The id **the backend** filed this intake under.
+  ///
+  /// Usually the same as `intakeId` and occasionally not: the kiosk contract
+  /// specifies a UUID, and where the client sends something else the backend
+  /// derives a stable UUID from it rather than rejecting a completed interview.
+  /// Everything posted *after* ingest — the consent artefact, the document
+  /// upload — has to address the intake by the id the hospital has, not the one
+  /// the phone made up.
+  ///
+  /// Persisted rather than held in memory because the upload can be retried
+  /// days later, from a cold start, after the response that carried it is long
+  /// gone. Nullable for receipts written before this column existed.
+  final String? serverIntakeId;
   const Receipt(
       {required this.intakeId,
       required this.referenceCode,
       required this.hospitalName,
-      required this.submittedAt});
+      required this.submittedAt,
+      this.serverIntakeId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1196,6 +1225,9 @@ class Receipt extends DataClass implements Insertable<Receipt> {
     map['reference_code'] = Variable<String>(referenceCode);
     map['hospital_name'] = Variable<String>(hospitalName);
     map['submitted_at'] = Variable<DateTime>(submittedAt);
+    if (!nullToAbsent || serverIntakeId != null) {
+      map['server_intake_id'] = Variable<String>(serverIntakeId);
+    }
     return map;
   }
 
@@ -1205,6 +1237,9 @@ class Receipt extends DataClass implements Insertable<Receipt> {
       referenceCode: Value(referenceCode),
       hospitalName: Value(hospitalName),
       submittedAt: Value(submittedAt),
+      serverIntakeId: serverIntakeId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverIntakeId),
     );
   }
 
@@ -1216,6 +1251,7 @@ class Receipt extends DataClass implements Insertable<Receipt> {
       referenceCode: serializer.fromJson<String>(json['referenceCode']),
       hospitalName: serializer.fromJson<String>(json['hospitalName']),
       submittedAt: serializer.fromJson<DateTime>(json['submittedAt']),
+      serverIntakeId: serializer.fromJson<String?>(json['serverIntakeId']),
     );
   }
   @override
@@ -1226,6 +1262,7 @@ class Receipt extends DataClass implements Insertable<Receipt> {
       'referenceCode': serializer.toJson<String>(referenceCode),
       'hospitalName': serializer.toJson<String>(hospitalName),
       'submittedAt': serializer.toJson<DateTime>(submittedAt),
+      'serverIntakeId': serializer.toJson<String?>(serverIntakeId),
     };
   }
 
@@ -1233,12 +1270,15 @@ class Receipt extends DataClass implements Insertable<Receipt> {
           {String? intakeId,
           String? referenceCode,
           String? hospitalName,
-          DateTime? submittedAt}) =>
+          DateTime? submittedAt,
+          Value<String?> serverIntakeId = const Value.absent()}) =>
       Receipt(
         intakeId: intakeId ?? this.intakeId,
         referenceCode: referenceCode ?? this.referenceCode,
         hospitalName: hospitalName ?? this.hospitalName,
         submittedAt: submittedAt ?? this.submittedAt,
+        serverIntakeId:
+            serverIntakeId.present ? serverIntakeId.value : this.serverIntakeId,
       );
   Receipt copyWithCompanion(ReceiptsCompanion data) {
     return Receipt(
@@ -1251,6 +1291,9 @@ class Receipt extends DataClass implements Insertable<Receipt> {
           : this.hospitalName,
       submittedAt:
           data.submittedAt.present ? data.submittedAt.value : this.submittedAt,
+      serverIntakeId: data.serverIntakeId.present
+          ? data.serverIntakeId.value
+          : this.serverIntakeId,
     );
   }
 
@@ -1260,14 +1303,15 @@ class Receipt extends DataClass implements Insertable<Receipt> {
           ..write('intakeId: $intakeId, ')
           ..write('referenceCode: $referenceCode, ')
           ..write('hospitalName: $hospitalName, ')
-          ..write('submittedAt: $submittedAt')
+          ..write('submittedAt: $submittedAt, ')
+          ..write('serverIntakeId: $serverIntakeId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(intakeId, referenceCode, hospitalName, submittedAt);
+  int get hashCode => Object.hash(
+      intakeId, referenceCode, hospitalName, submittedAt, serverIntakeId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1275,7 +1319,8 @@ class Receipt extends DataClass implements Insertable<Receipt> {
           other.intakeId == this.intakeId &&
           other.referenceCode == this.referenceCode &&
           other.hospitalName == this.hospitalName &&
-          other.submittedAt == this.submittedAt);
+          other.submittedAt == this.submittedAt &&
+          other.serverIntakeId == this.serverIntakeId);
 }
 
 class ReceiptsCompanion extends UpdateCompanion<Receipt> {
@@ -1283,12 +1328,14 @@ class ReceiptsCompanion extends UpdateCompanion<Receipt> {
   final Value<String> referenceCode;
   final Value<String> hospitalName;
   final Value<DateTime> submittedAt;
+  final Value<String?> serverIntakeId;
   final Value<int> rowid;
   const ReceiptsCompanion({
     this.intakeId = const Value.absent(),
     this.referenceCode = const Value.absent(),
     this.hospitalName = const Value.absent(),
     this.submittedAt = const Value.absent(),
+    this.serverIntakeId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ReceiptsCompanion.insert({
@@ -1296,6 +1343,7 @@ class ReceiptsCompanion extends UpdateCompanion<Receipt> {
     required String referenceCode,
     required String hospitalName,
     required DateTime submittedAt,
+    this.serverIntakeId = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : intakeId = Value(intakeId),
         referenceCode = Value(referenceCode),
@@ -1306,6 +1354,7 @@ class ReceiptsCompanion extends UpdateCompanion<Receipt> {
     Expression<String>? referenceCode,
     Expression<String>? hospitalName,
     Expression<DateTime>? submittedAt,
+    Expression<String>? serverIntakeId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1313,6 +1362,7 @@ class ReceiptsCompanion extends UpdateCompanion<Receipt> {
       if (referenceCode != null) 'reference_code': referenceCode,
       if (hospitalName != null) 'hospital_name': hospitalName,
       if (submittedAt != null) 'submitted_at': submittedAt,
+      if (serverIntakeId != null) 'server_intake_id': serverIntakeId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1322,12 +1372,14 @@ class ReceiptsCompanion extends UpdateCompanion<Receipt> {
       Value<String>? referenceCode,
       Value<String>? hospitalName,
       Value<DateTime>? submittedAt,
+      Value<String?>? serverIntakeId,
       Value<int>? rowid}) {
     return ReceiptsCompanion(
       intakeId: intakeId ?? this.intakeId,
       referenceCode: referenceCode ?? this.referenceCode,
       hospitalName: hospitalName ?? this.hospitalName,
       submittedAt: submittedAt ?? this.submittedAt,
+      serverIntakeId: serverIntakeId ?? this.serverIntakeId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1347,6 +1399,9 @@ class ReceiptsCompanion extends UpdateCompanion<Receipt> {
     if (submittedAt.present) {
       map['submitted_at'] = Variable<DateTime>(submittedAt.value);
     }
+    if (serverIntakeId.present) {
+      map['server_intake_id'] = Variable<String>(serverIntakeId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1360,6 +1415,7 @@ class ReceiptsCompanion extends UpdateCompanion<Receipt> {
           ..write('referenceCode: $referenceCode, ')
           ..write('hospitalName: $hospitalName, ')
           ..write('submittedAt: $submittedAt, ')
+          ..write('serverIntakeId: $serverIntakeId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1883,6 +1939,7 @@ typedef $$ReceiptsTableCreateCompanionBuilder = ReceiptsCompanion Function({
   required String referenceCode,
   required String hospitalName,
   required DateTime submittedAt,
+  Value<String?> serverIntakeId,
   Value<int> rowid,
 });
 typedef $$ReceiptsTableUpdateCompanionBuilder = ReceiptsCompanion Function({
@@ -1890,6 +1947,7 @@ typedef $$ReceiptsTableUpdateCompanionBuilder = ReceiptsCompanion Function({
   Value<String> referenceCode,
   Value<String> hospitalName,
   Value<DateTime> submittedAt,
+  Value<String?> serverIntakeId,
   Value<int> rowid,
 });
 
@@ -1913,6 +1971,10 @@ class $$ReceiptsTableFilterComposer
 
   ColumnFilters<DateTime> get submittedAt => $composableBuilder(
       column: $table.submittedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get serverIntakeId => $composableBuilder(
+      column: $table.serverIntakeId,
+      builder: (column) => ColumnFilters(column));
 }
 
 class $$ReceiptsTableOrderingComposer
@@ -1937,6 +1999,10 @@ class $$ReceiptsTableOrderingComposer
 
   ColumnOrderings<DateTime> get submittedAt => $composableBuilder(
       column: $table.submittedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get serverIntakeId => $composableBuilder(
+      column: $table.serverIntakeId,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$ReceiptsTableAnnotationComposer
@@ -1959,6 +2025,9 @@ class $$ReceiptsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get submittedAt => $composableBuilder(
       column: $table.submittedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get serverIntakeId => $composableBuilder(
+      column: $table.serverIntakeId, builder: (column) => column);
 }
 
 class $$ReceiptsTableTableManager extends RootTableManager<
@@ -1988,6 +2057,7 @@ class $$ReceiptsTableTableManager extends RootTableManager<
             Value<String> referenceCode = const Value.absent(),
             Value<String> hospitalName = const Value.absent(),
             Value<DateTime> submittedAt = const Value.absent(),
+            Value<String?> serverIntakeId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ReceiptsCompanion(
@@ -1995,6 +2065,7 @@ class $$ReceiptsTableTableManager extends RootTableManager<
             referenceCode: referenceCode,
             hospitalName: hospitalName,
             submittedAt: submittedAt,
+            serverIntakeId: serverIntakeId,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -2002,6 +2073,7 @@ class $$ReceiptsTableTableManager extends RootTableManager<
             required String referenceCode,
             required String hospitalName,
             required DateTime submittedAt,
+            Value<String?> serverIntakeId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ReceiptsCompanion.insert(
@@ -2009,6 +2081,7 @@ class $$ReceiptsTableTableManager extends RootTableManager<
             referenceCode: referenceCode,
             hospitalName: hospitalName,
             submittedAt: submittedAt,
+            serverIntakeId: serverIntakeId,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

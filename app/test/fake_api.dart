@@ -75,7 +75,13 @@ class FakeBackend implements HttpClientAdapter {
     return ResponseBody.fromString(
       body.isEmpty
           ? jsonEncode({
-              'intake_id': 'x',
+              // Deliberately *not* the id the client sent. The real backend
+              // derives a UUID when the client's id is not one, and everything
+              // posted after ingest — the consent artefact, the document
+              // upload — has to address the intake by the id that comes back.
+              // A fake that echoed the request's id would have hidden that,
+              // and did, until the app's live test caught it.
+              'intake_id': 'server-side-id',
               'status': 'stored',
               'consent_id': 'c',
               'verified': true,

@@ -24,9 +24,11 @@
 library;
 
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:medikiosk_app/content/answer.dart';
 import 'package:medikiosk_app/content/bundle.dart';
 import 'package:medikiosk_app/core/api.dart';
@@ -41,6 +43,39 @@ import 'package:medikiosk_app/submit/queue.dart';
 import 'test_sqlite.dart';
 
 const _baseUrl = String.fromEnvironment('MEDIKIOSK_LIVE');
+
+/// A picker that returns bytes this test made, rather than opening a camera.
+///
+/// The only thing stubbed in the document test below. Everything downstream of
+/// it — the downscale, the EXIF strip, the disk write, the multipart POST — is
+/// the real path, because the multipart POST is the part that had never once
+/// run against the real endpoint.
+class _FixedPicker implements PagePicker {
+  _FixedPicker(this.bytes);
+
+  final Uint8List bytes;
+
+  @override
+  Future<Uint8List?> pick({required bool fromCamera}) async => bytes;
+}
+
+/// A synthetic prescription: a light page with dark text-like marks.
+Uint8List _page({int width = 1600, int height = 2200}) {
+  final image = img.Image(width: width, height: height);
+  img.fill(image, color: img.ColorRgb8(245, 245, 240));
+  for (var line = 0; line < 30; line++) {
+    final y = (height * 0.1 + line * (height * 0.025)).round();
+    img.fillRect(
+      image,
+      x1: (width * 0.1).round(),
+      y1: y,
+      x2: (width * 0.9).round(),
+      y2: y + 8,
+      color: img.ColorRgb8(20, 20, 20),
+    );
+  }
+  return Uint8List.fromList(img.encodeJpg(image, quality: 90));
+}
 
 /// An answer for whichever question the walker puts next.
 ///
@@ -172,6 +207,137 @@ void main() {
 
     final receipt = await db.receiptFor(flow.intakeId);
     expect(receipt!.referenceCode, flow.referenceCode);
+  }, skip: skip);
+
+  test('a photographed document reaches the real multipart endpoint', () async {
+    // 3/3 §B2. Every other path in this app was verified against a running
+    // backend and each live run found something no unit test could. This one
+    // had never been run: the multipart upload was exercised only against a
+    // stub that accepted whatever it was handed.
+    final scratch = Directory.systemTemp.createTempSync('medikiosk_live_doc');
+    final db = LocalDatabase.memory();
+    addTearDown(() async {
+      await db.close();
+      if (scratch.existsSync()) scratch.deleteSync(recursive: true);
+    });
+
+    final anonymous =
+        ApiClient(config: const AppConfig(baseUrl: _baseUrl, appVersion: '1.0.0'));
+    final phone = '+9197${DateTime.now().millisecondsSinceEpoch % 100000000}';
+    final challenge = await anonymous.post<Map<String, dynamic>>(
+      '/auth/otp/request',
+      body: {'phone': phone},
+    );
+    expect(challenge.statusCode, 201, reason: 'is the backend running?');
+    final session = await anonymous.post<Map<String, dynamic>>(
+      '/auth/otp/verify',
+      body: {
+        'challenge_id': challenge.data!['challenge_id'],
+        'code': challenge.data!['code'],
+      },
+    );
+    expect(session.statusCode, 200);
+
+    Hospital? chosen;
+    final api = ApiClient(
+      config: const AppConfig(baseUrl: _baseUrl, appVersion: '1.0.0'),
+      readToken: () async => session.data!['token'] as String,
+      readHospitalId: () => chosen?.id,
+    );
+
+    final bundle = ContentBundle.parse(
+      (await api.get<String>('/content/bundle')).data!,
+    );
+    final hospitals = await HospitalRepository(api: api).list();
+    final hospital = chosen = hospitals.first;
+
+    final documents = DocumentStore(
+      database: db,
+      directory: scratch,
+      picker: _FixedPicker(_page()),
+    );
+    final queue = SubmissionQueue(database: db, api: api);
+    final flow = await IntakeFlow.begin(
+      database: db,
+      queue: queue,
+      documents: documents,
+      bundle: bundle,
+      language: 'en',
+      hospitalId: hospital.id,
+      hospitalName: hospital.displayName,
+      departmentCode:
+          hospital.departments.isEmpty ? null : hospital.departments.first.code,
+      reporter: 'self',
+      appVersion: '1.0.0',
+      patientRef: PatientRef.phone(session.data!['patient_ref'] as String),
+    );
+
+    var asked = 0;
+    while (flow.stage == FlowStage.question && asked < 500) {
+      final (value, text) = answerFor(flow.question!);
+      await flow.answer(value, text);
+      asked += 1;
+    }
+    expect(flow.stage, FlowStage.documents);
+
+    final added = await documents.add(
+      intakeId: flow.intakeId,
+      fromCamera: true,
+      kind: 'prescription',
+    );
+    expect(added, isA<PageAdded>(), reason: 'the synthetic page should pass quality');
+
+    flow.continueToReview();
+    await flow.submit();
+    expect(flow.stage, FlowStage.submitted);
+    expect(flow.queued, isFalse, reason: 'the hospital accepted the record');
+
+    // The row is dropped and the file deleted only when the upload actually
+    // succeeded — §10: nothing clinical stays on the device once the hospital
+    // has it. So an empty document table is the assertion that the multipart
+    // POST returned 2xx, and the empty directory is the assertion that the
+    // photograph is gone.
+    expect(await db.documentsFor(flow.intakeId), isEmpty);
+    expect(
+      scratch.listSync(recursive: true).whereType<File>(),
+      isEmpty,
+      reason: 'the photograph must not outlive its upload',
+    );
+
+    // The id the hospital filed this under, which is **not** the one the phone
+    // made up: the contract asks for a UUID and this app sends `intake-<hex>`,
+    // so the backend derives one. Posting the document to the local id 404s,
+    // and it 404s after the record was accepted — the patient sees a successful
+    // submission and the doctor never sees the prescription. That is the bug
+    // this line guards.
+    final receipt = await db.receiptFor(flow.intakeId);
+    final serverIntakeId = receipt!.serverIntakeId;
+    expect(serverIntakeId, isNotNull);
+    expect(serverIntakeId, isNot(flow.intakeId));
+
+    // And the hospital agrees it has one, asked from the other side of the wire
+    // as staff — a patient session may not list another party's documents, and
+    // the fact that it may not is itself worth leaving asserted here.
+    final staff = Dio(BaseOptions(
+      baseUrl: '$_baseUrl/api/v1',
+      validateStatus: (_) => true,
+      headers: {
+        'X-User-Id': 'live-test-staff',
+        'X-User-Role': 'staff',
+        'X-Hospital-Id': hospital.id,
+      },
+    ));
+    // The local id lists nothing, because the hospital has no such intake. It
+    // answers 200 with an empty list rather than 404 — a document listing is a
+    // collection, and an empty one is a valid answer — which is precisely why
+    // the original bug was silent: nothing on either side raised.
+    final underLocalId =
+        await staff.get<dynamic>('/intakes/${flow.intakeId}/documents');
+    expect(underLocalId.data, isEmpty);
+    final listed = await staff.get<dynamic>('/intakes/$serverIntakeId/documents');
+    expect(listed.statusCode, 200);
+    expect(listed.data, hasLength(1));
+    expect((listed.data as List).first['kind'], 'prescription');
   }, skip: skip);
 
   test('the same record replayed creates nothing', () async {

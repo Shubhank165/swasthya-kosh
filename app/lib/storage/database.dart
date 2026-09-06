@@ -90,6 +90,20 @@ class Receipts extends Table {
   TextColumn get hospitalName => text()();
   DateTimeColumn get submittedAt => dateTime()();
 
+  /// The id **the backend** filed this intake under.
+  ///
+  /// Usually the same as `intakeId` and occasionally not: the kiosk contract
+  /// specifies a UUID, and where the client sends something else the backend
+  /// derives a stable UUID from it rather than rejecting a completed interview.
+  /// Everything posted *after* ingest — the consent artefact, the document
+  /// upload — has to address the intake by the id the hospital has, not the one
+  /// the phone made up.
+  ///
+  /// Persisted rather than held in memory because the upload can be retried
+  /// days later, from a cold start, after the response that carried it is long
+  /// gone. Nullable for receipts written before this column existed.
+  TextColumn get serverIntakeId => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {intakeId};
 }
@@ -102,10 +116,34 @@ class LocalDatabase extends _$LocalDatabase {
   ///
   /// Encryption is a property of the file on disk; the schema and every query
   /// are identical either way, so testing against memory tests the same code.
-  LocalDatabase.memory() : super(NativeDatabase.memory());
+  ///
+  /// The library override runs first, and it has to. On a host `flutter test`
+  /// the system SQLite is there and this is a no-op, so it was never needed —
+  /// but on a device there is no `libsqlite3.so`, because this app ships
+  /// SQLCipher and deliberately not `sqlite3_flutter_libs` beside it. The first
+  /// query threw `Failed to load dynamic library 'libsqlite3.so'` before a
+  /// single screen rendered, which is why `integration_test/journey_test.dart`
+  /// could not run on hardware at all until it was found by running it there.
+  LocalDatabase.memory() : super(_memoryExecutor());
+
+  static QueryExecutor _memoryExecutor() {
+    _useCipherOnAndroid();
+    return NativeDatabase.memory();
+  }
+
+  /// Point sqlite3 at the SQLCipher build.
+  ///
+  /// Idempotent, and called before **every** connection this class opens. Done
+  /// late, the first connection uses the system SQLite and silently produces a
+  /// plaintext database that later connections cannot read — the worst of both
+  /// outcomes — or, where there is no system SQLite, fails to open at all.
+  static void _useCipherOnAndroid() {
+    sqlite_open.open
+        .overrideFor(sqlite_open.OperatingSystem.android, openCipherOnAndroid);
+  }
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -113,16 +151,12 @@ class LocalDatabase extends _$LocalDatabase {
         onUpgrade: (m, from, to) async {
           if (from < 2) await m.addColumn(drafts, drafts.hospitalName);
           if (from < 3) await m.addColumn(drafts, drafts.returnVisit);
+          if (from < 4) await m.addColumn(receipts, receipts.serverIntakeId);
         },
       );
 
   static Future<LocalDatabase> open({required String encryptionKey}) async {
-    // Point sqlite3 at the SQLCipher build *before* anything opens a
-    // connection. Done late, the first connection uses the system SQLite and
-    // silently produces a plaintext database that later connections cannot
-    // read — the worst of both outcomes.
-    sqlite_open.open
-        .overrideFor(sqlite_open.OperatingSystem.android, openCipherOnAndroid);
+    _useCipherOnAndroid();
 
     final directory = await getApplicationDocumentsDirectory();
     final file = File(p.join(directory.path, 'medikiosk.db'));

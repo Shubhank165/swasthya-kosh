@@ -178,3 +178,46 @@ class TestGoldenFixtures:
             f["rule_id"] for f in payload.get("red_flags", [])
         ]
         assert all(not e.is_acknowledged for e in record.red_flags)
+
+
+class TestTheTwoRegistriesCannotDiverge:
+    """The failure this class exists to prevent has already happened once.
+
+    A version registered as a normalizer but not as a contract is a version the
+    backend can map and will not accept: validation runs first and refuses the
+    payload, repair cannot fix a version it has no schema for, and the intake is
+    stored raw as `needs_manual_review`. Ingest answers that with a 200 — by
+    design, because the answers are worth more than the status code — so nothing
+    anywhere fails.
+
+    That is exactly what happened to the Flutter app's 0.2 payloads, and what
+    found it was the app's live end-to-end test trying to upload a document to
+    an intake that had never been created.
+    """
+
+    def test_every_normalizer_has_a_contract(self) -> None:
+        from app.contracts.kiosk import CONTRACTS
+
+        assert set(NORMALIZERS) == set(CONTRACTS), (
+            "a schema version must be registered in both app/normalize/registry.py "
+            "and app/contracts/kiosk/__init__.py — one without the other is a "
+            "version the backend maps and refuses"
+        )
+
+    def test_the_repair_path_reads_the_same_registry(self) -> None:
+        """Not a copy of it. `repair.py` kept its own for a while."""
+        from app.contracts.kiosk import CONTRACTS
+        from app.services import repair
+
+        assert repair.CONTRACTS is CONTRACTS
+
+    def test_readyz_advertises_versions_the_backend_will_actually_accept(self) -> None:
+        """`/readyz` reports `supported_versions()`, which reads the normalizer
+        registry. A version listed there and missing a contract is the backend
+        advertising something it refuses."""
+        from app.services.repair import validate
+
+        for version in supported_versions():
+            payload = _load(FIXTURES / f"{version}.json")
+            ok, errors = validate(payload)
+            assert ok, (version, errors)

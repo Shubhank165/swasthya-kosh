@@ -35,13 +35,15 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.adapters.protocols import RepairProvider
-from app.contracts.kiosk.v0_1 import KioskIntakeV0_1
+# The single registry. This module used to keep its own copy, which is how the
+# app's 0.2 payloads spent a fortnight being filed as `needs_manual_review` —
+# see the note in `app/contracts/kiosk/__init__.py`.
+from app.contracts.kiosk import CONTRACTS, contract_for
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-#: Contract model per schema version. Grows with `app/normalize/registry.py`.
-CONTRACTS: dict[str, type[KioskIntakeV0_1]] = {"0.1": KioskIntakeV0_1}
+__all__ = ["CONTRACTS", "RepairOutcome", "contract_for", "repair", "safe_errors", "validate"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,10 +61,6 @@ class RepairOutcome:
     reason: str = "ok"
     #: Fields the repair changed, so the normalizer can stamp them.
     touched_fields: frozenset[str] = field(default_factory=frozenset)
-
-
-def contract_for(version: object) -> type[KioskIntakeV0_1] | None:
-    return CONTRACTS.get(version) if isinstance(version, str) else None
 
 
 def safe_errors(exc: ValidationError) -> tuple[dict[str, Any], ...]:
