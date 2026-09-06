@@ -61,8 +61,13 @@ EXPECTED: dict[tuple[str, str], set[Role]] = {
     ("GET", "/api/v1/documents/content/{key:path}"): {Role.STAFF},
     ("GET", "/api/v1/patients/{ref}/history"): {Role.STAFF},
     ("GET", "/api/v1/worklist"): {Role.STAFF},
+    ("GET", "/api/v1/alerts"): {Role.STAFF},
     ("POST", "/api/v1/alerts/{intake_id}/acknowledge"): {Role.STAFF},
     ("GET", "/api/v1/metrics/ingest"): {Role.STAFF},
+    # A claim about the system rather than about a patient. Admin-scoped so the
+    # person quoting the correction rate on a slide is the person who can see
+    # how it was computed — 3/3 §6, §10.
+    ("GET", "/api/v1/metrics/correction-rate"): {Role.ADMIN},
     ("GET", "/api/v1/consent/{consent_id}"): {Role.STAFF},
     ("GET", "/api/v1/fhir/intakes/{intake_id}"): {Role.STAFF},
     ("GET", "/api/v1/terminology/search"): {Role.STAFF},
@@ -70,8 +75,9 @@ EXPECTED: dict[tuple[str, str], set[Role]] = {
     ("GET", "/api/v1/terminology/ConceptMap"): {Role.STAFF},
     ("GET", "/api/v1/terminology/ValueSet/{system}"): {Role.STAFF},
     ("GET", "/api/v1/terminology/dual-codes"): {Role.STAFF},
-    # The one route where the answer changes the clinical weight of the record.
+    # The two routes where the answer changes the clinical weight of the record.
     ("POST", "/api/v1/intakes/{intake_id}/verify"): {Role.PHYSICIAN},
+    ("POST", "/api/v1/intakes/{intake_id}/facts/{fact_id}/verify"): {Role.PHYSICIAN},
 }
 
 #: Routes that are deliberately open. Each one is here because it must answer
@@ -237,6 +243,32 @@ class TestTheGuardsActuallyRefuse:
         )
         assert response.status_code == 403
         assert response.json()["details"]["required"] == ["physician"]
+
+    def test_staff_cannot_act_on_a_single_fact(self, app_client: Any) -> None:
+        """Per-fact verification is the same act at a finer grain — 3/3 §6.
+
+        Worth its own assertion rather than trusting the table: the whole-record
+        route and this one are guarded in different files, and the finer-grained
+        one is the one a dashboard calls hundreds of times a day.
+        """
+        response = app_client.post(
+            "/api/v1/intakes/any/facts/any/verify",
+            headers=STAFF_HEADERS,
+            json={"action": "verified"},
+        )
+        assert response.status_code == 403
+        assert response.json()["details"]["required"] == ["physician"]
+
+    def test_a_physician_is_not_an_admin(self, app_client: Any) -> None:
+        """The correction rate is not a clinical read and does not inherit one."""
+        response = app_client.get(
+            "/api/v1/metrics/correction-rate", headers=PHYSICIAN_HEADERS
+        )
+        assert response.status_code == 403
+
+    def test_a_kiosk_cannot_list_alerts(self, app_client: Any) -> None:
+        response = app_client.get("/api/v1/alerts", headers=KIOSK_HEADERS)
+        assert response.status_code == 403
 
     def test_a_physician_inherits_staff_access(self, app_client: Any) -> None:
         response = app_client.get("/api/v1/worklist", headers=PHYSICIAN_HEADERS)

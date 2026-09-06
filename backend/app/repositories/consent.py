@@ -18,8 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
 from app.core.idempotency import IdempotencyRecord
+from app.domain.record import PhysicianAction
 from app.models.clinical import (
     AuditLogEntry,
+    ClinicalFactRecord,
     ConsentArtefact,
     IdempotencyKeyRecord,
     IngestRawRecord,
@@ -316,9 +318,10 @@ class IngestRawRepository:
 class MetricsRepository:
     """Counters worth stating out loud.
 
-    `repair_rate` is the one that matters: it should fall as the Jetson's
-    extractor improves, and a number that moves in the right direction over a
-    fortnight is a better argument than any slide.
+    Two of the three numbers this project reports live here — `repair_rate` and
+    `correction_rate`. Both should fall as the pipeline improves, and a pair of
+    numbers moving in the right direction over a fortnight is a better argument
+    than any slide.
     """
 
     def __init__(self, session: AsyncSession) -> None:
@@ -351,6 +354,79 @@ class MetricsRepository:
             "repaired": repaired,
             "needs_manual_review": manual,
             "repair_rate": round(repaired / total_int, 4) if total_int else 0.0,
+        }
+
+
+    async def correction_rate(
+        self, *, hospital_id: str
+    ) -> dict[str, float | int | None]:
+        """How often a physician had to correct what the pipeline recorded — §6.
+
+        The denominator is **facts a physician actually looked at**, not every
+        fact in the database. A field nobody reviewed says nothing about
+        extraction quality, and counting it would let the rate be driven down by
+        ingesting more intakes rather than by extracting better.
+
+        Counted per field, latest action wins. A fact verified in a bulk sign-off
+        and then amended a minute later is one correction, not one of each —
+        without that, working carefully looks worse than working carelessly.
+        """
+        # `hospital_id` is carried out of the subquery and re-applied on the
+        # outer select. Belt and braces, and the tenancy guard in
+        # `app/db/tenancy.py` reads the outer WHERE — a nested filter it cannot
+        # see is a filter it must assume is missing, which is the right default
+        # for a guard whose whole job is catching the query that forgot.
+        acted = (
+            select(
+                ClinicalFactRecord.hospital_id.label("hospital_id"),
+                ClinicalFactRecord.intake_id.label("intake_id"),
+                ClinicalFactRecord.field_id.label("field_id"),
+                ClinicalFactRecord.physician_action.label("action"),
+                func.row_number()
+                .over(
+                    partition_by=(
+                        ClinicalFactRecord.intake_id,
+                        ClinicalFactRecord.field_id,
+                    ),
+                    order_by=ClinicalFactRecord.seq.desc(),
+                )
+                .label("rank"),
+            )
+            .where(
+                ClinicalFactRecord.hospital_id == hospital_id,
+                ClinicalFactRecord.physician_action.is_not(None),
+            )
+            .subquery()
+        )
+        result = await self._session.execute(
+            select(acted.c.action, func.count())
+            .where(acted.c.hospital_id == hospital_id, acted.c.rank == 1)
+            .group_by(acted.c.action)
+        )
+        counts = {str(action): int(count) for action, count in result.all()}
+
+        verified = counts.get(PhysicianAction.VERIFIED.value, 0)
+        amended = counts.get(PhysicianAction.AMENDED.value, 0)
+        rejected = counts.get(PhysicianAction.REJECTED.value, 0)
+        reviewed = verified + amended + rejected
+        corrected = amended + rejected
+
+        intakes_result = await self._session.execute(
+            select(func.count(func.distinct(ClinicalFactRecord.intake_id))).where(
+                ClinicalFactRecord.hospital_id == hospital_id,
+                ClinicalFactRecord.physician_action.is_not(None),
+            )
+        )
+        return {
+            "facts_reviewed": reviewed,
+            "verified": verified,
+            "amended": amended,
+            "rejected": rejected,
+            # Undefined rather than zero when nothing has been reviewed. A rate
+            # of 0.0 on an empty denominator reads as "the pipeline was never
+            # wrong", which is a claim this has not earned.
+            "correction_rate": round(corrected / reviewed, 4) if reviewed else None,
+            "intakes_reviewed": int(intakes_result.scalar() or 0),
         }
 
 

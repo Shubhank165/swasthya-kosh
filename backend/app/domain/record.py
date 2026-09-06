@@ -308,6 +308,38 @@ class EntrySource(BaseModel):
         return f"entered by {self.entered_by}"
 
 
+class CarriedForward(BaseModel):
+    """This answer came from a previous visit — 3/3 §B1.
+
+    The gap this closes: at v0.1 a returning patient confirming "yes, still
+    diabetic" produced a fact indistinguishable from one first established
+    today. Those are different clinical claims. A value carried from June and
+    confirmed this morning is stronger than one carried from June and never
+    revisited, and both are different from a value the patient volunteered for
+    the first time — and a physician deciding whether to re-ask must be able to
+    tell which they are looking at.
+
+    `confirmed_today` is deliberately three-valued. `None` means the question
+    was not put today, which is not the same as the patient declining to
+    confirm; collapsing the two would be the same mistake `FieldStatus` exists
+    to prevent, one level down.
+
+    Provenance, not a source. The fact still carries its own `SourceRef` — an
+    `EntrySource` naming the prior intake — because this describes *how old* the
+    answer is, not *what evidence* stands behind it.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    #: The intake this answer was first recorded on. The evidence panel links
+    #: straight to it (§5).
+    from_intake_id: str = Field(min_length=1)
+    #: The date it was originally recorded, which is what the physician reads.
+    originally_recorded: date
+    #: `True` confirmed, `False` contradicted, `None` not asked today.
+    confirmed_today: bool | None = None
+
+
 SourceRef = Annotated[TurnSource | DocumentSource | EntrySource, Field(discriminator="kind")]
 
 
@@ -362,6 +394,34 @@ class IngestProvenance(BaseModel):
 # --- the fact ----------------------------------------------------------------
 
 
+class PhysicianAction(StrEnum):
+    """What a physician did to a fact — 3/3 §6.
+
+    A column rather than a note prefix, because the **correction rate** is a
+    number this project reports out loud (§B3): the proportion of facts a
+    doctor amends is its extraction-quality metric, and a metric derived by
+    string-matching a free-text note is one that breaks the first time somebody
+    rewords the note.
+
+    Absent on every fact the pipeline produced. Only the three revision methods
+    below set it, and each sets exactly one value.
+    """
+
+    #: Confirmed as recorded. The value did not change.
+    VERIFIED = "verified"
+    #: The physician typed a different value. Counts towards the correction rate.
+    AMENDED = "amended"
+    #: The physician says this was never established. Also a correction.
+    REJECTED = "rejected"
+
+
+#: The two actions that mean the pipeline got it wrong. `VERIFIED` is not one of
+#: them, which is the whole point of keeping three values rather than a boolean.
+CORRECTING_ACTIONS: frozenset[PhysicianAction] = frozenset(
+    {PhysicianAction.AMENDED, PhysicianAction.REJECTED}
+)
+
+
 class CertaintyIncreaseError(ValueError):
     """A revision claimed more confidence than its predecessor.
 
@@ -393,12 +453,18 @@ class Fact(BaseModel):
     section: Section = Section.HPI
     channel: FactChannel = FactChannel.VOICE
     physician_verified: bool = False
+    #: What a physician did to this revision, if anything — §6. `None` on
+    #: everything the pipeline wrote.
+    physician_action: PhysicianAction | None = None
     #: Produced by the repair model rather than the extractor. Renders as
     #: lower-confidence and can never be `physician_verified` at ingest.
     repaired: bool = False
     #: A numeric OCR value below the confidence floor. Rendered distinctly with
     #: the raw text alongside.
     needs_verification: bool = False
+    #: Set when this answer came from a previous visit rather than from today's
+    #: intake — §B1. Absent for everything asked today.
+    carried_forward: CarriedForward | None = None
     recorded_at: datetime
     supersedes: str | None = None
     #: Why this fact exists — a rule id, an extractor note, a verifier. Never
@@ -502,6 +568,10 @@ class Fact(BaseModel):
                 "recorded_at": recorded_at,
                 "supersedes": self.fact_id,
                 "physician_verified": False,
+                # A revision is a fresh claim, so the previous sign-off does not
+                # carry over — and neither does the record of it, or a
+                # re-extracted value would count as a physician correction.
+                "physician_action": None,
             }
         )
 
@@ -523,9 +593,92 @@ class Fact(BaseModel):
                 "fact_id": new_fact_id,
                 "certainty": certainty,
                 "physician_verified": True,
+                "physician_action": PhysicianAction.VERIFIED,
                 "recorded_at": recorded_at,
                 "supersedes": self.fact_id,
                 "note": f"verified_by={physician_id}",
+            }
+        )
+
+
+    def amended_by_physician(
+        self,
+        *,
+        new_fact_id: str,
+        recorded_at: datetime,
+        physician_id: str,
+        value: FactValue,
+        reason: str | None = None,
+    ) -> Fact:
+        """A physician corrected what was recorded — 3/3 §6.
+
+        A **new revision**, never an edit. The original stays on the record with
+        its own timestamp, because the proportion of facts a physician amends is
+        the extraction-quality metric this project reports, and a log that
+        rewrites history cannot produce it.
+
+        The amended value is `CONFIRMED` and `physician_verified`: a doctor who
+        types a value has established it, which is a stronger claim than
+        anything the pipeline can make and the only place that claim is allowed
+        to originate. `original_text` is carried through unchanged — the
+        patient's own words are not the physician's to revise.
+        """
+        note = f"amended_by={physician_id}"
+        if reason:
+            note = f"{note}; reason={reason}"
+        return self.model_copy(
+            update={
+                "fact_id": new_fact_id,
+                "value": value,
+                "status": FieldStatus.ANSWERED,
+                "certainty": Certainty.CONFIRMED,
+                "physician_verified": True,
+                "physician_action": PhysicianAction.AMENDED,
+                # Whatever made the pipeline unsure, a physician has now read
+                # it. Leaving these set would keep warning about a value the
+                # doctor typed.
+                "needs_verification": False,
+                "confidence": None,
+                "recorded_at": recorded_at,
+                "supersedes": self.fact_id,
+                "note": note,
+            }
+        )
+
+    def rejected_by_physician(
+        self,
+        *,
+        new_fact_id: str,
+        recorded_at: datetime,
+        physician_id: str,
+        reason: str | None = None,
+    ) -> Fact:
+        """A physician says this was never established.
+
+        The revision is `UNRESOLVED`, **not** `answered: false` — rejecting a
+        misheard "diabetes" means nobody knows whether the patient is diabetic,
+        not that they are not. Turning a rejection into a negative finding would
+        be the certainty increase this whole model exists to prevent, and it
+        would do it in the one place a physician's name is attached.
+
+        `physician_verified` stays false for the same reason: there is nothing
+        confirmed here.
+        """
+        note = f"rejected_by={physician_id}"
+        if reason:
+            note = f"{note}; reason={reason}"
+        return self.model_copy(
+            update={
+                "fact_id": new_fact_id,
+                "value": None,
+                "status": FieldStatus.UNRESOLVED,
+                "certainty": Certainty.REPORTED,
+                "physician_verified": False,
+                "physician_action": PhysicianAction.REJECTED,
+                "needs_verification": False,
+                "recorded_at": recorded_at,
+                "supersedes": self.fact_id,
+                "note": note,
             }
         )
 

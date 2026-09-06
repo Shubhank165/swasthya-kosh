@@ -38,8 +38,16 @@ def fact_out(fact: Fact, *, labels: FieldLabels) -> FactOut:
         section=fact.section.value,
         confidence=fact.confidence,
         physician_verified=fact.physician_verified,
+        physician_action=(
+            fact.physician_action.value if fact.physician_action is not None else None
+        ),
         repaired=fact.repaired,
         needs_verification=fact.needs_verification,
+        carried_forward=(
+            fact.carried_forward.model_dump(mode="json")
+            if fact.carried_forward is not None
+            else None
+        ),
         source=fact.source.model_dump(mode="json"),
         recorded_at=fact.recorded_at,
     )

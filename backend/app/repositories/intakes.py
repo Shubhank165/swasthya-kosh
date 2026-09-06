@@ -58,6 +58,9 @@ def _fact_to_row(fact: Fact, *, hospital_id: str, intake_id: str, seq: int) -> C
         confidence=fact.confidence,
         reported_by=fact.reported_by.value,
         physician_verified=fact.physician_verified,
+        physician_action=(
+            fact.physician_action.value if fact.physician_action is not None else None
+        ),
         repaired=fact.repaired,
         needs_verification=fact.needs_verification,
         recorded_at=fact.recorded_at,
@@ -82,6 +85,7 @@ def _fact_from_row(row: ClinicalFactRecord) -> Fact:
             "section": row.section,
             "channel": row.channel,
             "physician_verified": row.physician_verified,
+            "physician_action": row.physician_action,
             "repaired": row.repaired,
             "needs_verification": row.needs_verification,
             "recorded_at": row.recorded_at,
@@ -361,6 +365,47 @@ class IntakeRepository:
             .group_by(RedFlagEventRecord.intake_id)
         )
         return {intake_id: int(count) for intake_id, count in result.all()}
+
+    async def alerts(
+        self,
+        *,
+        hospital_id: str,
+        acknowledged: bool | None = None,
+        department_code: str | None = None,
+        since: datetime | None = None,
+        limit: int = 200,
+    ) -> Sequence[tuple[RedFlagEventRecord, IntakeRecord]]:
+        """Red-flag events with the intake each fired on — 3/3 §10.
+
+        Joined rather than fetched in two passes because the alerts view needs
+        the arrival time and the department, and a per-alert lookup for those is
+        a query per row on the one screen that must not be slow.
+
+        Unacknowledged first, then newest: the ordering is the triage view's
+        whole argument, and doing it here means the API cannot forget it.
+        """
+        statement = (
+            select(RedFlagEventRecord, IntakeRecord)
+            .join(IntakeRecord, RedFlagEventRecord.intake_id == IntakeRecord.id)
+            .where(RedFlagEventRecord.hospital_id == hospital_id)
+        )
+        if acknowledged is True:
+            statement = statement.where(RedFlagEventRecord.acknowledged_by.is_not(None))
+        elif acknowledged is False:
+            statement = statement.where(RedFlagEventRecord.acknowledged_by.is_(None))
+        if department_code is not None:
+            statement = statement.where(IntakeRecord.department_code == department_code)
+        if since is not None:
+            statement = statement.where(RedFlagEventRecord.received_at >= since)
+        statement = statement.order_by(
+            # NULL acknowledgements sort first on both backends only if the
+            # ordering is expressed as a predicate rather than as NULLS FIRST,
+            # which SQLite does not accept.
+            case((RedFlagEventRecord.acknowledged_by.is_(None), 0), else_=1),
+            RedFlagEventRecord.received_at.desc(),
+        ).limit(limit)
+        result = await self._session.execute(statement)
+        return [(alert, intake) for alert, intake in result.all()]
 
     async def facts_for(
         self, *, hospital_id: str, intake_ids: Sequence[str]

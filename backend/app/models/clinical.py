@@ -177,6 +177,9 @@ class ClinicalFactRecord(Base):
     confidence: Mapped[float | None] = mapped_column(Float)
     reported_by: Mapped[str] = mapped_column(String(32), nullable=False)
     physician_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: `verified` | `amended` | `rejected`, and NULL for everything the pipeline
+    #: wrote. Indexed because the correction-rate metric groups on it.
+    physician_action: Mapped[str | None] = mapped_column(String(16), index=True)
     repaired: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     needs_verification: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     recorded_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)

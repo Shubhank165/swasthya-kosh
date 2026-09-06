@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.domain.record import DocumentKind
+from app.domain.record import DocumentKind, FactValue, PhysicianAction
 
 
 class ApiModel(BaseModel):
@@ -56,8 +56,17 @@ class FactOut(ApiModel):
     section: str
     confidence: float | None = None
     physician_verified: bool = False
+    #: `verified` | `amended` | `rejected`, and absent on everything the
+    #: pipeline wrote. The dashboard renders an amended line differently from a
+    #: merely confirmed one — a value a doctor typed is a different claim.
+    physician_action: str | None = None
     repaired: bool = False
     needs_verification: bool = False
+    #: Present when this answer came from a previous visit — §B1. The dashboard
+    #: renders it as carried forward, with the date and whether the patient
+    #: confirmed it today; `confirmed_today: null` means it was not re-asked,
+    #: which is not the same as the patient declining.
+    carried_forward: dict[str, Any] | None = None
     source: dict[str, Any]
     recorded_at: datetime
 
@@ -233,6 +242,80 @@ class VerifyRequest(ApiModel):
 
     field_ids: list[str] | None = None
     language: str | None = None
+
+
+class FactVerifyRequest(ApiModel):
+    """A physician acting on one fact — 3/3 §6.
+
+    Three actions, and the wording matters. `verified` says the record is right;
+    `amended` supplies a corrected value; `rejected` says the field was never
+    established. **Rejection is not a `no`** — see
+    `Fact.rejected_by_physician` — and there is deliberately no fourth action
+    that would let one be written as the other.
+    """
+
+    action: PhysicianAction
+    #: Required for `amended`, refused for the other two. The typed value, not a
+    #: string: the dashboard renders what the record model can hold, so a
+    #: correction that cannot be expressed as a `FactValue` is a correction the
+    #: report could not have printed in the first place.
+    value: FactValue | None = None
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class AlertOut(ApiModel):
+    """One fired red-flag criterion — §4.3.
+
+    `label` is the rule's own fixed wording — "urgent clinical review criterion
+    triggered" — and **never a condition name**. `criteria_met` names the
+    answers that met the rule, which is what lets a clinician judge it; the rule
+    does not get to name a diagnosis it did not make.
+    """
+
+    alert_id: str
+    intake_id: str
+    department_code: str | None = None
+    rule_id: str
+    severity: str
+    label: str | None = None
+    criteria_met: list[str] = Field(default_factory=list)
+    fired_at_turn: int | None = None
+    engine_version: str | None = None
+    received_at: datetime
+    arrived_at: datetime
+    intake_status: str
+    language: str = "en"
+    acknowledged_by: str | None = None
+    acknowledged_at: datetime | None = None
+    acknowledgement_note: str | None = None
+
+
+class AlertListOut(ApiModel):
+    alerts: list[AlertOut] = Field(default_factory=list)
+    unacknowledged: int = 0
+    generated_at: datetime | None = None
+    demo: bool = False
+
+
+class CorrectionRateOut(ApiModel):
+    """How often a physician had to correct the pipeline — §6, §B3.
+
+    The denominator is facts a physician reviewed, not every fact stored. A
+    field nobody looked at says nothing about extraction quality, and including
+    it would let the rate be improved by ingesting more intakes.
+
+    `correction_rate` is `null`, not `0.0`, when nothing has been reviewed yet —
+    a zero on an empty denominator reads as "never wrong", which is a claim this
+    has not earned.
+    """
+
+    facts_reviewed: int = 0
+    verified: int = 0
+    amended: int = 0
+    rejected: int = 0
+    correction_rate: float | None = None
+    intakes_reviewed: int = 0
+    demo: bool = False
 
 
 class ConsentRequest(ApiModel):

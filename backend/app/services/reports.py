@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from datetime import date
 
 from app.core.clock import Clock
-from app.core.errors import NotFoundError, ValidationError
+from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.ids import IdFactory
 from app.core.logging import get_logger
 from app.domain.clinical.enums import Section
@@ -27,7 +27,7 @@ from app.domain.documents.extraction import (
 )
 from app.domain.documents.ingredients import IngredientIndex
 from app.domain.documents.interactions import InteractionFinding, InteractionTable
-from app.domain.record import CanonicalRecord, Fact
+from app.domain.record import CanonicalRecord, Fact, FactValue, PhysicianAction
 from app.domain.report import builder
 from app.domain.report.builder import FieldLabels
 from app.domain.report.model import PhysicianReport, ReportBundle
@@ -309,6 +309,134 @@ class ReportService:
             }
         )
 
+    async def verify_fact(
+        self,
+        *,
+        hospital_id: str,
+        intake_id: str,
+        fact_id: str,
+        physician_id: str,
+        action: PhysicianAction,
+        value: FactValue | None = None,
+        reason: str | None = None,
+    ) -> Fact:
+        """One fact: accept it, amend it, or reject it — 3/3 §6.
+
+        The per-fact counterpart to `verify`, and the one the dashboard actually
+        drives. All three write a **new revision**; none edits what is there. A
+        physician correcting a misheard answer must not erase the misheard
+        answer, because the proportion of facts they correct is this project's
+        extraction-quality metric and a log that rewrites history cannot produce
+        one.
+
+        Acting on a superseded revision is a conflict rather than a silent
+        success. Two clinicians with the same report open, one amending a value
+        the other already changed, is a real sequence in a two-minute
+        consultation, and the second one needs to be told rather than have their
+        edit land on a fact nobody is looking at.
+        """
+        record = await self._intakes.load(hospital_id=hospital_id, intake_id=intake_id)
+        fact = record.fact(fact_id)
+        if fact is None:
+            raise NotFoundError(
+                f"no fact {fact_id!r} on intake {intake_id}",
+                details={"intake_id": intake_id, "fact_id": fact_id},
+            )
+        if fact not in record.live_facts():
+            raise ConflictError(
+                "this fact has been superseded; reload the report before acting on it",
+                details={"intake_id": intake_id, "fact_id": fact_id},
+            )
+
+        now = self._clock.now()
+        new_fact_id = self._ids.new_id("fact")
+        if action is PhysicianAction.VERIFIED:
+            if not fact.is_answered:
+                # The same refusal `verify` makes in bulk, made loudly here
+                # because this one was a deliberate click on a specific line. A
+                # physician's signature on an unresolved field would turn "the
+                # patient could not say" into an established finding.
+                raise ValidationError(
+                    "there is nothing to confirm on a field that was never answered; "
+                    "amend it if you know the value",
+                    details={"fact_id": fact_id, "status": fact.status.value},
+                )
+            revision = fact.verified_by_physician(
+                new_fact_id=new_fact_id, recorded_at=now, physician_id=physician_id
+            )
+        elif action is PhysicianAction.AMENDED:
+            if value is None:
+                raise ValidationError(
+                    "an amendment must carry the corrected value",
+                    details={"fact_id": fact_id},
+                )
+            revision = fact.amended_by_physician(
+                new_fact_id=new_fact_id,
+                recorded_at=now,
+                physician_id=physician_id,
+                value=value,
+                reason=reason,
+            )
+        else:
+            revision = fact.rejected_by_physician(
+                new_fact_id=new_fact_id,
+                recorded_at=now,
+                physician_id=physician_id,
+                reason=reason,
+            )
+
+        await self._intakes.append_facts(
+            hospital_id=hospital_id, intake_id=intake_id, facts=[revision]
+        )
+        # Actor, before, after and reason — §6. The rendered values are clinical
+        # text and this is the one place that is correct: an audit entry that
+        # records a correction without recording what was corrected proves
+        # nothing. `app/core/logging.py` keeps it out of the log stream; the
+        # audit table is not the log stream.
+        await self._audit.write(
+            hospital_id=hospital_id,
+            occurred_at=now,
+            actor_id=physician_id,
+            actor_role="physician",
+            action=f"fact.{action.value}",
+            entity_type="clinical_fact",
+            entity_id=fact.fact_id,
+            before={
+                "field_id": fact.field_id,
+                "status": fact.status.value,
+                "value": fact.rendered_value(),
+                "certainty": fact.certainty.value,
+            },
+            after={
+                "fact_id": revision.fact_id,
+                "status": revision.status.value,
+                "value": revision.rendered_value(),
+                "certainty": revision.certainty.value,
+            },
+            reason=reason,
+        )
+        await self._bus.publish(
+            Event(
+                name=EventName.REPORT_PHYSICIAN_VERIFIED,
+                occurred_at=now,
+                intake_id=intake_id,
+                department_code=record.department_code,
+                actor_id=physician_id,
+                # The field id and the action, never the value. This frame
+                # reaches every dashboard subscribed to the department.
+                payload={"action": action.value, "field_id": fact.field_id},
+            )
+        )
+        logger.info(
+            "fact_reviewed",
+            intake_id=intake_id,
+            fact_id=fact.fact_id,
+            field_id=fact.field_id,
+            action=action.value,
+            actor_id=physician_id,
+        )
+        return revision
+
     async def evidence_for(
         self, *, hospital_id: str, intake_id: str, fact_id: str
     ) -> dict[str, object]:
@@ -335,6 +463,19 @@ class ReportService:
             "repaired": fact.repaired,
             "needs_verification": fact.needs_verification,
             "physician_verified": fact.physician_verified,
+            "physician_action": (
+                fact.physician_action.value
+                if fact.physician_action is not None
+                else None
+            ),
+            # Which previous visit this came from, so the panel can link to it
+            # (§5) — and whether the patient confirmed it today, which is what
+            # decides whether the physician needs to re-ask.
+            "carried_forward": (
+                fact.carried_forward.model_dump(mode="json")
+                if fact.carried_forward is not None
+                else None
+            ),
             "source": fact.source.model_dump(mode="json"),
             "recorded_at": fact.recorded_at.isoformat(),
             "supersedes": fact.supersedes,

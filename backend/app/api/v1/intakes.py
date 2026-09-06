@@ -15,8 +15,10 @@ from app.api.deps import (
     SettingsDep,
     idempotent,
 )
-from app.api.serialise import intake_out, report_out
+from app.api.serialise import fact_out, intake_out, report_out
 from app.schemas.api import (
+    FactOut,
+    FactVerifyRequest,
     IngestResponse,
     IntakeOut,
     ReportOut,
@@ -149,3 +151,37 @@ async def verify(
         language=request.language,
     )
     return report_out(bundle, demo=settings.demo_mode)
+
+
+@router.post(
+    "/{intake_id}/facts/{fact_id}/verify",
+    response_model=FactOut,
+    summary="Physician accepts, amends or rejects one fact",
+)
+async def verify_fact(
+    intake_id: str,
+    fact_id: str,
+    principal: RequirePhysician,
+    service: ReportServiceDep,
+    labels: LabelsDep,
+    request: Annotated[FactVerifyRequest, Body()],
+) -> FactOut:
+    """One line of the report, confirmed or corrected — 3/3 §6.
+
+    The endpoint the dashboard drives as a physician reads down the report.
+    Returns the **new revision**, not the old one: the client re-renders that
+    line from what came back rather than guessing what the server did with it.
+
+    Rejecting is not answering "no". It records that the field was never
+    established, which is a different clinical claim and is stored as one.
+    """
+    revision = await service.verify_fact(
+        hospital_id=principal.hospital_id,
+        intake_id=intake_id,
+        fact_id=fact_id,
+        physician_id=principal.user_id,
+        action=request.action,
+        value=request.value,
+        reason=request.reason,
+    )
+    return fact_out(revision, labels=labels)

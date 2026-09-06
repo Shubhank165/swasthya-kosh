@@ -333,7 +333,12 @@ def app_client(engine: Any, settings: Settings, still_clock: FrozenClock) -> Ite
     application.dependency_overrides[deps.get_settings_dep] = lambda: settings
     application.dependency_overrides[auth.auth_settings] = lambda: settings
     application.dependency_overrides[deps.get_clock] = lambda: still_clock
-    application.dependency_overrides[deps.get_ids] = SequentialIdFactory
+    # One factory for the whole client, not one per request. Rebuilding it per
+    # request restarts the counter, so two calls that each mint a fact id both
+    # mint `fact_000001` — which collides on insert the moment a test performs
+    # two writes. Deterministic must still mean unique.
+    sequential_ids = SequentialIdFactory()
+    application.dependency_overrides[deps.get_ids] = lambda: sequential_ids
 
     with TestClient(application) as client:
         yield client

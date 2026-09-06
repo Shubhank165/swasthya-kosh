@@ -1,0 +1,142 @@
+{
+  "schema_version": "0.2",
+  "intake_id": "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e02",
+  "kiosk_id": "kiosk-aiia-01",
+  "hospital_id": "aiia-delhi",
+  "started_at": "2026-09-03T10:14:22+05:30",
+  "completed_at": "2026-09-03T10:21:05+05:30",
+  "status": "complete",
+  "language": "hi",
+  "language_locked_at_turn": 2,
+  "reporter": "self",
+  "department_code": "kayachikitsa",
+  "patient_ref": {
+    "type": "hospital_id",
+    "value": "UHID-100241"
+  },
+  "turns": [
+    {
+      "turn_id": 1,
+      "question_id": "ask_complaint",
+      "asked_text": "आज आप किस समस्या के लिए आए हैं?",
+      "transcript": "पेट में दर्द",
+      "asr_confidence": 0.93,
+      "rms": 508,
+      "bound_field": "chief_complaint",
+      "bound_value": "abdominal_pain",
+      "resolved": true
+    },
+    {
+      "turn_id": 3,
+      "question_id": "ask_duration",
+      "asked_text": "यह दर्द कब से है?",
+      "transcript": "तीन दिन से",
+      "asr_confidence": 0.91,
+      "rms": 412,
+      "bound_field": "duration",
+      "bound_value": {
+        "n": 3,
+        "unit": "day"
+      },
+      "resolved": true
+    },
+    {
+      "turn_id": 5,
+      "question_id": "ask_severity",
+      "asked_text": "दर्द कितना तेज़ है, एक से दस के बीच?",
+      "transcript": "पता नहीं ठीक से",
+      "asr_confidence": 0.44,
+      "rms": 201,
+      "bound_field": "severity",
+      "bound_value": null,
+      "resolved": false
+    },
+    {
+      "turn_id": 7,
+      "question_id": "ask_medications",
+      "asked_text": "आप कोई दवा ले रहे हैं?",
+      "transcript": "हाँ, मेटफॉर्मिन",
+      "asr_confidence": 0.86,
+      "rms": 470,
+      "bound_field": "current_medications",
+      "bound_value": "Metformin 500",
+      "resolved": true
+    },
+    {
+      "turn_id": 9,
+      "question_id": "ask_tobacco",
+      "asked_text": "क्या आप तंबाकू का सेवन करते हैं?",
+      "transcript": "यह नहीं बताना चाहता",
+      "asr_confidence": 0.88,
+      "rms": 455,
+      "bound_field": "tobacco",
+      "bound_value": null,
+      "resolved": false
+    }
+  ],
+  "fields": {
+    "chief_complaint": {
+      "value": "abdominal_pain",
+      "status": "answered",
+      "original_text": "पेट में दर्द",
+      "source_turn": 1,
+      "confidence": 0.93
+    },
+    "duration": {
+      "value": {
+        "n": 3,
+        "unit": "day"
+      },
+      "status": "answered",
+      "original_text": "तीन दिन से",
+      "source_turn": 3,
+      "confidence": 0.91
+    },
+    "severity": {
+      "value": null,
+      "status": "unresolved",
+      "source_turn": 5
+    },
+    "current_medications": {
+      "value": "Metformin 500",
+      "status": "answered",
+      "original_text": "हाँ, मेटफॉर्मिन",
+      "source_turn": 7,
+      "confidence": 0.86
+    },
+    "known_diabetes": {
+      "value": true,
+      "status": "answered",
+      "carried_forward": {
+        "from_intake_id": "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e01",
+        "originally_recorded": "2026-06-12",
+        "confirmed_today": true
+      }
+    },
+    "drug_allergy": {
+      "value": false,
+      "status": "answered",
+      "carried_forward": {
+        "from_intake_id": "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e01",
+        "originally_recorded": "2026-06-12"
+      }
+    },
+    "tobacco": {
+      "value": null,
+      "status": "refused",
+      "original_text": "यह नहीं बताना चाहता",
+      "source_turn": 9
+    },
+    "pregnancy": {
+      "value": null,
+      "status": "not_applicable"
+    },
+    "breathlessness": {
+      "value": null,
+      "status": "not_asked"
+    }
+  },
+  "red_flags": [],
+  "engine_version": "jetson-0.4.1",
+  "content_version": "questions-2026-09-01"
+}

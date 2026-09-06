@@ -23,7 +23,7 @@ from typing import Any, Protocol
 
 from app.core.errors import MediKioskError
 from app.domain.record import CanonicalRecord
-from app.normalize import from_kiosk_v0_1
+from app.normalize import from_kiosk_v0_1, from_kiosk_v0_2
 
 
 class UnsupportedSchemaVersion(MediKioskError):
@@ -58,7 +58,9 @@ class Normalizer(Protocol):
 
 NORMALIZERS: dict[str, Normalizer] = {
     "0.1": from_kiosk_v0_1.normalize,
-    # "0.2": from_kiosk_v0_2.normalize,
+    # 0.2 adds carry-forward provenance and nothing else — 3/3 §B1. 0.1 keeps
+    # working; a device is upgraded when it is upgraded.
+    "0.2": from_kiosk_v0_2.normalize,
 }
 
 

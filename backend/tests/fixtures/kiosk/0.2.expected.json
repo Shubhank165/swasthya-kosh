@@ -10,7 +10,7 @@
       "certainty": "reported",
       "channel": "voice",
       "confidence": null,
-      "fact_id": "fact_52419a64-2e5b-5d56-980f-4f457f0c226b",
+      "fact_id": "fact_6441d3c7-1324-5df1-a3ce-448f6b8973cf",
       "field_id": "breathlessness",
       "language": "hi",
       "needs_verification": false,
@@ -37,7 +37,7 @@
       "certainty": "reported",
       "channel": "voice",
       "confidence": 0.93,
-      "fact_id": "fact_8c490cd3-3921-576b-a38a-d48698231624",
+      "fact_id": "fact_f591c850-89c7-5d8a-8f85-4193992a0317",
       "field_id": "chief_complaint",
       "language": "hi",
       "needs_verification": false,
@@ -69,7 +69,7 @@
       "certainty": "reported",
       "channel": "voice",
       "confidence": 0.86,
-      "fact_id": "fact_e025b602-c9a2-5a24-a886-be475fb08fd5",
+      "fact_id": "fact_e676e68f-a6ec-5f06-b9a0-d4cf620225fd",
       "field_id": "current_medications",
       "language": "hi",
       "needs_verification": false,
@@ -95,11 +95,15 @@
       }
     },
     {
-      "carried_forward": null,
+      "carried_forward": {
+        "confirmed_today": null,
+        "from_intake_id": "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e01",
+        "originally_recorded": "2026-06-12"
+      },
       "certainty": "reported",
-      "channel": "voice",
-      "confidence": 0.9,
-      "fact_id": "fact_76f6a1db-2d68-5aff-b058-4502e201aab2",
+      "channel": "prior_record",
+      "confidence": null,
+      "fact_id": "fact_007a4515-4a9b-5a46-bc04-fa4c4eaad0a5",
       "field_id": "drug_allergy",
       "language": "hi",
       "needs_verification": false,
@@ -112,10 +116,9 @@
       "reported_by": "self",
       "section": "allergies",
       "source": {
-        "kind": "turn",
-        "question_id": null,
-        "transcript_excerpt": null,
-        "turn_id": 8
+        "entered_by": "carried_forward",
+        "kind": "entry",
+        "prior_intake_id": "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e01"
       },
       "status": "answered",
       "supersedes": null,
@@ -129,7 +132,7 @@
       "certainty": "reported",
       "channel": "voice",
       "confidence": 0.91,
-      "fact_id": "fact_979d8071-6727-500f-85bc-14f4c0fa97f3",
+      "fact_id": "fact_bdaa55d6-0fce-5b92-81b4-aa5cb79a65ce",
       "field_id": "duration",
       "language": "hi",
       "needs_verification": false,
@@ -156,16 +159,20 @@
       }
     },
     {
-      "carried_forward": null,
+      "carried_forward": {
+        "confirmed_today": true,
+        "from_intake_id": "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e01",
+        "originally_recorded": "2026-06-12"
+      },
       "certainty": "reported",
-      "channel": "voice",
-      "confidence": 0.86,
-      "fact_id": "fact_4f2f9035-f85b-562d-b227-3c78766bf8ed",
+      "channel": "prior_record",
+      "confidence": null,
+      "fact_id": "fact_216ff7b4-3465-5fb7-b420-2168cf6d0120",
       "field_id": "known_diabetes",
       "language": "hi",
       "needs_verification": false,
       "note": null,
-      "original_text": "हाँ, मेटफॉर्मिन",
+      "original_text": null,
       "physician_action": null,
       "physician_verified": false,
       "recorded_at": "2026-09-03T10:21:05+05:30",
@@ -173,10 +180,9 @@
       "reported_by": "self",
       "section": "past_medical",
       "source": {
-        "kind": "turn",
-        "question_id": "ask_medications",
-        "transcript_excerpt": "हाँ, मेटफॉर्मिन",
-        "turn_id": 7
+        "entered_by": "carried_forward",
+        "kind": "entry",
+        "prior_intake_id": "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e01"
       },
       "status": "answered",
       "supersedes": null,
@@ -190,7 +196,7 @@
       "certainty": "reported",
       "channel": "voice",
       "confidence": null,
-      "fact_id": "fact_868271e8-a47d-5a93-834e-1dcf4a550391",
+      "fact_id": "fact_d98ea6c5-151e-59b0-9b6a-fd60b4c6d160",
       "field_id": "pregnancy",
       "language": "hi",
       "needs_verification": false,
@@ -217,7 +223,7 @@
       "certainty": "reported",
       "channel": "voice",
       "confidence": 0.44,
-      "fact_id": "fact_15fec445-6ec3-5ce1-a371-c518647ea84a",
+      "fact_id": "fact_64ff1c84-4b14-53bf-8c74-2b3feda7356f",
       "field_id": "severity",
       "language": "hi",
       "needs_verification": false,
@@ -244,7 +250,7 @@
       "certainty": "reported",
       "channel": "voice",
       "confidence": 0.88,
-      "fact_id": "fact_f4e76bf2-faa5-5d1a-8eb1-01dff9314cf4",
+      "fact_id": "fact_f7d05b2e-9268-5d03-a739-b4a409f7c8ea",
       "field_id": "tobacco",
       "language": "hi",
       "needs_verification": false,
@@ -268,7 +274,7 @@
     }
   ],
   "hospital_id": "aiia-delhi",
-  "intake_id": "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e01",
+  "intake_id": "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e02",
   "language": "hi",
   "patient_ref": {
     "type": "hospital_id",
@@ -280,7 +286,7 @@
     "kiosk_id": "kiosk-aiia-01",
     "needs_manual_review": false,
     "repaired": false,
-    "schema_version": "0.1"
+    "schema_version": "0.2"
   },
   "record_version": "1.0",
   "red_flags": [],

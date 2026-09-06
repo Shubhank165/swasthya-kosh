@@ -33,6 +33,10 @@ logger = get_logger(__name__)
 #: OPD is a dashboard nobody reads.
 DEFAULT_WINDOW = timedelta(hours=24)
 
+#: How far back the alerts view looks. Deliberately longer than the worklist's:
+#: an unacknowledged red flag does not stop mattering because the shift changed.
+ALERT_WINDOW = timedelta(days=7)
+
 
 class WorklistService:
     """Serves the dashboard's ordered list and records acknowledgements."""
@@ -144,6 +148,57 @@ class WorklistService:
             )
             counted[intake_id] = len(detector.detect(aligned))
         return counted
+
+    async def alerts(
+        self,
+        *,
+        hospital_id: str,
+        acknowledged: bool | None = None,
+        department_code: str | None = None,
+        window: timedelta = ALERT_WINDOW,
+        limit: int = 200,
+    ) -> list[dict[str, object]]:
+        """Red-flag events for the triage view — 3/3 §4.3, §10.
+
+        The rule's own fixed wording and the criteria that met it, and nothing
+        else. **Never a condition name**: every rule in `clinical/questions/
+        redflags/` carries the same label — "urgent clinical review criterion
+        triggered" — because an alert that names a diagnosis has made one, and
+        the device that fired it screened a questionnaire rather than examined a
+        patient.
+
+        A wider window than the worklist's. An unacknowledged alert does not
+        stop mattering because the shift changed, and a triage view that quietly
+        drops yesterday's is worse than an empty one.
+        """
+        rows = await self._intakes.alerts(
+            hospital_id=hospital_id,
+            acknowledged=acknowledged,
+            department_code=department_code,
+            since=self._clock.now() - window,
+            limit=limit,
+        )
+        return [
+            {
+                "alert_id": alert.id,
+                "intake_id": alert.intake_id,
+                "department_code": intake.department_code,
+                "rule_id": alert.rule_id,
+                "severity": alert.severity,
+                "label": alert.label,
+                "criteria_met": list(alert.criteria_met),
+                "fired_at_turn": alert.fired_at_turn,
+                "engine_version": alert.engine_version,
+                "received_at": alert.received_at,
+                "arrived_at": intake.received_at,
+                "intake_status": intake.status,
+                "language": intake.language,
+                "acknowledged_by": alert.acknowledged_by,
+                "acknowledged_at": alert.acknowledged_at,
+                "acknowledgement_note": alert.acknowledgement_note,
+            }
+            for alert, intake in rows
+        ]
 
     async def acknowledge(
         self,
