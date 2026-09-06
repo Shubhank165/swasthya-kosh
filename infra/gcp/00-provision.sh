@@ -193,6 +193,24 @@ else
   made "${SECRET_PUSH_TOKEN}"
 fi
 
+# The patient-reference pepper. Generated here and never shown: nothing needs to
+# read it, so nothing should ever print it.
+if exists gc secrets describe "${SECRET_PATIENT_PEPPER}"; then
+  skip "${SECRET_PATIENT_PEPPER}"
+else
+  gc secrets create "${SECRET_PATIENT_PEPPER}" \
+    --replication-policy=user-managed --locations="${REGION}"
+  made "${SECRET_PATIENT_PEPPER}"
+fi
+
+if ! exists gc secrets versions describe latest --secret="${SECRET_PATIENT_PEPPER}"; then
+  # `openssl rand` straight into the secret, never through a file or a variable
+  # this script could later echo.
+  openssl rand -base64 48 | tr -d '\n' \
+    | gc secrets versions add "${SECRET_PATIENT_PEPPER}" --data-file=-
+  made "${SECRET_PATIENT_PEPPER} version"
+fi
+
 if exists gc secrets describe "${SECRET_KIOSK_TOKENS}"; then
   skip "${SECRET_KIOSK_TOKENS}"
 else
@@ -248,6 +266,7 @@ secret_access() {  # secret_access <secret> <member>
 secret_access "${SECRET_DATABASE_URL}" "${API_SA}"
 secret_access "${SECRET_DATABASE_URL}" "${WORKER_SA}"
 secret_access "${SECRET_KIOSK_TOKENS}" "${API_SA}"
+secret_access "${SECRET_PATIENT_PEPPER}" "${API_SA}"
 secret_access "${SECRET_PUSH_TOKEN}" "${WORKER_SA}"
 
 # Object-level, on the one bucket. The API writes uploads and signs read URLs;

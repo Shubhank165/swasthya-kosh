@@ -53,7 +53,7 @@ gc run deploy "${API_SERVICE}" "${common[@]}" \
   --cpu=1 --memory=1Gi \
   --timeout=120s \
   --set-env-vars="^;^${ENV_SHARED}" \
-  --set-secrets="DATABASE_URL=${SECRET_DATABASE_URL}:latest,KIOSK_TOKENS=${SECRET_KIOSK_TOKENS}:latest"
+  --set-secrets="DATABASE_URL=${SECRET_DATABASE_URL}:latest,KIOSK_TOKENS=${SECRET_KIOSK_TOKENS}:latest,PATIENT_REF_PEPPER=${SECRET_PATIENT_PEPPER}:latest"
 
 API_URL="$(gc run services describe "${API_SERVICE}" --region="${REGION}" --format='value(status.url)')"
 
@@ -61,12 +61,17 @@ API_URL="$(gc run services describe "${API_SERVICE}" --region="${REGION}" --form
 # Separate because OCR is bursty and the API is not: the worker scales to zero
 # between patients, and the API never has to hold a request open while a model
 # reads a photograph. More memory and a longer timeout for the same reason.
+# The worker's ceiling is 10, not 20: with direct VPC egress attached, Cloud Run
+# requires `maxScale` to be within the project's VPC-connected instance quota,
+# which is 10 on a new project — and it rejects the deploy rather than clamping.
+# OCR is queue-driven and Pub/Sub redelivers, so a lower ceiling costs latency
+# under a burst, not work.
 say "Deploying ${WORKER_SERVICE}"
 gc run deploy "${WORKER_SERVICE}" "${common[@]}" \
   --service-account="${WORKER_SA}" \
   --no-allow-unauthenticated \
   --min-instances=0 \
-  --max-instances=20 \
+  --max-instances=10 \
   --concurrency=4 \
   --cpu=2 --memory=2Gi \
   --timeout=540s \

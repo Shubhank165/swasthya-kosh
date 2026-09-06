@@ -71,6 +71,12 @@ PUBSUB_SA="medikiosk-pubsub@${PROJECT_ID}.iam.gserviceaccount.com"
 SECRET_DATABASE_URL="${SECRET_DATABASE_URL:-medikiosk-database-url}"
 SECRET_KIOSK_TOKENS="${SECRET_KIOSK_TOKENS:-medikiosk-kiosk-tokens}"
 SECRET_PUSH_TOKEN="${SECRET_PUSH_TOKEN:-medikiosk-pubsub-push-token}"
+# The pepper for patient phone references (2/3 §7.1). Without it the backend
+# refuses to issue a patient session at all — a stored HMAC with no pepper is a
+# plain digest of a ten-digit number, and a ten-digit space is a rainbow table.
+# Generated at provision time and never printed, unlike the kiosk tokens, which
+# have to be typed into devices.
+SECRET_PATIENT_PEPPER="${SECRET_PATIENT_PEPPER:-medikiosk-patient-ref-pepper}"
 
 VPC_NETWORK="${VPC_NETWORK:-default}"
 VPC_SUBNET="${VPC_SUBNET:-default}"

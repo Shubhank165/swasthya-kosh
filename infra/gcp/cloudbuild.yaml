@@ -17,5 +17,10 @@ images:
   - ${_IMAGE}:latest
 options:
   logging: CLOUD_LOGGING_ONLY
-  machineType: E2_HIGHCPU_8
+  # The default machine, not E2_HIGHCPU_8. A newly created project has no quota
+  # for the larger Cloud Build machines in asia-south1 and the build fails with
+  # FAILED_PRECONDITION rather than queueing — and raising that quota needs a
+  # support request, which is not a thing a deploy script can wait on. The image
+  # is a Python service; it builds in a few minutes on the default.
+  machineType: E2_MEDIUM
 timeout: 1200s
