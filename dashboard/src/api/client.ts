@@ -34,6 +34,7 @@ export class ApiError extends Error {
 }
 
 let accessToken: string | null = null;
+let principalHeaders: Record<string, string> = {};
 let onAuthFailure: (() => void) | null = null;
 
 export function setAccessToken(token: string | null) {
@@ -42,6 +43,22 @@ export function setAccessToken(token: string | null) {
 
 export function getAccessToken() {
   return accessToken;
+}
+
+/**
+ * The header principal — `X-User-Id` / `X-User-Role` / `X-Hospital-Id`.
+ *
+ * **A stand-in for the hospital's identity provider**, and the backend says so
+ * itself: `app/api/auth.py` gates it on `ALLOW_HEADER_AUTH`, which is off in
+ * any environment holding real data. It exists so this dashboard could be built
+ * before the IdP integration was, and it is what the sign-in screen collects.
+ *
+ * Held in the same place as the access token and under the same rule: **memory
+ * only**. When the IdP lands, `setAccessToken` is the path that survives and
+ * this function is deleted along with the sign-in form.
+ */
+export function setPrincipalHeaders(headers: Record<string, string> | null) {
+  principalHeaders = headers ?? {};
 }
 
 /** Called when the server refuses. The app clears its session and shows a refusal. */
@@ -65,6 +82,7 @@ async function request<T>(
       Accept: 'application/json',
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...principalHeaders,
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     ...(signal ? { signal } : {}),

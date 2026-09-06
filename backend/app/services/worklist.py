@@ -118,6 +118,7 @@ class WorklistService:
                     contradiction_count=contradictions,
                     needs_verification=needs_verification,
                     repaired=row.repaired,
+                    needs_manual_review=row.needs_manual_review,
                     patient_ref_type=row.patient_ref_type,
                     seen_at=row.seen_at,
                 )

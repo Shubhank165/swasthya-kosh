@@ -68,6 +68,10 @@ class WorklistEntry(BaseModel):
     contradiction_count: int = 0
     needs_verification: bool = False
     repaired: bool = False
+    #: The repair path could not rescue this payload and a person has to look
+    #: before the patient is seen — 3/3 §4.1. Distinct from `repaired`, which
+    #: means repair ran and worked: one is a note, the other is a blocker.
+    needs_manual_review: bool = False
     patient_ref_type: str = "guest"
     seen_at: datetime | None = None
 

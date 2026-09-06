@@ -9,7 +9,7 @@
  */
 
 import { create } from 'zustand';
-import { setAccessToken } from '../api/client';
+import { setAccessToken, setPrincipalHeaders } from '../api/client';
 
 export const DASHBOARD_ROLES = ['physician', 'staff', 'triage', 'admin'] as const;
 export type DashboardRole = (typeof DASHBOARD_ROLES)[number];
@@ -34,19 +34,37 @@ interface SessionState {
   session: Session | null;
   /** Set when a session ended by itself, so the login screen can say why. */
   endedBecause: 'idle' | 'refused' | null;
-  signIn: (session: Session, token: string) => void;
+  /**
+   * `token` is the access token once the hospital's IdP is wired. Until then it
+   * is omitted and the header principal below carries the identity — see
+   * `setPrincipalHeaders`. Either way nothing is persisted.
+   */
+  signIn: (session: Session, token?: string) => void;
   signOut: (reason?: 'idle' | 'refused') => void;
+}
+
+/** The stand-in principal, from a session. One place, so it cannot drift. */
+export function principalHeadersFor(session: Session): Record<string, string> {
+  return {
+    'X-User-Id': session.userId,
+    'X-User-Role': session.role,
+    'X-Hospital-Id': session.hospitalId,
+  };
 }
 
 export const useSession = create<SessionState>((set) => ({
   session: null,
   endedBecause: null,
   signIn: (session, token) => {
-    setAccessToken(token);
+    setAccessToken(token ?? null);
+    setPrincipalHeaders(principalHeadersFor(session));
     set({ session, endedBecause: null });
   },
   signOut: (reason) => {
+    // Both, always. Clearing one and leaving the other is how a signed-out tab
+    // keeps making authenticated requests.
     setAccessToken(null);
+    setPrincipalHeaders(null);
     set({ session: null, endedBecause: reason ?? null });
   },
 }));

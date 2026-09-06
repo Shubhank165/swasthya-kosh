@@ -11,38 +11,16 @@
  * line arrive from the backend already decided (§1 rule 1, §12).
  */
 import { StateChip } from '../components/StateChip';
+import type {
+  Contradiction,
+  ConflictSide,
+  PhysicianReport,
+  ReportLine,
+  ReportSection,
+} from '../api/types';
 import { statesFor, type FactLike, type FactState } from './factState';
 
-export interface ReportLine {
-  text: string;
-  fact_ids?: readonly string[];
-  field_ids?: readonly string[];
-  markers?: readonly { code: string; text: string }[];
-  original_text?: string | null;
-  original_language?: string | null;
-}
-
-export interface ReportSection {
-  section: string;
-  title: string;
-  lines: readonly ReportLine[];
-}
-
-export interface Contradiction {
-  field_id?: string;
-  description?: string;
-  claims?: readonly { text: string; source?: string }[];
-}
-
-export interface PhysicianReport {
-  intake_id: string;
-  language: string;
-  sections?: readonly ReportSection[];
-  unresolved?: readonly ReportLine[];
-  conflicts?: readonly Contradiction[];
-  interactions?: readonly { text: string; severity: string; source: string }[];
-  document_notes?: readonly ReportLine[];
-}
+export type { PhysicianReport, ReportLine, ReportSection, Contradiction };
 
 interface Props {
   report: PhysicianReport;
@@ -50,9 +28,17 @@ interface Props {
   facts: Record<string, FactLike>;
   selectedFactId: string | null;
   onSelectFact: (factId: string) => void;
+  /** Rendered beside a line when the reader may act on it — §6. */
+  renderActions?: (factId: string) => React.ReactNode;
 }
 
-export function ReportView({ report, facts, selectedFactId, onSelectFact }: Props) {
+export function ReportView({
+  report,
+  facts,
+  selectedFactId,
+  onSelectFact,
+  renderActions,
+}: Props) {
   const sections = report.sections ?? [];
   return (
     <article className="space-y-6" aria-label="Patient report">
@@ -65,12 +51,23 @@ export function ReportView({ report, facts, selectedFactId, onSelectFact }: Prop
             facts={facts}
             selectedFactId={selectedFactId}
             onSelectFact={onSelectFact}
+            renderActions={renderActions}
           />
         ))}
 
       {/* Full sections, never a toggle — §12. */}
-      <UnresolvedBlock lines={report.unresolved ?? []} facts={facts} />
-      <ConflictsBlock conflicts={report.conflicts ?? []} />
+      <UnresolvedBlock
+        lines={report.unresolved ?? []}
+        facts={facts}
+        selectedFactId={selectedFactId}
+        onSelectFact={onSelectFact}
+        renderActions={renderActions}
+      />
+      <ConflictsBlock
+        conflicts={report.conflicts ?? []}
+        selectedFactId={selectedFactId}
+        onSelectFact={onSelectFact}
+      />
     </article>
   );
 }
@@ -80,11 +77,13 @@ function ReportSectionBlock({
   facts,
   selectedFactId,
   onSelectFact,
+  renderActions,
 }: {
   section: ReportSection;
   facts: Record<string, FactLike>;
   selectedFactId: string | null;
   onSelectFact: (factId: string) => void;
+  renderActions?: (factId: string) => React.ReactNode;
 }) {
   return (
     <section aria-labelledby={`section-${section.section}`}>
@@ -102,6 +101,7 @@ function ReportSectionBlock({
             facts={facts}
             selected={!!line.fact_ids?.some((id) => id === selectedFactId)}
             onSelect={onSelectFact}
+            renderActions={renderActions}
           />
         ))}
       </ul>
@@ -114,11 +114,13 @@ export function FactLine({
   facts,
   selected,
   onSelect,
+  renderActions,
 }: {
   line: ReportLine;
   facts: Record<string, FactLike>;
   selected: boolean;
   onSelect: (factId: string) => void;
+  renderActions?: (factId: string) => React.ReactNode;
 }) {
   const factId = line.fact_ids?.[0];
   const fact = factId ? facts[factId] : undefined;
@@ -126,7 +128,7 @@ export function FactLine({
   const traceable = Boolean(factId);
 
   return (
-    <li>
+    <li className="group flex items-start gap-2">
       {/* §1 rule 5: every displayed fact is traceable in one click. A line with
           no fact behind it is not clickable rather than clickable-and-inert. */}
       <button
@@ -136,7 +138,7 @@ export function FactLine({
         data-fact-id={factId}
         data-states={states.join(' ')}
         aria-current={selected ? 'true' : undefined}
-        className={`w-full rounded px-2 py-1.5 text-left transition ${
+        className={`flex-1 rounded px-2 py-1.5 text-left transition ${
           selected ? 'bg-accent-soft ring-1 ring-accent/40' : 'hover:bg-surface-sunken'
         } ${traceable ? '' : 'cursor-default'}`}
       >
@@ -160,7 +162,16 @@ export function FactLine({
             {line.original_text}
           </span>
         )}
+        {/* Every marker the backend attached, in its own words. Dropping one
+            because the chip above already implies it would be this screen
+            deciding which qualifiers a physician needs. */}
+        {(line.markers?.length ?? 0) > 0 && (
+          <span className="mt-1 block text-xs text-ink-faint">
+            {line.markers!.map((marker) => marker.text).join('; ')}
+          </span>
+        )}
       </button>
+      {factId && renderActions?.(factId)}
     </li>
   );
 }
@@ -168,9 +179,15 @@ export function FactLine({
 function UnresolvedBlock({
   lines,
   facts,
+  selectedFactId,
+  onSelectFact,
+  renderActions,
 }: {
   lines: readonly ReportLine[];
   facts: Record<string, FactLike>;
+  selectedFactId: string | null;
+  onSelectFact: (factId: string) => void;
+  renderActions?: (factId: string) => React.ReactNode;
 }) {
   return (
     <section aria-labelledby="section-unresolved" data-testid="unresolved-section">
@@ -189,8 +206,9 @@ function UnresolvedBlock({
               key={`unresolved-${index}`}
               line={line}
               facts={facts}
-              selected={false}
-              onSelect={() => undefined}
+              selected={!!line.fact_ids?.some((id) => id === selectedFactId)}
+              onSelect={onSelectFact}
+              renderActions={renderActions}
             />
           ))}
         </ul>
@@ -199,7 +217,15 @@ function UnresolvedBlock({
   );
 }
 
-function ConflictsBlock({ conflicts }: { conflicts: readonly Contradiction[] }) {
+function ConflictsBlock({
+  conflicts,
+  selectedFactId,
+  onSelectFact,
+}: {
+  conflicts: readonly Contradiction[];
+  selectedFactId: string | null;
+  onSelectFact: (factId: string) => void;
+}) {
   return (
     <section aria-labelledby="section-conflicts" data-testid="conflicts-section">
       <h3
@@ -212,33 +238,84 @@ function ConflictsBlock({ conflicts }: { conflicts: readonly Contradiction[] }) 
         <p className="px-2 text-sm text-ink-muted">No conflicting accounts.</p>
       ) : (
         <ul className="space-y-2">
-          {conflicts.map((conflict, index) => (
+          {conflicts.map((conflict) => (
             <li
-              key={`conflict-${index}`}
+              key={`${conflict.field_id}-${conflict.kind}`}
               className="rounded border border-conflict/30 bg-conflict-soft p-2"
+              data-field-id={conflict.field_id}
             >
               <p className="text-sm font-medium text-conflict">
-                {conflict.description ?? conflict.field_id}
+                {conflict.field_id.replace(/_/g, ' ')}
               </p>
               {/* Both claims side by side, both sources, unresolved — §4.2. The
-                  dashboard does not pick a winner; that is the physician's. */}
+                  dashboard does not pick a winner; the backend does not either,
+                  and `resolution` is always "physician verification required". */}
               <div className="mt-1 grid gap-2 sm:grid-cols-2">
-                {(conflict.claims ?? []).map((claim, claimIndex) => (
-                  <div
-                    key={claimIndex}
-                    className="rounded border border-line bg-surface p-2 text-sm"
-                  >
-                    <p className="text-ink">{claim.text}</p>
-                    {claim.source && (
-                      <p className="mt-0.5 text-xs text-ink-faint">{claim.source}</p>
-                    )}
-                  </div>
-                ))}
+                <ClaimCard
+                  heading="Reported today"
+                  side={conflict.reported_today ?? null}
+                  selectedFactId={selectedFactId}
+                  onSelectFact={onSelectFact}
+                />
+                <ClaimCard
+                  heading="Already on record"
+                  side={conflict.from_record}
+                  selectedFactId={selectedFactId}
+                  onSelectFact={onSelectFact}
+                />
               </div>
+              <p className="mt-1 text-xs text-conflict">{conflict.resolution}</p>
             </li>
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+function ClaimCard({
+  heading,
+  side,
+  selectedFactId,
+  onSelectFact,
+}: {
+  heading: string;
+  side: ConflictSide | null;
+  selectedFactId: string | null;
+  onSelectFact: (factId: string) => void;
+}) {
+  if (side === null) {
+    // A conflict can have only one side — a medicine on the prescription that
+    // the patient did not mention. Saying so is more useful than hiding the
+    // half that exists, and much more useful than implying the patient denied
+    // it, which they did not.
+    return (
+      <div className="rounded border border-dashed border-line bg-surface p-2 text-sm">
+        <p className="text-xs font-medium text-ink-muted">{heading}</p>
+        <p className="mt-0.5 text-ink-muted">Not mentioned in today's intake.</p>
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => onSelectFact(side.fact_id)}
+      aria-current={selectedFactId === side.fact_id ? 'true' : undefined}
+      data-fact-id={side.fact_id}
+      className={`rounded border bg-surface p-2 text-left text-sm ${
+        selectedFactId === side.fact_id
+          ? 'border-accent ring-1 ring-accent/40'
+          : 'border-line hover:bg-surface-sunken'
+      }`}
+    >
+      <p className="text-xs font-medium text-ink-muted">{heading}</p>
+      <p className="text-ink">{side.statement}</p>
+      {side.original_text && (
+        <p className="mt-0.5 border-l-2 border-line pl-2 text-ink-muted">
+          {side.original_text}
+        </p>
+      )}
+      <p className="mt-0.5 text-xs text-ink-faint">{side.source_label}</p>
+    </button>
   );
 }

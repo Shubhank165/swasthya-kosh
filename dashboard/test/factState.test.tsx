@@ -9,8 +9,14 @@
  */
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { STATE_STYLES, statesFor, type FactState } from '../src/report/factState';
+import {
+  STATE_STYLES,
+  statesFor,
+  type FactLike,
+  type FactState,
+} from '../src/report/factState';
 import { ReportView } from '../src/report/ReportView';
+import type { PhysicianReport } from '../src/api/types';
 
 describe('what a state means', () => {
   it('keeps the four unsettled statuses apart', () => {
@@ -68,8 +74,17 @@ describe('what a state means', () => {
   });
 });
 
-const report = {
+/**
+ * A fixture containing **every state in §4.2's table** — §11 item 2.
+ *
+ * The conflict is the backend's real shape (`app/domain/record.py::
+ * Contradiction`), not a convenient one: a conflict where only the record has
+ * a claim is a real case — a medicine on the prescription the patient did not
+ * mention — and the screen must not render that as the patient denying it.
+ */
+const report: PhysicianReport = {
   intake_id: 'i1',
+  hospital_id: 'aiia-delhi',
   language: 'en',
   sections: [
     {
@@ -88,6 +103,8 @@ const report = {
         { text: 'Diabetes', fact_ids: ['f-carried'] },
         { text: 'HbA1c 8.2%', fact_ids: ['f-lowconf'] },
         { text: 'Penicillin allergy', fact_ids: ['f-verified'] },
+        { text: 'Pain 6/10', fact_ids: ['f-amended'] },
+        { text: 'Pregnancy', fact_ids: ['f-na'] },
       ],
     },
   ],
@@ -95,22 +112,40 @@ const report = {
   conflicts: [
     {
       field_id: 'diabetes',
-      description: 'Diabetes reported today, absent on the prescription',
-      claims: [
-        { text: 'Patient reports diabetes', source: 'interview' },
-        { text: 'No antidiabetic on the prescription', source: 'document' },
-      ],
+      kind: 'status',
+      reported_today: {
+        fact_id: 'f-carried',
+        statement: 'Patient reports diabetes',
+        channel: 'voice',
+        source_label: 'turn 7',
+      },
+      from_record: {
+        fact_id: 'f-doc',
+        statement: 'No antidiabetic on the prescription',
+        channel: 'document',
+        source_label: 'doc-1 p1',
+      },
+      resolution: 'Physician verification required',
     },
   ],
 };
 
-const facts = {
+const facts: Record<string, FactLike> = {
   'f-plain': { status: 'answered' },
   'f-unresolved': { status: 'unresolved' },
   'f-repaired': { status: 'answered', repaired: true },
-  'f-carried': { status: 'answered', carried_forward: { from_intake_id: 'i0' } },
+  'f-carried': {
+    status: 'answered',
+    carried_forward: { from_intake_id: 'i0', originally_recorded: '2026-06-12' },
+  },
   'f-lowconf': { status: 'answered', needs_verification: true },
   'f-verified': { status: 'answered', physician_verified: true },
+  'f-amended': {
+    status: 'answered',
+    physician_verified: true,
+    physician_action: 'amended',
+  },
+  'f-na': { status: 'not_applicable' },
   'f-notasked': { status: 'not_asked' },
 };
 
@@ -131,6 +166,25 @@ describe('the report as rendered', () => {
     expect(stateOf('f-carried')).toContain('carried_forward');
     expect(stateOf('f-lowconf')).toContain('low_confidence');
     expect(stateOf('f-verified')).toContain('verified');
+    expect(stateOf('f-notasked')).toContain('not_asked');
+    expect(stateOf('f-na')).toContain('not_applicable');
+    // A value the doctor typed, distinct from one the doctor agreed with.
+    expect(stateOf('f-amended')).toContain('amended');
+    expect(stateOf('f-amended')).not.toContain('verified');
+  });
+
+  it('renders every state in §4.2\u2019s table, and none of them as absence', () => {
+    view();
+    // The assertion the section is for: nothing unsettled vanishes, and
+    // nothing unsettled reads as a denial.
+    for (const factId of ['f-unresolved', 'f-notasked', 'f-na']) {
+      const line = document.querySelector(`[data-fact-id="${factId}"]`);
+      expect(line).not.toBeNull();
+      expect(line!.textContent ?? '').not.toMatch(/\bno\b/i);
+    }
+    expect(screen.getByText('not established')).toBeVisible();
+    expect(screen.getByText('not asked')).toBeVisible();
+    expect(screen.getByText('not applicable')).toBeVisible();
   });
 
   it('shows unresolved and conflicts as full sections, not a toggle', () => {
@@ -145,6 +199,12 @@ describe('the report as rendered', () => {
     // Both claims, both sources, and no winner picked.
     expect(within(conflicts).getByText('Patient reports diabetes')).toBeVisible();
     expect(within(conflicts).getByText('No antidiabetic on the prescription')).toBeVisible();
+    expect(within(conflicts).getByText('turn 7')).toBeVisible();
+    expect(within(conflicts).getByText('doc-1 p1')).toBeVisible();
+    // The backend never resolves a conflict, and neither does this screen.
+    expect(
+      within(conflicts).getByText('Physician verification required'),
+    ).toBeVisible();
   });
 
   it("shows the patient's own words without translating them in place", () => {

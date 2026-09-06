@@ -348,6 +348,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/intakes/{intake_id}/facts/{fact_id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Physician accepts, amends or rejects one fact
+         * @description One line of the report, confirmed or corrected — 3/3 §6.
+         *
+         *     The endpoint the dashboard drives as a physician reads down the report.
+         *     Returns the **new revision**, not the old one: the client re-renders that
+         *     line from what came back rather than guessing what the server did with it.
+         *
+         *     Rejecting is not answering "no". It records that the field was never
+         *     established, which is a different clinical claim and is stored as one.
+         */
+        post: operations["verify_fact_api_v1_intakes__intake_id__facts__fact_id__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/intakes/{intake_id}/documents": {
         parameters: {
             query?: never;
@@ -585,8 +612,41 @@ export interface paths {
          *     `pending_alerts` so it cannot be scrolled past, but it does **not** move the
          *     intake up the list — reordering a waiting room on a machine's reading of a
          *     symptom is a triage decision, and this system does not make those.
+         *
+         *     `state` narrows the list; `total` still counts the whole window, so a filter
+         *     that hides thirty patients says so rather than making the department look
+         *     quiet. `pending_alerts` is **never** filtered — an unacknowledged red flag
+         *     that a dropdown could hide is a red flag the dashboard has failed to raise.
          */
         get: operations["worklist_api_v1_worklist_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Red-flag criteria that fired, unacknowledged first
+         * @description The triage view — §4.3.
+         *
+         *     Every alert carries the rule's own fixed wording and the answers that met
+         *     it. **Never a condition name**: the device screened a questionnaire, it did
+         *     not examine a patient, and a label that named a diagnosis would be a
+         *     diagnosis this system is not permitted to make.
+         *
+         *     Acknowledging is a separate `POST` and escalation is a third thing that
+         *     happens outside this API. Nothing here collapses the two.
+         */
+        get: operations["alerts_api_v1_alerts_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -640,6 +700,35 @@ export interface paths {
          *     argument than any slide.
          */
         get: operations["metrics_api_v1_metrics_ingest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/metrics/correction-rate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How often a physician corrected the pipeline
+         * @description The extraction-quality metric — §6, §B3.
+         *
+         *     Admin-scoped, not because it is sensitive but because it is a claim about
+         *     the system rather than about a patient, and the person making that claim on
+         *     a slide should be the person who can see how it was computed.
+         *
+         *     It replaces the figures the shelved evaluation harness used to produce.
+         *     Those measured question selection, which now runs on the Jetson, so they no
+         *     longer describe anything this backend does — and none of them may be quoted
+         *     until this number has data behind it.
+         */
+        get: operations["correction_rate_api_v1_metrics_correction_rate_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -845,12 +934,115 @@ export interface components {
              */
             acknowledged_at: string;
         };
+        /** AlertListOut */
+        AlertListOut: {
+            /** Alerts */
+            alerts?: components["schemas"]["AlertOut"][];
+            /**
+             * Unacknowledged
+             * @default 0
+             */
+            unacknowledged: number;
+            /** Generated At */
+            generated_at?: string | null;
+            /**
+             * Demo
+             * @default false
+             */
+            demo: boolean;
+        };
+        /**
+         * AlertOut
+         * @description One fired red-flag criterion — §4.3.
+         *
+         *     `label` is the rule's own fixed wording — "urgent clinical review criterion
+         *     triggered" — and **never a condition name**. `criteria_met` names the
+         *     answers that met the rule, which is what lets a clinician judge it; the rule
+         *     does not get to name a diagnosis it did not make.
+         */
+        AlertOut: {
+            /** Alert Id */
+            alert_id: string;
+            /** Intake Id */
+            intake_id: string;
+            /** Department Code */
+            department_code?: string | null;
+            /** Rule Id */
+            rule_id: string;
+            /** Severity */
+            severity: string;
+            /** Label */
+            label?: string | null;
+            /** Criteria Met */
+            criteria_met?: string[];
+            /** Fired At Turn */
+            fired_at_turn?: number | null;
+            /** Engine Version */
+            engine_version?: string | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /**
+             * Arrived At
+             * Format: date-time
+             */
+            arrived_at: string;
+            /** Intake Status */
+            intake_status: string;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /** Acknowledged By */
+            acknowledged_by?: string | null;
+            /** Acknowledged At */
+            acknowledged_at?: string | null;
+            /** Acknowledgement Note */
+            acknowledgement_note?: string | null;
+        };
         /** Body_upload_document_api_v1_intakes__intake_id__documents_post */
         Body_upload_document_api_v1_intakes__intake_id__documents_post: {
             /** File */
             file: string;
             /** @default other */
             kind: components["schemas"]["DocumentKind"];
+        };
+        /**
+         * Boolean
+         * @description A genuinely binary attribute — `currently_taking`, `breathlessness`.
+         *
+         *     Never a stand-in for `FieldStatus`. A `Boolean(value=False)` on an
+         *     `answered` field means the patient said no; a missing field means nothing of
+         *     the sort, and there is no way to write one as the other.
+         */
+        Boolean: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "boolean";
+            /** Value */
+            value: boolean;
+        };
+        /**
+         * Coded
+         * @description A value drawn from a controlled vocabulary.
+         */
+        Coded: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "coded";
+            /** Code */
+            code: string;
+            /** System */
+            system?: string | null;
+            /** Display */
+            display?: string | null;
         };
         /** ConsentOut */
         ConsentOut: {
@@ -920,6 +1112,74 @@ export interface components {
             };
             /** Resolution */
             resolution: string;
+        };
+        /**
+         * CorrectionRateOut
+         * @description How often a physician had to correct the pipeline — §6, §B3.
+         *
+         *     The denominator is facts a physician reviewed, not every fact stored. A
+         *     field nobody looked at says nothing about extraction quality, and including
+         *     it would let the rate be improved by ingesting more intakes.
+         *
+         *     `correction_rate` is `null`, not `0.0`, when nothing has been reviewed yet —
+         *     a zero on an empty denominator reads as "never wrong", which is a claim this
+         *     has not earned.
+         */
+        CorrectionRateOut: {
+            /**
+             * Facts Reviewed
+             * @default 0
+             */
+            facts_reviewed: number;
+            /**
+             * Verified
+             * @default 0
+             */
+            verified: number;
+            /**
+             * Amended
+             * @default 0
+             */
+            amended: number;
+            /**
+             * Rejected
+             * @default 0
+             */
+            rejected: number;
+            /** Correction Rate */
+            correction_rate?: number | null;
+            /**
+             * Intakes Reviewed
+             * @default 0
+             */
+            intakes_reviewed: number;
+            /**
+             * Demo
+             * @default false
+             */
+            demo: boolean;
+        };
+        /**
+         * DateValue
+         * @description A calendar date, with precision so "sometime in 2019" survives.
+         */
+        DateValue: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "date";
+            /**
+             * Value
+             * Format: date
+             */
+            value: string;
+            /**
+             * Precision
+             * @default day
+             * @enum {string}
+             */
+            precision: "day" | "month" | "year";
         };
         /** DepartmentOut */
         DepartmentOut: {
@@ -991,6 +1251,27 @@ export interface components {
              */
             demo: boolean;
         };
+        /**
+         * Duration
+         * @description A span in the unit the patient used.
+         *
+         *     Deliberately not normalised to seconds: "about 2 weeks" and "14 days" carry
+         *     different precision and the physician should see which was said.
+         */
+        Duration: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "duration";
+            /** Magnitude */
+            magnitude: number;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "hour" | "day" | "week" | "month" | "year";
+        };
         /** FactOut */
         FactOut: {
             /** Fact Id */
@@ -1024,6 +1305,8 @@ export interface components {
              * @default false
              */
             physician_verified: boolean;
+            /** Physician Action */
+            physician_action?: string | null;
             /**
              * Repaired
              * @default false
@@ -1034,6 +1317,10 @@ export interface components {
              * @default false
              */
             needs_verification: boolean;
+            /** Carried Forward */
+            carried_forward?: {
+                [key: string]: unknown;
+            } | null;
             /** Source */
             source: {
                 [key: string]: unknown;
@@ -1043,6 +1330,23 @@ export interface components {
              * Format: date-time
              */
             recorded_at: string;
+        };
+        /**
+         * FactVerifyRequest
+         * @description A physician acting on one fact — 3/3 §6.
+         *
+         *     Three actions, and the wording matters. `verified` says the record is right;
+         *     `amended` supplies a corrected value; `rejected` says the field was never
+         *     established. **Rejection is not a `no`** — see
+         *     `Fact.rejected_by_physician` — and there is deliberately no fourth action
+         *     that would let one be written as the other.
+         */
+        FactVerifyRequest: {
+            action: components["schemas"]["PhysicianAction"];
+            /** Value */
+            value?: (components["schemas"]["Quantity"] | components["schemas"]["Duration"] | components["schemas"]["Coded"] | components["schemas"]["Text"] | components["schemas"]["Boolean"] | components["schemas"]["DateValue"] | components["schemas"]["Scale"]) | null;
+            /** Reason */
+            reason?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1233,6 +1537,37 @@ export interface components {
             /** Patient Ref */
             patient_ref: string;
         };
+        /**
+         * PhysicianAction
+         * @description What a physician did to a fact — 3/3 §6.
+         *
+         *     A column rather than a note prefix, because the **correction rate** is a
+         *     number this project reports out loud (§B3): the proportion of facts a
+         *     doctor amends is its extraction-quality metric, and a metric derived by
+         *     string-matching a free-text note is one that breaks the first time somebody
+         *     rewords the note.
+         *
+         *     Absent on every fact the pipeline produced. Only the three revision methods
+         *     below set it, and each sets exactly one value.
+         * @enum {string}
+         */
+        PhysicianAction: "verified" | "amended" | "rejected";
+        /**
+         * Quantity
+         * @description A magnitude with a unit. The unit is mandatory: a bare `120` is not
+         *     clinical data.
+         */
+        Quantity: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "quantity";
+            /** Magnitude */
+            magnitude: number;
+            /** Unit */
+            unit: string;
+        };
         /** RedFlagOut */
         RedFlagOut: {
             /** Rule Id */
@@ -1313,6 +1648,29 @@ export interface components {
             notice?: string | null;
         };
         /**
+         * Scale
+         * @description A point on a bounded ordinal scale, e.g. pain 0-10.
+         */
+        Scale: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "scale";
+            /** Value */
+            value: number;
+            /**
+             * Minimum
+             * @default 0
+             */
+            minimum: number;
+            /**
+             * Maximum
+             * @default 10
+             */
+            maximum: number;
+        };
+        /**
          * TerminologyMatchOut
          * @description One candidate. `mappings` is empty when no mapping exists — which is a
          *     real answer, not a gap for the client to fill in.
@@ -1345,6 +1703,20 @@ export interface components {
             systems: string[];
             /** Results */
             results?: components["schemas"]["TerminologyMatchOut"][];
+        };
+        /**
+         * Text
+         * @description Free narrative, already normalised. The verbatim original lives on
+         *     `Fact.original_text`.
+         */
+        Text: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "text";
+            /** Text */
+            text: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -1416,6 +1788,11 @@ export interface components {
              */
             repaired: boolean;
             /**
+             * Needs Manual Review
+             * @default false
+             */
+            needs_manual_review: boolean;
+            /**
              * Patient Ref Type
              * @default guest
              */
@@ -1444,6 +1821,12 @@ export interface components {
              */
             demo: boolean;
         };
+        /**
+         * WorklistState
+         * @description What the dashboard shows against an intake.
+         * @enum {string}
+         */
+        WorklistState: "ready" | "partial" | "red_flag_pending" | "needs_review" | "seen";
     };
     responses: never;
     parameters: never;
@@ -1890,6 +2273,47 @@ export interface operations {
             };
         };
     };
+    verify_fact_api_v1_intakes__intake_id__facts__fact_id__verify_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path: {
+                intake_id: string;
+                fact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_documents_api_v1_intakes__intake_id__documents_get: {
         parameters: {
             query?: never;
@@ -2198,6 +2622,7 @@ export interface operations {
         parameters: {
             query?: {
                 department?: string | null;
+                state?: components["schemas"]["WorklistState"][] | null;
                 hours?: number;
             };
             header?: {
@@ -2218,6 +2643,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorklistOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    alerts_api_v1_alerts_get: {
+        parameters: {
+            query?: {
+                acknowledged?: boolean | null;
+                department?: string | null;
+                days?: number;
+            };
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertListOut"];
                 };
             };
             /** @description Validation Error */
@@ -2292,6 +2755,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetricsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correction_rate_api_v1_metrics_correction_rate_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionRateOut"];
                 };
             };
             /** @description Validation Error */

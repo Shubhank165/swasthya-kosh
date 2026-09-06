@@ -207,6 +207,10 @@ class WorklistEntryOut(ApiModel):
     contradiction_count: int = 0
     needs_verification: bool = False
     repaired: bool = False
+    #: Repair could not rescue the payload. A person looks before the patient is
+    #: seen — §4.1 asks the dashboard to surface these prominently, and it
+    #: cannot without being told which they are.
+    needs_manual_review: bool = False
     patient_ref_type: str = "guest"
     seen_at: datetime | None = None
 

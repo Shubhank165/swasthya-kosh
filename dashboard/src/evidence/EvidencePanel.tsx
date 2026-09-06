@@ -13,7 +13,7 @@
  */
 
 export interface Evidence {
-  channel: 'voice' | 'document' | 'app' | 'carried_forward' | string;
+  channel: 'voice' | 'document' | 'app' | 'carried_forward' | 'entry' | string;
   /** Voice: the turn. App: the question as displayed. */
   question?: string | null;
   transcript?: string | null;
@@ -35,6 +35,8 @@ export interface Evidence {
   from_intake_id?: string | null;
   originally_recorded?: string | null;
   confirmed_today?: boolean | null;
+  /** Entered by a person: who. The act of entry is the evidence. */
+  entered_by?: string | null;
 }
 
 export function EvidencePanel({
@@ -68,6 +70,8 @@ export function EvidencePanel({
       return <AppEvidence evidence={evidence} />;
     case 'carried_forward':
       return <CarriedForwardEvidence evidence={evidence} onOpenIntake={onOpenIntake} />;
+    case 'entry':
+      return <EntryEvidence evidence={evidence} />;
     default:
       return (
         <Frame title="Evidence">
@@ -188,6 +192,25 @@ function AppEvidence({ evidence }: { evidence: Evidence }) {
         {/* No confidence score, and its absence is deliberate: a tap has none,
             and inventing 1.0 would make it look like a perfectly-heard answer. */}
         <p className="text-xs text-ink-faint">Answered by tapping, in the patient app.</p>
+      </div>
+    </Frame>
+  );
+}
+
+function EntryEvidence({ evidence }: { evidence: Evidence }) {
+  return (
+    <Frame title="Entered by a person">
+      <div data-testid="evidence-entry" className="space-y-3">
+        <p className="rounded border border-line bg-surface-sunken px-3 py-2 text-lg text-ink">
+          {evidence.transcript ?? '—'}
+        </p>
+        {/* Thin provenance, shown as thin rather than dressed up. The evidence
+            here is the act of entry and the person who performed it; there is
+            no transcript to check it against and the panel does not imply one. */}
+        <p className="text-xs text-ink-faint">
+          Recorded by {evidence.entered_by ?? 'a member of staff'}. No recording
+          or document stands behind this line.
+        </p>
       </div>
     </Frame>
   );

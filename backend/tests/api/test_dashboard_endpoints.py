@@ -353,3 +353,38 @@ class TestTheWorklistStateFilter:
             "/api/v1/worklist?state=urgent", headers=STAFF_HEADERS
         )
         assert response.status_code == 422
+
+
+class TestVerificationSurvivesARereadOfTheReport:
+    """Found by the end-to-end journey, not by a unit test.
+
+    The builder is pure and knows nothing about verification; the verification
+    lives on the stored report row. Regenerating the report on every read — which
+    is right, because a document that arrived since changes it — dropped the
+    sign-off, so a signed record came back looking like a draft.
+    """
+
+    def test_a_verified_report_still_says_so_when_read_again(
+        self, app_client: Any, intake_id: str
+    ) -> None:
+        verified = app_client.post(
+            f"/api/v1/intakes/{intake_id}/verify",
+            headers=PHYSICIAN_HEADERS,
+            json={},
+        )
+        assert verified.status_code == 200, verified.text
+        assert verified.json()["physician_verified_by"] == "dr-sharma"
+
+        again = app_client.get(
+            f"/api/v1/intakes/{intake_id}/report", headers=STAFF_HEADERS
+        )
+        assert again.status_code == 200
+        assert again.json()["physician_verified_by"] == "dr-sharma"
+
+    def test_an_unverified_report_does_not_claim_a_signature(
+        self, app_client: Any, intake_id: str
+    ) -> None:
+        response = app_client.get(
+            f"/api/v1/intakes/{intake_id}/report", headers=STAFF_HEADERS
+        )
+        assert response.json()["physician_verified_by"] is None

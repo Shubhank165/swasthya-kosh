@@ -230,6 +230,9 @@ class TestTheRowCarriesNoClinicalText:
             "contradiction_count",
             "needs_verification",
             "repaired",
+            # A boolean. Says the repair path could not rescue the payload, not
+            # what was in it — 3/3 §4.1.
+            "needs_manual_review",
             "patient_ref_type",
             "seen_at",
         }

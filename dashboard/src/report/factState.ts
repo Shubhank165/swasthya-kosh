@@ -19,6 +19,7 @@ export type MarkerCode = 'uncertain' | 'repaired' | 'verify' | 'approximate' | '
 export type FactState =
   | 'confirmed'
   | 'verified'
+  | 'amended'
   | 'unresolved'
   | 'not_asked'
   | 'not_applicable'
@@ -60,6 +61,15 @@ export const STATE_STYLES: Record<FactState, StateStyle> = {
     glyph: '✓',
     chip: 'bg-verified-soft text-verified border-verified/30',
     showsOriginal: false,
+  },
+  amended: {
+    // Distinct from `verified`, and deliberately so. A value a doctor typed is
+    // a different claim from a value a doctor read and agreed with, and the
+    // next clinician to open this record should be able to tell which.
+    label: 'corrected by physician',
+    glyph: '✎',
+    chip: 'bg-verified-soft text-verified border-verified/30',
+    showsOriginal: true,
   },
   unresolved: {
     // "Not established", never "no" and never blank — §1 rule 3.
@@ -136,10 +146,15 @@ export interface LineLike {
 export interface FactLike {
   status?: string;
   physician_verified?: boolean;
+  physician_action?: string | null;
   repaired?: boolean;
   needs_verification?: boolean;
   confidence?: number | null;
-  carried_forward?: unknown;
+  carried_forward?: {
+    from_intake_id?: string;
+    originally_recorded?: string;
+    confirmed_today?: boolean | null;
+  } | null;
 }
 
 /**
@@ -153,7 +168,11 @@ export interface FactLike {
 export function statesFor(line: LineLike, fact?: FactLike): FactState[] {
   const states = new Set<FactState>();
 
-  if (fact?.physician_verified) states.add('verified');
+  // Amended supersedes verified rather than joining it: every amended fact is
+  // also `physician_verified`, and showing both chips would say the same thing
+  // twice while burying the half that matters.
+  if (fact?.physician_action === 'amended') states.add('amended');
+  else if (fact?.physician_verified) states.add('verified');
 
   switch (fact?.status) {
     case 'unresolved':

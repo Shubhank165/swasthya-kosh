@@ -118,7 +118,7 @@ class ReportService:
         text = builder.render_text(report, templates)
 
         now = self._clock.now()
-        await self._reports.upsert(
+        stored = await self._reports.upsert(
             report_id=self._ids.new_id("report"),
             hospital_id=hospital_id,
             intake_id=intake_id,
@@ -128,6 +128,15 @@ class ReportService:
             generated_at=now,
             service_date=self._service_date(),
         )
+        # Verification lives on the stored row and survives regeneration; the
+        # builder is pure and knows nothing about it. Without this line a report
+        # read back after sign-off comes out unverified, and the dashboard shows
+        # a signed record as a draft — which was the state of it until the
+        # end-to-end journey walked the whole sequence and noticed.
+        if stored.physician_verified_by is not None:
+            report = report.model_copy(
+                update={"physician_verified_by": stored.physician_verified_by}
+            )
         await self._bus.publish(
             Event(
                 name=EventName.REPORT_READY,

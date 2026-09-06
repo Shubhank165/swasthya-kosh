@@ -10,6 +10,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { EvidencePanel } from '../src/evidence/EvidencePanel';
+import { evidenceFromApi } from '../src/evidence/fromApi';
 
 describe('evidence by channel', () => {
   it('opens the transcript turn for a voice fact', () => {
@@ -100,5 +101,108 @@ describe('evidence by channel', () => {
   it('says nothing rather than guessing when there is no source', () => {
     render(<EvidencePanel loading={false} evidence={{ channel: 'unknown' }} />);
     expect(screen.getByText(/no source recorded/i)).toBeVisible();
+  });
+});
+
+/**
+ * The adapter between the backend's vocabulary and the panel's — `fromApi.ts`.
+ *
+ * Worth testing apart from the component because this is where two vocabularies
+ * meet: the backend speaks `FactChannel` (`voice`, `touch`, `document`,
+ * `prior_record`, `staff`) and the panel speaks in terms of what the physician
+ * is about to look at.
+ */
+describe('the backend payload as evidence', () => {
+  const base = {
+    fact_id: 'f-1',
+    field_id: 'known_diabetes',
+    status: 'answered',
+    certainty: 'reported',
+    recorded_at: '2026-09-06T09:00:00Z',
+  };
+
+  it('routes a carried-forward fact to the previous visit, whatever its channel', () => {
+    const evidence = evidenceFromApi({
+      ...base,
+      channel: 'prior_record',
+      source: { kind: 'entry', entered_by: 'carried_forward', prior_intake_id: 'i-0' },
+      carried_forward: {
+        from_intake_id: 'i-0',
+        originally_recorded: '2026-06-12',
+        confirmed_today: true,
+      },
+    });
+    expect(evidence.channel).toBe('carried_forward');
+    expect(evidence.originally_recorded).toBe('2026-06-12');
+    expect(evidence.confirmed_today).toBe(true);
+    expect(evidence.from_intake_id).toBe('i-0');
+  });
+
+  it('keeps "not re-asked" distinct from "the patient said no"', () => {
+    const evidence = evidenceFromApi({
+      ...base,
+      channel: 'prior_record',
+      source: { kind: 'entry', entered_by: 'carried_forward', prior_intake_id: 'i-0' },
+      carried_forward: { from_intake_id: 'i-0', originally_recorded: '2026-06-12' },
+    });
+    // `null`, not `false`. The panel renders it "Not asked".
+    expect(evidence.confirmed_today).toBeNull();
+
+    render(<EvidencePanel loading={false} evidence={evidence} />);
+    expect(screen.getByText('Not asked')).toBeVisible();
+  });
+
+  it('renders a tapped answer as a tap, not as speech with no confidence', () => {
+    const evidence = evidenceFromApi({
+      ...base,
+      channel: 'touch',
+      value: { kind: 'boolean', value: true },
+      source: { kind: 'turn', turn_id: 4, question_id: 'ask_diabetes' },
+    });
+    expect(evidence.channel).toBe('app');
+    expect(evidence.chosen_option).toBe('yes');
+    // A tap has no ASR confidence, and inventing 1.0 would make it look like a
+    // perfectly-heard answer rather than a different kind of answer.
+    expect(evidence.asr_confidence).toBeUndefined();
+  });
+
+  it('carries the signed document URL and the box through unchanged', () => {
+    const evidence = evidenceFromApi(
+      {
+        ...base,
+        channel: 'document',
+        value: { kind: 'quantity', magnitude: 8.2, unit: '%' },
+        original_text: 'HbA1c 8.2',
+        confidence: 0.71,
+        source: {
+          kind: 'document',
+          document_id: 'doc-1',
+          page: 1,
+          bbox: { x: 0.1, y: 0.2, width: 0.3, height: 0.05 },
+        },
+      },
+      { documentUrl: (id) => `https://signed.example/${id}.png` },
+    );
+    expect(evidence.image_url).toBe('https://signed.example/doc-1.png');
+    expect(evidence.bounding_box).toEqual({ x: 0.1, y: 0.2, width: 0.3, height: 0.05 });
+    expect(evidence.extracted_value).toBe('8.2 %');
+    expect(evidence.raw_text).toBe('HbA1c 8.2');
+  });
+
+  it('shows a staff-entered fact as thin provenance rather than dropping it', () => {
+    const evidence = evidenceFromApi({
+      ...base,
+      channel: 'staff',
+      value: { kind: 'text', text: 'Penicillin' },
+      source: { kind: 'entry', entered_by: 'nurse-2' },
+    });
+    expect(evidence.channel).toBe('entry');
+
+    render(<EvidencePanel loading={false} evidence={evidence} />);
+    // A fact with a blank evidence panel reads as a bug. A fact whose evidence
+    // is "a person typed this" has real, if thin, provenance — and the panel
+    // says out loud that nothing stands behind it.
+    expect(screen.getByText(/nurse-2/)).toBeVisible();
+    expect(screen.getByText(/No recording or document/i)).toBeVisible();
   });
 });
