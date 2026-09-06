@@ -43,6 +43,13 @@ writing for {project}/{region}.
 # free-text answer that must survive verbatim rather than being resolved.
 BROKEN = {
     "schema_version": "0.2",
+    # Present, and correct. The first run of this script omitted them, and the
+    # model supplied "unknown_intake_id" and "unknown_hospital_id" rather than
+    # leave a required field out — which is how `IDENTITY_KEYS` in
+    # `app/services/repair.py` came to exist. Keep them here: what this script
+    # is for now is checking the model leaves them alone when they are there.
+    "intake_id": "aa11bb22-0000-4000-8000-00000000dead",
+    "hospital_id": "aiia-delhi",
     "fields": [
         {"field_id": "chief_complaint", "status": "ANSWERED!!", "value": "chest pain"},
         {"field_id": "duration"},
@@ -85,9 +92,22 @@ async def main(image_path: Path) -> int:
     # ambiguity. "maybe two weeks" is the patient's answer, and an intake that
     # turns it into "14 days" has invented a clinical fact.
     blob = json.dumps(repaired, ensure_ascii=False)
-    verdict = "kept" if "maybe two weeks" in blob else "LOST — the model rewrote it"
-    print(f"\n  original text: {verdict}")
-    return 0 if "maybe two weeks" in blob else 1
+    ok = True
+
+    if "maybe two weeks" in blob:
+        print("\n  original text: kept")
+    else:
+        print("\n  original text: LOST — the model rewrote it")
+        ok = False
+
+    for key in ("intake_id", "hospital_id"):
+        if repaired.get(key) == BROKEN[key]:
+            print(f"  {key}: unchanged")
+        else:
+            print(f"  {key}: CHANGED to {repaired.get(key)!r} — repair would be rejected")
+            ok = False
+
+    return 0 if ok else 1
 
 
 def _schema() -> dict:

@@ -124,6 +124,46 @@ def _changed_fields(
     )
 
 
+#: Keys repair is never allowed to touch. Everything here answers "which record
+#: is this, and whose", and none of it is a formatting problem a model could
+#: help with.
+IDENTITY_KEYS: frozenset[str] = frozenset(
+    {"schema_version", "intake_id", "hospital_id", "kiosk_id"}
+)
+
+
+def _identity_violation(
+    before: Mapping[str, Any], after: Mapping[str, Any]
+) -> str | None:
+    """The identity key repair changed or invented, if any.
+
+    The first live call against Vertex was handed a payload with no `intake_id`
+    and no `hospital_id` — both required by the contract — and the model
+    supplied `"unknown_intake_id"` and `"unknown_hospital_id"`. It satisfied the
+    schema, so `validate()` passed it, and it had invented the two fields that
+    say which patient's record this is and which hospital owns it.
+
+    `ingest` overwrites `hospital_id` from the kiosk token *before* repair runs,
+    so a changed one would have been silently re-filed under whatever the model
+    wrote. A changed `intake_id` is the defect this session already fixed once
+    from the other end: the record is accepted under an id the kiosk does not
+    have, and every document and consent artefact that follows 404s against a
+    record that exists.
+
+    The instruction already forbids inventing. An instruction is not a
+    guarantee, which is the reasoning the adapter's own docstring gives for
+    re-validating at all; this is the same reasoning applied to the fields where
+    invention is worst.
+    """
+    for key in IDENTITY_KEYS:
+        if key not in before:
+            if key in after:
+                return key
+        elif before[key] != after.get(key):
+            return key
+    return None
+
+
 async def attempt(
     payload: Mapping[str, Any],
     *,
@@ -165,6 +205,21 @@ async def attempt(
             break
         ok, current_errors = validate(candidate)
         if ok:
+            violated = _identity_violation(payload, candidate)
+            if violated is not None:
+                # Not a retry. A model that rewrote the record's identity once
+                # is not more trustworthy on the second pass, and the payload
+                # is stored raw either way — `needs_manual_review` on a record
+                # nobody can mis-file beats a repaired record filed under an
+                # invented id.
+                logger.warning(
+                    "repair_rejected_identity_change",
+                    provider=provider.name,
+                    key=violated,
+                )
+                return RepairOutcome(
+                    payload=None, errors=errors, reason="repair_changed_identity"
+                )
             logger.info(
                 "repair_succeeded", attempt=attempt_number, provider=provider.name
             )

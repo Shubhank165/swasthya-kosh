@@ -345,8 +345,12 @@ class IngestService:
                 error_detail={"errors": [dict(e) for e in outcome.errors]},
                 payload=dict(payload),
                 payload_fingerprint=fingerprint,
+                # A repair that ran and was thrown out still ran. The two
+                # reasons that are *not* an attempt are "repair_disabled" and
+                # "unsupported_version", where the provider was never called.
                 repair_attempted=self._repair is not None
-                and outcome.reason == "repair_failed",
+                and outcome.reason
+                in ("repair_failed", "repair_changed_identity"),
                 received_at=now,
             )
 

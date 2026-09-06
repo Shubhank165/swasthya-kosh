@@ -25,7 +25,10 @@ project, never in CI, and the mock is what the test suite runs.
 from __future__ import annotations
 
 import json
+from datetime import date
 from typing import Any
+
+from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.core.errors import MediKioskError
@@ -53,6 +56,9 @@ Rules, all of them absolute:
 - Do not add a diagnosis, an impression or any advice.
 - Give every item a page number, a bounding box in normalised 0..1 coordinates,
   a confidence in 0..1, and the raw text exactly as it appears.
+- document_date: ISO 8601 only, YYYY-MM-DD. A date printed 04/09/2026 on an
+  Indian document is 4 September 2026; write it 2026-09-04. If the printed date
+  is ambiguous, undated or unclear, omit the field entirely. Never guess a date.
 """
 
 
@@ -190,8 +196,57 @@ def _to_extraction(
         items.append(entry)
     body["items"] = items
     body["redactions"] = counts
+    _drop_unparseable_date(body, document_id=document_id)
 
-    return DocumentExtraction.model_validate(body)
+    try:
+        return DocumentExtraction.model_validate(body)
+    except ValidationError:
+        # The model answered, and what it answered does not fit the contract.
+        #
+        # This has to be a verdict rather than an exception. The caller has
+        # already marked the row `processing`, and in the cloud it is a Pub/Sub
+        # push: raising here leaves the document stuck, 500s the push, and burns
+        # all five delivery attempts before dead-lettering something a person
+        # could have looked at immediately. A rejected document is visible. A
+        # stuck one is not.
+        #
+        # No `exc_info`, and no field names: a pydantic error message quotes the
+        # offending input, and the offending input is the document (§1 rule 7).
+        logger.warning("ocr_response_off_contract", document_id=document_id)
+        return DocumentExtraction(
+            document_id=document_id,
+            kind=hint or DocumentKind.OTHER,
+            quality=QualityVerdict.REJECTED,
+            quality_reason="provider returned a response that failed validation",
+            provider="gemini",
+            model_id=model_id,
+        )
+
+
+def _drop_unparseable_date(body: dict[str, Any], *, document_id: str) -> None:
+    """Keep `document_date` only when it is unambiguously ISO 8601.
+
+    The first live call against Vertex returned `"04/09/2026"` — the date as
+    printed, which is what "transcribe only" asks for everywhere else in this
+    contract, and which pydantic rejects. The instruction and the schema now
+    both say ISO; this is what happens when the model does it anyway.
+
+    Dropping it is the only correct answer. `04/09/2026` is 4 September to an
+    Indian clerk and 9 April to an American parser, and this codebase does not
+    resolve an ambiguity on a patient's behalf — repair does not, the walker
+    does not, and neither does this. The date is still in `page_text` exactly as
+    printed, so nothing is lost that a physician cannot read; what is lost is a
+    structured date nobody could have trusted.
+    """
+    value = body.get("document_date")
+    if value in (None, ""):
+        body.pop("document_date", None)
+        return
+    try:
+        date.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        logger.info("ocr_document_date_not_iso", document_id=document_id)
+        body.pop("document_date", None)
 
 
 def _response_schema() -> dict[str, Any]:
@@ -208,7 +263,10 @@ def _response_schema() -> dict[str, Any]:
                 "enum": ["prescription", "lab_report", "discharge_summary", "other"],
             },
             "page_count": {"type": "integer"},
-            "document_date": {"type": "string"},
+            "document_date": {
+                "type": "string",
+                "description": "ISO 8601 date, YYYY-MM-DD. Omit if not printed or ambiguous.",
+            },
             "issuing_facility": {"type": "string"},
             "overall_confidence": {"type": "number"},
             "pages": {"type": "array", "items": {"type": "string"}},

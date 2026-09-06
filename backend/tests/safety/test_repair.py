@@ -7,6 +7,8 @@ Three claims:
 2. A payload that cannot be repaired is **stored and flagged, never dropped**.
 3. Repair never invents a value. A field with no answer comes back
    `unresolved`, not filled in.
+4. Repair never rewrites the record's identity — not `intake_id`, not
+   `hospital_id`, not even to fill one in that was missing.
 
 The third is the one that matters. A repair step that quietly resolved
 ambiguities would be a language model editing a clinical record, which is the
@@ -336,6 +338,97 @@ class TestTheRepairRateIsReported:
             "needs_manual_review": 0,
             "repair_rate": 0.5,
         }
+
+
+class TestRepairCannotRewriteWhoTheRecordIs:
+    """Claim 4, and it came from a live model rather than from imagination.
+
+    The first call against Vertex was handed a payload with no `intake_id` and
+    no `hospital_id`. The contract requires both, so the model — obeying the
+    schema and disobeying the instruction — supplied `"unknown_intake_id"` and
+    `"unknown_hospital_id"`. The result validated.
+
+    Both are worse than a failed repair. `ingest` sets `hospital_id` from the
+    kiosk token before repair runs, so a changed one re-files the record under
+    whatever the model wrote; a changed `intake_id` accepts the record under an
+    id the kiosk does not have, and every document and consent artefact that
+    follows 404s against a record that exists.
+    """
+
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("intake_id", "11112222-0000-4000-8000-000000000001"),
+            ("hospital_id", "some-other-hospital"),
+        ],
+    )
+    async def test_a_changed_identity_field_throws_the_repair_away(
+        self, key: str, value: str
+    ) -> None:
+        outcome = await repair_path.attempt(
+            malformed(), provider=_rewriting_provider({key: value})
+        )
+        assert outcome.payload is None
+        assert outcome.repaired is False
+        assert outcome.reason == "repair_changed_identity"
+
+    async def test_an_invented_identity_field_throws_the_repair_away(self) -> None:
+        """Absent is not the same as wrong, and it is not better.
+
+        A payload with no `kiosk_id` came from somewhere that did not say which
+        kiosk. A repaired one that names a kiosk is a provenance claim nobody
+        made.
+        """
+        payload = malformed()
+        payload.pop("kiosk_id", None)
+        outcome = await repair_path.attempt(
+            payload, provider=_rewriting_provider({"kiosk_id": "kiosk-9"})
+        )
+        assert outcome.payload is None
+        assert outcome.reason == "repair_changed_identity"
+
+    def test_schema_version_is_guarded_too(self) -> None:
+        """No behavioural test, because the contracts make it unexploitable.
+
+        A 0.1 payload relabelled 0.2 fails 0.2's validation and a 0.2 payload
+        relabelled 0.1 fails 0.1's, so a downgraded version never reaches the
+        guard today. It is in the set anyway: which contract a record was
+        written against is part of what the record *is*, and the next version
+        need not be shaped so that a relabel is obviously wrong.
+        """
+        assert "schema_version" in repair_path.IDENTITY_KEYS
+
+    async def test_a_repair_that_leaves_identity_alone_still_works(self) -> None:
+        """The guard has to be narrow or it is just a way of refusing repairs."""
+        outcome = await repair_path.attempt(
+            malformed(), provider=MockRepairProvider()
+        )
+        assert outcome.payload is not None
+        assert outcome.repaired is True
+        assert outcome.payload["hospital_id"] == HOSPITAL_ID
+
+
+def _rewriting_provider(overrides: dict[str, Any]) -> Any:
+    """A provider that repairs correctly and then changes one identity field.
+
+    Deliberately built on the mock rather than returning a hand-written payload:
+    the candidate has to *validate*, or the guard would never be reached and
+    this test would pass for the wrong reason.
+    """
+
+    class _Rewriting:
+        name = "rewriting"
+
+        async def repair(
+            self, payload: Any, *, schema: Any, errors: Any
+        ) -> Any:
+            repaired = await MockRepairProvider().repair(
+                payload, schema=schema, errors=errors
+            )
+            assert repaired is not None
+            return {**repaired, **overrides}
+
+    return _Rewriting()
 
 
 def _recording_provider() -> Any:
