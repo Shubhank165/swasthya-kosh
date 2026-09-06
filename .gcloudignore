@@ -1,0 +1,28 @@
+# What Cloud Build does *not* need to upload.
+#
+# gcloud reads this file, not `.dockerignore` — the two are separate, and
+# without this the build context was 369 MB of mostly `node_modules`, uploaded
+# from a laptop on every build.
+.git/
+.gitignore
+
+# Node and Flutter dependency trees: both are reinstalled inside their own
+# builds and neither is part of the backend image.
+dashboard/node_modules/
+dashboard/dist/
+app/build/
+app/.dart_tool/
+app/.pub-cache/
+
+__pycache__/
+*.pyc
+.venv/
+backend/.venv/
+backend/uploads/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local state that must never reach a build, let alone an image.
+.env
+*.local
