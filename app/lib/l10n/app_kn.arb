@@ -64,5 +64,9 @@
   "abhaExplanation": "ಜೋಡಿಸಿದರೆ ಆಸ್ಪತ್ರೆ ನಿಮ್ಮ ಹಿಂದಿನ ಭೇಟಿಗಳನ್ನು ನೋಡಬಹುದು. ಇದನ್ನು ಬಿಟ್ಟು ಮುಂದುವರಿಯಬಹುದು.",
   "abhaAddressLabel": "ABHA ವಿಳಾಸ",
   "abhaNotFound": "ಆ ವಿಳಾಸ ಸಿಗಲಿಲ್ಲ. ಅದಿಲ್ಲದೆ ಮುಂದುವರಿಯಬಹುದು.",
-  "skipForNow": "ಬಿಟ್ಟುಬಿಡಿ"
+  "skipForNow": "ಬಿಟ್ಟುಬಿಡಿ",
+  "doneLabel": "ಮುಗಿದಿದೆ",
+  "@doneLabel": {
+    "description": "Closes the finished intake and returns to the start"
+  }
 }

@@ -158,6 +158,7 @@ void main() {
         referenceCode: 'MK-4821',
         hospitalName: 'AIIA, New Delhi',
         queued: false,
+        onDone: _noop,
       )));
       expect(find.text('MK-4821'), findsOneWidget);
       expect(find.text('Show this code at the registration desk.'), findsOneWidget);
@@ -171,6 +172,7 @@ void main() {
         referenceCode: 'MK-4821',
         hospitalName: 'AIIA, New Delhi',
         queued: true,
+        onDone: _noop,
       )));
       expect(
         find.text('Saved on this phone. It will be sent when you are back online.'),
@@ -185,10 +187,28 @@ void main() {
         referenceCode: 'MK-4821',
         hospitalName: 'AIIA',
         queued: false,
+        onDone: _noop,
       )));
       for (final word in ['appointment', 'booked', 'slot', 'token number']) {
         expect(find.textContaining(word), findsNothing);
       }
     });
+
+    testWidgets('there is a way off this screen', (tester) async {
+      // It had none. The only exit was the system back gesture, which pops the
+      // intake and drops the patient on the language chooser looking like the
+      // app forgot what they just did.
+      var done = false;
+      await tester.pumpWidget(wrap(SubmittedScreen(
+        referenceCode: 'MK-4821',
+        hospitalName: 'AIIA',
+        queued: false,
+        onDone: () => done = true,
+      )));
+      await tester.tap(find.byKey(const Key('submitted.done')));
+      expect(done, isTrue);
+    });
   });
 }
+
+void _noop() {}

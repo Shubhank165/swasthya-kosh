@@ -64,5 +64,9 @@
   "abhaExplanation": "இணைத்தால், மருத்துவமனை உங்கள் முந்தைய வருகைகளைக் காணும். இதைத் தவிர்த்துத் தொடரலாம்.",
   "abhaAddressLabel": "ABHA முகவரி",
   "abhaNotFound": "அந்த முகவரி கிடைக்கவில்லை. அது இல்லாமல் தொடரலாம்.",
-  "skipForNow": "தவிர்"
+  "skipForNow": "தவிர்",
+  "doneLabel": "முடிந்தது",
+  "@doneLabel": {
+    "description": "Closes the finished intake and returns to the start"
+  }
 }

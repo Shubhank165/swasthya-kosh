@@ -64,5 +64,9 @@
   "abhaExplanation": "జోడిస్తే, ఆసుపత్రి మీ గత సందర్శనలను చూడగలదు. దీన్ని దాటవేసి కొనసాగవచ్చు.",
   "abhaAddressLabel": "ABHA చిరునామా",
   "abhaNotFound": "ఆ చిరునామా దొరకలేదు. అది లేకుండా కొనసాగవచ్చు.",
-  "skipForNow": "దాటవేయి"
+  "skipForNow": "దాటవేయి",
+  "doneLabel": "పూర్తయింది",
+  "@doneLabel": {
+    "description": "Closes the finished intake and returns to the start"
+  }
 }

@@ -64,5 +64,9 @@
   "abhaExplanation": "ਜੋੜਨ 'ਤੇ ਹਸਪਤਾਲ ਤੁਹਾਡੀਆਂ ਪਿਛਲੀਆਂ ਮੁਲਾਕਾਤਾਂ ਵੇਖ ਸਕਦਾ ਹੈ। ਤੁਸੀਂ ਇਹ ਛੱਡ ਕੇ ਅੱਗੇ ਵਧ ਸਕਦੇ ਹੋ।",
   "abhaAddressLabel": "ABHA ਪਤਾ",
   "abhaNotFound": "ਉਹ ਪਤਾ ਨਹੀਂ ਮਿਲਿਆ। ਤੁਸੀਂ ਇਸ ਤੋਂ ਬਿਨਾਂ ਅੱਗੇ ਵਧ ਸਕਦੇ ਹੋ।",
-  "skipForNow": "ਛੱਡੋ"
+  "skipForNow": "ਛੱਡੋ",
+  "doneLabel": "ਹੋ ਗਿਆ",
+  "@doneLabel": {
+    "description": "Closes the finished intake and returns to the start"
+  }
 }

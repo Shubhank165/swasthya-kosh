@@ -273,5 +273,9 @@
   "skipForNow": "Skip",
   "@skipForNow": {
     "description": "Leaves the ABHA screen without linking. Distinct from answerSkip, which skips a clinical question and records not_asked."
+  },
+  "doneLabel": "Done",
+  "@doneLabel": {
+    "description": "Closes the finished intake and returns to the start"
   }
 }

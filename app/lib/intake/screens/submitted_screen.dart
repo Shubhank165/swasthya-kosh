@@ -18,10 +18,19 @@ class SubmittedScreen extends StatelessWidget {
     required this.referenceCode,
     required this.hospitalName,
     required this.queued,
+    required this.onDone,
   });
 
   final String referenceCode;
   final String hospitalName;
+
+  /// Closes the finished intake.
+  ///
+  /// This screen had no control on it at all, so the only way off was the
+  /// system back gesture — which pops the intake route and drops the patient on
+  /// the language chooser with no explanation. Finishing something has to be
+  /// something you *do*, not something you escape from.
+  final VoidCallback onDone;
 
   /// True when the record is on the device waiting for a connection rather than
   /// accepted by the hospital. The patient is told which, plainly: a code they
@@ -82,6 +91,13 @@ class SubmittedScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
+              const Spacer(),
+              FilledButton(
+                key: const Key('submitted.done'),
+                onPressed: onDone,
+                child: Text(strings.doneLabel),
+              ),
+              const SizedBox(height: Sizes.gutter),
             ],
           ),
         ),

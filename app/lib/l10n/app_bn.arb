@@ -64,5 +64,9 @@
   "abhaExplanation": "যুক্ত করলে হাসপাতাল আপনার আগের ভিজিট দেখতে পারবে। আপনি এটি এড়িয়ে এগিয়ে যেতে পারেন।",
   "abhaAddressLabel": "ABHA ঠিকানা",
   "abhaNotFound": "আমরা সেই ঠিকানা পাইনি। আপনি এটি ছাড়াই এগিয়ে যেতে পারেন।",
-  "skipForNow": "এড়িয়ে যান"
+  "skipForNow": "এড়িয়ে যান",
+  "doneLabel": "সম্পন্ন",
+  "@doneLabel": {
+    "description": "Closes the finished intake and returns to the start"
+  }
 }

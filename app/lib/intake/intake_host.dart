@@ -62,6 +62,10 @@ class _IntakeHostState extends ConsumerState<IntakeHost> {
             referenceCode: flow.referenceCode,
             hospitalName: flow.hospitalName,
             queued: flow.queued,
+            // Back to the start today; back to the home screen once there is
+            // one (stage 4). Either way it is a button the patient presses,
+            // not a gesture they resort to.
+            onDone: () => Navigator.of(context).popUntil((route) => route.isFirst),
           ),
       },
     );
