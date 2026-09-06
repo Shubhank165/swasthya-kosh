@@ -284,14 +284,14 @@ EXTRACTIONS: dict[str, dict[str, Any]] = {
         "page_count": 1,
         "overall_confidence": 0.88,
         "page_text": [
-            "Patient: [name]\nAadhaar: 4321 8765 2109\nMobile: 9876543210\n"
+            "Patient: [name]\nAadhaar: 4321 8765 2108\nMobile: 9876543210\n"
             "Rx: Tab. Metformin 500 mg BD\n"
         ],
         "items": [
             {
                 "item_id": "item_leak1",
                 "kind": "other",
-                "raw_text": "Aadhaar: 4321 8765 2109  Mobile: 9876543210",
+                "raw_text": "Aadhaar: 4321 8765 2108  Mobile: 9876543210",
                 "page": 1,
                 "bbox": _bbox(0.08, 0.12),
                 "confidence": 0.88,

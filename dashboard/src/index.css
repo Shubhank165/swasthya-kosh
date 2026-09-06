@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { color-scheme: light; }
+  body { @apply bg-surface-sunken text-ink font-sans text-[15px] antialiased; }
+  /* A visible focus ring everywhere: §9 requires the report to be workable
+     without a mouse, and an invisible focus is an unworkable one. */
+  :focus-visible { @apply outline-none ring-2 ring-accent ring-offset-1; }
+}

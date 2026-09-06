@@ -15,6 +15,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 say "Project ${PROJECT_ID}, region ${REGION}"
 
+if [[ "${SQL_PITR}" == "true" ]]; then
+  SQL_PITR_FLAG="--enable-point-in-time-recovery"
+else
+  SQL_PITR_FLAG="--no-enable-point-in-time-recovery"
+  say "Point-in-time recovery is OFF (SQL_PITR=false)"
+fi
+
 # --- APIs -------------------------------------------------------------------
 say "Enabling APIs"
 gc services enable \
@@ -95,15 +102,20 @@ else
   # No public IP. Deletion protection on: this holds patient records, and the
   # cost of an accidental `gcloud sql instances delete` is not recoverable from
   # a backup that was taken after the delete.
+  # `--edition=ENTERPRISE` explicitly: gcloud now defaults Postgres 16 to
+  # ENTERPRISE_PLUS, which accepts only `db-perf-optimized-*` machine types and
+  # rejects every shared-core tier. The default silently triples the bill of the
+  # one resource here that runs whether or not anybody uses it.
   gc sql instances create "${SQL_INSTANCE}" \
     --database-version=POSTGRES_16 \
+    --edition=ENTERPRISE \
     --region="${REGION}" \
     --tier="${SQL_TIER}" \
     --storage-auto-increase \
     --network="projects/${PROJECT_ID}/global/networks/${VPC_NETWORK}" \
     --no-assign-ip \
     --backup-start-time=19:30 \
-    --enable-point-in-time-recovery \
+    ${SQL_PITR_FLAG} \
     --deletion-protection
   made "${SQL_INSTANCE}"
 fi

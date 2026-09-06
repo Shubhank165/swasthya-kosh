@@ -37,7 +37,20 @@ IMAGE_BASE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}"
 SQL_INSTANCE="${SQL_INSTANCE:-medikiosk-pg}"
 SQL_DATABASE="${SQL_DATABASE:-medikiosk}"
 SQL_USER="${SQL_USER:-medikiosk}"
-SQL_TIER="${SQL_TIER:-db-custom-1-3840}"
+# The database is the one resource here that costs money whether or not anybody
+# uses it: Cloud Run scales to zero, Cloud SQL does not.
+#
+# `db-g1-small` is a shared-core tier at roughly a third the price of the
+# dedicated-core `db-custom-1-3840` this used to default to, and it is ample for
+# an OPD's intake volume — the workload is a few hundred small writes a day, not
+# a transaction system. Raise it for a real deployment; the knob is here so that
+# is a decision somebody makes rather than a default nobody read.
+SQL_TIER="${SQL_TIER:-db-g1-small}"
+
+# Point-in-time recovery keeps write-ahead logs and bills for them, and it is
+# not supported on every shared-core tier. On by default because losing a day of
+# intakes is worse than the storage; off for a demo deployment on a budget.
+SQL_PITR="${SQL_PITR:-true}"
 
 BUCKET="${BUCKET:-${PROJECT_ID}-medikiosk-documents}"
 
