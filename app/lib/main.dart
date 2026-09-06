@@ -13,7 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/providers.dart';
 import 'core/theme.dart';
-import 'intake/screens/start_screen.dart';
+import 'home/root.dart';
 
 void main() {
   runApp(const ProviderScope(child: MediKioskApp()));
@@ -30,6 +30,13 @@ class _MediKioskAppState extends ConsumerState<MediKioskApp> {
   @override
   void initState() {
     super.initState();
+    // Adopt the remembered language before the first frame that needs it.
+    // `languageProvider` is what every screen reads; `storedLanguageProvider`
+    // is what survives a restart, and this is the one place they are joined.
+    ref.listenManual(storedLanguageProvider, (_, next) {
+      final stored = next.valueOrNull;
+      if (stored != null) ref.read(languageProvider.notifier).state = stored;
+    }, fireImmediately: true);
     // Drain the submission queue on launch — §9, §15 item 8.
     //
     // Unawaited and unannounced: an intake finished on a train goes out the
@@ -55,7 +62,7 @@ class _MediKioskAppState extends ConsumerState<MediKioskApp> {
       // The OS text-scale setting is respected up to 200% (§14). Clamped at the
       // top so the "I don't know" affordance cannot be pushed off screen.
       builder: (context, child) => withClampedTextScale(context, child!),
-      home: const StartScreen(),
+      home: const Root(),
     );
   }
 }

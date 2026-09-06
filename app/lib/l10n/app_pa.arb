@@ -68,5 +68,61 @@
   "doneLabel": "ਹੋ ਗਿਆ",
   "@doneLabel": {
     "description": "Closes the finished intake and returns to the start"
+  },
+  "homeTab": "ਹੋਮ",
+  "@homeTab": {
+    "description": ""
+  },
+  "documentsTab": "ਦਸਤਾਵੇਜ਼",
+  "@documentsTab": {
+    "description": ""
+  },
+  "visitsTab": "ਮੇਰੀਆਂ ਮੁਲਾਕਾਤਾਂ",
+  "@visitsTab": {
+    "description": ""
+  },
+  "profileTab": "ਪ੍ਰੋਫਾਈਲ",
+  "@profileTab": {
+    "description": ""
+  },
+  "newIntakeTitle": "ਨਵੀਂ ਮੁਲਾਕਾਤ ਸ਼ੁਰੂ ਕਰੋ",
+  "@newIntakeTitle": {
+    "description": ""
+  },
+  "newIntakeSubtitle": "ਡਾਕਟਰ ਨੂੰ ਮਿਲਣ ਤੋਂ ਪਹਿਲਾਂ ਕੁਝ ਸਵਾਲਾਂ ਦੇ ਜਵਾਬ ਦਿਓ",
+  "@newIntakeSubtitle": {
+    "description": ""
+  },
+  "ayushTitle": "ਆਯੂਸ਼ ਮੁਲਾਂਕਣ",
+  "@ayushTitle": {
+    "description": ""
+  },
+  "notAvailableYet": "ਅਜੇ ਉਪਲਬਧ ਨਹੀਂ",
+  "@notAvailableYet": {
+    "description": ""
+  },
+  "noDocumentsYet": "ਅਜੇ ਕੋਈ ਦਸਤਾਵੇਜ਼ ਨਹੀਂ",
+  "@noDocumentsYet": {
+    "description": ""
+  },
+  "noVisitsYet": "ਅਜੇ ਕੋਈ ਮੁਲਾਕਾਤ ਨਹੀਂ",
+  "@noVisitsYet": {
+    "description": ""
+  },
+  "profilePhone": "ਫ਼ੋਨ",
+  "@profilePhone": {
+    "description": ""
+  },
+  "profileLanguage": "ਭਾਸ਼ਾ",
+  "@profileLanguage": {
+    "description": ""
+  },
+  "profileAbha": "ਆਭਾ ਪਤਾ",
+  "@profileAbha": {
+    "description": ""
+  },
+  "notLinked": "ਲਿੰਕ ਨਹੀਂ ਹੈ",
+  "@notLinked": {
+    "description": ""
   }
 }

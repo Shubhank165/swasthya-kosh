@@ -190,6 +190,14 @@ class DocumentService:
         row = await self._documents.get(hospital_id=hospital_id, document_id=document_id)
         return await self._storage.signed_url(row.storage_key, ttl_seconds=self._ttl)
 
+    async def list_for_intakes(
+        self, *, hospital_id: str, intake_ids: Sequence[str]
+    ) -> Sequence[Any]:
+        """Document rows across several intakes, newest first."""
+        return await self._documents.for_intakes(
+            hospital_id=hospital_id, intake_ids=intake_ids
+        )
+
     async def list_for_intake(self, *, hospital_id: str, intake_id: str) -> Sequence[Any]:
         """Document rows for an intake, newest last."""
         return await self._documents.for_intake(

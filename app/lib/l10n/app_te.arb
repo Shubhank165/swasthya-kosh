@@ -68,5 +68,61 @@
   "doneLabel": "పూర్తయింది",
   "@doneLabel": {
     "description": "Closes the finished intake and returns to the start"
+  },
+  "homeTab": "హోమ్",
+  "@homeTab": {
+    "description": ""
+  },
+  "documentsTab": "పత్రాలు",
+  "@documentsTab": {
+    "description": ""
+  },
+  "visitsTab": "నా సందర్శనలు",
+  "@visitsTab": {
+    "description": ""
+  },
+  "profileTab": "ప్రొఫైల్",
+  "@profileTab": {
+    "description": ""
+  },
+  "newIntakeTitle": "కొత్త సందర్శన ప్రారంభించండి",
+  "@newIntakeTitle": {
+    "description": ""
+  },
+  "newIntakeSubtitle": "వైద్యుడిని కలవడానికి ముందు కొన్ని ప్రశ్నలకు సమాధానం ఇవ్వండి",
+  "@newIntakeSubtitle": {
+    "description": ""
+  },
+  "ayushTitle": "ఆయుష్ మూల్యాంకనం",
+  "@ayushTitle": {
+    "description": ""
+  },
+  "notAvailableYet": "ఇంకా అందుబాటులో లేదు",
+  "@notAvailableYet": {
+    "description": ""
+  },
+  "noDocumentsYet": "ఇంకా పత్రాలు లేవు",
+  "@noDocumentsYet": {
+    "description": ""
+  },
+  "noVisitsYet": "ఇంకా సందర్శనలు లేవు",
+  "@noVisitsYet": {
+    "description": ""
+  },
+  "profilePhone": "ఫోన్",
+  "@profilePhone": {
+    "description": ""
+  },
+  "profileLanguage": "భాష",
+  "@profileLanguage": {
+    "description": ""
+  },
+  "profileAbha": "ఆభా చిరునామా",
+  "@profileAbha": {
+    "description": ""
+  },
+  "notLinked": "లింక్ చేయబడలేదు",
+  "@notLinked": {
+    "description": ""
   }
 }

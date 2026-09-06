@@ -25,7 +25,12 @@ from app.core.errors import ValidationError
 from app.core.ids import IdFactory
 from app.core.logging import get_logger
 from app.domain.clinical.enums import Section
-from app.domain.record import FieldStatus, PatientRef, PatientRefType
+from app.domain.record import (
+    CanonicalRecord,
+    FieldStatus,
+    PatientRef,
+    PatientRefType,
+)
 from app.repositories.intakes import IntakeRepository
 from app.repositories.patients import PatientRepository
 
@@ -37,6 +42,27 @@ logger = get_logger(__name__)
 CARRY_FORWARD_SECTIONS: frozenset[Section] = frozenset(
     {Section.PAST_MEDICAL, Section.MEDICATIONS, Section.ALLERGIES}
 )
+
+
+def _complaint_of(record: CanonicalRecord) -> str | None:
+    """What the patient said was wrong, in their own words where they exist.
+
+    `original_text` first and the coded value second, which is the order used
+    everywhere a human reads a fact: "seene mein dard" is what the patient said
+    and `chest_pain` is what it was coded as, and only one of those is worth
+    showing back to them.
+
+    Returns `None` rather than a placeholder when the field is not answered — a
+    visit with no recorded complaint is a real state, and "Unknown" printed in
+    a list of a patient's own visits reads like the record was lost.
+    """
+    for fact in record.live_facts():
+        if fact.field_id != "chief_complaint":
+            continue
+        if fact.status is not FieldStatus.ANSWERED:
+            return None
+        return fact.original_text or fact.rendered_value()
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -231,6 +257,10 @@ class IdentityService:
             ref_value=ref.value,
             limit=limit,
         )
+        # `complaint` is filled in below, from the record each row's
+        # carry-forward pass already loads. Without it a patient's own list of
+        # visits reads "6 September, Kayachikitsa" and says nothing about which
+        # visit that was.
         summaries = [
             {
                 "intake_id": row.id,
@@ -239,13 +269,16 @@ class IdentityService:
                 "department_code": row.department_code,
                 "received_at": row.received_at.isoformat(),
                 "seen_at": row.seen_at.isoformat() if row.seen_at else None,
+                "complaint": None,
             }
             for row in rows
         ]
+        by_intake = {summary["intake_id"]: summary for summary in summaries}
 
         carried: dict[str, CarriedFact] = {}
         for row in rows:
             record = await self._intakes.load(hospital_id=hospital_id, intake_id=row.id)
+            by_intake[row.id]["complaint"] = _complaint_of(record)
             for fact in record.live_facts():
                 if fact.section not in CARRY_FORWARD_SECTIONS:
                     continue

@@ -83,6 +83,10 @@ class AuthRepository {
   Future<AuthResult> verify({
     required String challengeId,
     required String code,
+    /// Kept only so the profile screen can show the patient which number they
+    /// are signed in as. The backend holds a peppered HMAC and cannot send the
+    /// digits back, so if this app does not keep them nothing can.
+    String? phone,
   }) async {
     final Response<Map<String, dynamic>> response;
     try {
@@ -109,11 +113,15 @@ class AuthRepository {
     await _sessions.save(
       token: response.data!['token'] as String,
       patientRef: response.data!['patient_ref'] as String,
+      phone: phone,
     );
     return const AuthResult(ok: true);
   }
 
   Future<bool> isSignedIn() async => (await _sessions.token()) != null;
+
+  /// The number this session was signed in with, for the profile screen.
+  Future<String?> phone() => _sessions.phone();
 
   /// Sign in without a screen, for walking the app during development.
   ///
@@ -132,7 +140,11 @@ class AuthRepository {
       final challenge = await requestCode(phone);
       final code = challenge?.code;
       if (challenge == null || code == null) return false;
-      final result = await verify(challengeId: challenge.challengeId, code: code);
+      final result = await verify(
+        challengeId: challenge.challengeId,
+        code: code,
+        phone: phone,
+      );
       return result.ok;
     } on Object {
       // A shortcut that cannot reach the backend is a shortcut that does not

@@ -15,6 +15,7 @@ import '../consent/consent_repository.dart';
 import '../content/bundle.dart';
 import '../content/bundle_repository.dart';
 import '../documents/document_store.dart';
+import '../documents/patient_documents.dart';
 import '../identity/abha_repository.dart';
 import '../identity/auth_repository.dart';
 import '../identity/history_repository.dart';
@@ -83,6 +84,25 @@ final historyRepositoryProvider = Provider<HistoryRepository>(
 /// Empty for a guest and empty on any failure; it must never block an intake.
 final carryForwardProvider = FutureProvider<List<CarriedFact>>(
   (ref) => ref.watch(historyRepositoryProvider).carryForward(),
+);
+
+/// The document library behind the Documents tab — stage 4.
+final patientDocumentsRepositoryProvider = Provider<PatientDocumentsRepository>(
+  (ref) => PatientDocumentsRepository(api: ref.watch(apiProvider)),
+);
+
+final patientDocumentsProvider = FutureProvider<List<PatientDocument>>(
+  (ref) => ref.watch(patientDocumentsRepositoryProvider).list(),
+);
+
+/// The number the current session was signed in with, or null.
+final signedInPhoneProvider = FutureProvider<String?>(
+  (ref) => ref.watch(authProvider).phone(),
+);
+
+/// Past visits, for the visits tab — stage 4.
+final visitsProvider = FutureProvider<List<Visit>>(
+  (ref) => ref.watch(historyRepositoryProvider).visits(),
 );
 
 /// Where captured pages live before they upload.
@@ -176,6 +196,18 @@ final signedInProvider = FutureProvider<bool>((ref) async {
 /// where the bundle has no prompt the walker records `not_asked` rather than
 /// falling back.
 final languageProvider = StateProvider<String>((ref) => 'en');
+
+/// Where the chosen language is remembered between launches.
+final languageStoreProvider = Provider<LanguageStore>((ref) => LanguageStore());
+
+/// The remembered language, or `null` when the patient has never chosen one.
+///
+/// `null` is the first-run signal, and it has to be distinguishable from `'en'`
+/// — English is a real answer, not an absence, and treating the default as
+/// "unanswered" would ask an English speaker the same question on every launch.
+final storedLanguageProvider = FutureProvider<String?>(
+  (ref) => ref.watch(languageStoreProvider).read(),
+);
 
 /// The hospital the patient picked (§5 screen 2).
 final selectedHospitalProvider = StateProvider<Hospital?>((ref) => null);

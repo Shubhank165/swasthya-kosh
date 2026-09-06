@@ -277,5 +277,61 @@
   "doneLabel": "Done",
   "@doneLabel": {
     "description": "Closes the finished intake and returns to the start"
+  },
+  "homeTab": "Home",
+  "@homeTab": {
+    "description": ""
+  },
+  "documentsTab": "Documents",
+  "@documentsTab": {
+    "description": ""
+  },
+  "visitsTab": "My visits",
+  "@visitsTab": {
+    "description": ""
+  },
+  "profileTab": "Profile",
+  "@profileTab": {
+    "description": ""
+  },
+  "newIntakeTitle": "Start a new visit",
+  "@newIntakeTitle": {
+    "description": ""
+  },
+  "newIntakeSubtitle": "Answer a few questions before you see the doctor",
+  "@newIntakeSubtitle": {
+    "description": ""
+  },
+  "ayushTitle": "AYUSH assessment",
+  "@ayushTitle": {
+    "description": ""
+  },
+  "notAvailableYet": "Not available yet",
+  "@notAvailableYet": {
+    "description": ""
+  },
+  "noDocumentsYet": "No documents yet",
+  "@noDocumentsYet": {
+    "description": ""
+  },
+  "noVisitsYet": "No visits yet",
+  "@noVisitsYet": {
+    "description": ""
+  },
+  "profilePhone": "Phone",
+  "@profilePhone": {
+    "description": ""
+  },
+  "profileLanguage": "Language",
+  "@profileLanguage": {
+    "description": ""
+  },
+  "profileAbha": "ABHA address",
+  "@profileAbha": {
+    "description": ""
+  },
+  "notLinked": "Not linked",
+  "@notLinked": {
+    "description": ""
   }
 }

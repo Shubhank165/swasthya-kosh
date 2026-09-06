@@ -53,6 +53,44 @@ class CarriedFact {
   final DateTime? verifiedAt;
 }
 
+
+/// One past visit, for the visits tab — stage 4.
+///
+/// Everything here is what the hospital recorded, not an interpretation of it.
+/// There is deliberately no field for a diagnosis, a report or anything read
+/// off a document: §8 keeps unverified extraction away from the patient, and a
+/// verified report is the physician's to hand over, not this app's to publish.
+class Visit {
+  const Visit({
+    required this.intakeId,
+    required this.receivedAt,
+    this.complaint,
+    this.department,
+    this.seenAt,
+  });
+
+  factory Visit.fromJson(Map<String, dynamic> json) => Visit(
+        intakeId: json['intake_id'] as String,
+        receivedAt:
+            DateTime.tryParse(json['received_at']?.toString() ?? '') ?? DateTime.now(),
+        complaint: json['complaint'] as String?,
+        department: json['department_code'] as String?,
+        seenAt: DateTime.tryParse(json['seen_at']?.toString() ?? ''),
+      );
+
+  final String intakeId;
+  final DateTime receivedAt;
+
+  /// What the patient said was wrong, in their own words where the record kept
+  /// them. Null when the visit has no answered complaint — a real state, and
+  /// better shown as nothing than as "Unknown".
+  final String? complaint;
+  final String? department;
+
+  /// When a physician opened it. Null means submitted and not yet seen.
+  final DateTime? seenAt;
+}
+
 class HistoryRepository {
   HistoryRepository({required ApiClient api}) : _api = api;
   final ApiClient _api;
@@ -69,6 +107,24 @@ class HistoryRepository {
       return [
         for (final fact in (response.data!['carry_forward'] as List<dynamic>? ?? []))
           CarriedFact.fromJson(fact as Map<String, dynamic>),
+      ];
+    } on Object {
+      return const [];
+    }
+  }
+
+  /// Past visits at this hospital, newest first.
+  ///
+  /// Same endpoint as [carryForward] and the same failure rule: empty on any
+  /// failure. A visits tab that cannot load is a tab with nothing in it, not a
+  /// reason to tell a patient something went wrong with their records.
+  Future<List<Visit>> visits() async {
+    try {
+      final response = await _api.get<Map<String, dynamic>>('/patients/me/history');
+      if (response.statusCode != 200 || response.data == null) return const [];
+      return [
+        for (final visit in (response.data!['intakes'] as List<dynamic>? ?? []))
+          Visit.fromJson(visit as Map<String, dynamic>),
       ];
     } on Object {
       return const [];

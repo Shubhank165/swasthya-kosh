@@ -53,6 +53,9 @@ EXPECTED: dict[tuple[str, str], set[Role]] = {
     # no path parameter: the patient comes from the session token.
     ("POST", "/api/v1/patients/me/abha"): {Role.PATIENT},
     ("GET", "/api/v1/patients/me/history"): {Role.PATIENT},
+    # The Documents tab. Same guard and strictly less content than the staff
+    # route on the intake — no confidence figures and nothing read off the page.
+    ("GET", "/api/v1/patients/me/documents"): {Role.PATIENT},
     # Clinical reads. Staff and above.
     ("GET", "/api/v1/intakes/{intake_id}"): {Role.STAFF},
     ("GET", "/api/v1/intakes/{intake_id}/report"): {Role.STAFF},

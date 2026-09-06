@@ -68,5 +68,61 @@
   "doneLabel": "ಮುಗಿದಿದೆ",
   "@doneLabel": {
     "description": "Closes the finished intake and returns to the start"
+  },
+  "homeTab": "ಮುಖಪುಟ",
+  "@homeTab": {
+    "description": ""
+  },
+  "documentsTab": "ದಾಖಲೆಗಳು",
+  "@documentsTab": {
+    "description": ""
+  },
+  "visitsTab": "ನನ್ನ ಭೇಟಿಗಳು",
+  "@visitsTab": {
+    "description": ""
+  },
+  "profileTab": "ಪ್ರೊಫೈಲ್",
+  "@profileTab": {
+    "description": ""
+  },
+  "newIntakeTitle": "ಹೊಸ ಭೇಟಿ ಪ್ರಾರಂಭಿಸಿ",
+  "@newIntakeTitle": {
+    "description": ""
+  },
+  "newIntakeSubtitle": "ವೈದ್ಯರನ್ನು ಭೇಟಿಯಾಗುವ ಮೊದಲು ಕೆಲವು ಪ್ರಶ್ನೆಗಳಿಗೆ ಉತ್ತರಿಸಿ",
+  "@newIntakeSubtitle": {
+    "description": ""
+  },
+  "ayushTitle": "ಆಯುಷ್ ಮೌಲ್ಯಮಾಪನ",
+  "@ayushTitle": {
+    "description": ""
+  },
+  "notAvailableYet": "ಇನ್ನೂ ಲಭ್ಯವಿಲ್ಲ",
+  "@notAvailableYet": {
+    "description": ""
+  },
+  "noDocumentsYet": "ಇನ್ನೂ ದಾಖಲೆಗಳಿಲ್ಲ",
+  "@noDocumentsYet": {
+    "description": ""
+  },
+  "noVisitsYet": "ಇನ್ನೂ ಭೇಟಿಗಳಿಲ್ಲ",
+  "@noVisitsYet": {
+    "description": ""
+  },
+  "profilePhone": "ಫೋನ್",
+  "@profilePhone": {
+    "description": ""
+  },
+  "profileLanguage": "ಭಾಷೆ",
+  "@profileLanguage": {
+    "description": ""
+  },
+  "profileAbha": "ಆಭಾ ವಿಳಾಸ",
+  "@profileAbha": {
+    "description": ""
+  },
+  "notLinked": "ಲಿಂಕ್ ಮಾಡಿಲ್ಲ",
+  "@notLinked": {
+    "description": ""
   }
 }

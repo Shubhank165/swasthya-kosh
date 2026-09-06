@@ -133,6 +133,12 @@ void main() {
         // Signed in, and a first visit: nothing is held about this patient, so
         // screen 5 has nothing to confirm and is skipped.
         signedInProvider.overrideWith((ref) async => true),
+        // No language remembered, so the run starts where a first run starts:
+        // at the chooser. On a device that has been used before `Root` skips
+        // straight to the home screen, which is the point of remembering it.
+        storedLanguageProvider.overrideWith((ref) async => null),
+        visitsProvider.overrideWith((ref) async => []),
+        patientDocumentsProvider.overrideWith((ref) async => []),
         carryForwardProvider.overrideWith((ref) async => []),
         consentNoticeProvider.overrideWith((ref) async => notice),
       ];
@@ -149,10 +155,16 @@ void main() {
     await tester.pumpWidget(ProviderScope(overrides: edges(), child: const MediKioskApp()));
     await settle(tester);
 
-    // 1. Language, before anything else is shown.
+    // 1. Language, before anything else is shown. Tapping it *is* the answer
+    // — the Continue button that used to sit under the list confirmed which of
+    // nine buttons you had just pressed, and is gone (stage 4).
     await tester.tap(find.byKey(const Key('language.en')));
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('start.continue')));
+    await settle(tester);
+
+    // 1b. The home screen, which is new. The app no longer drops a signed-in
+    // patient straight into an interview; starting one is a thing they choose,
+    // alongside their documents, their past visits and their profile.
+    await tester.tap(find.byKey(const Key('home.newIntake')));
     await settle(tester);
 
     // 2. Hospital, then department. Continue appears only once both are picked.

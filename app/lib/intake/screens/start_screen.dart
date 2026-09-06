@@ -1,8 +1,17 @@
-/// Welcome, language, and sign-in — 2/3 §5 screen 1, §7.
+/// The language chooser — 2/3 §5 screen 1, and stage 4.
 ///
 /// Language comes first, before anything else is shown. A patient who cannot
 /// read the sign-in screen cannot sign in, and the nine-language chooser is the
 /// one thing that must be legible without reading.
+///
+/// **It is now shown once, not on every launch.** It used to be the app's home
+/// screen and carried the continue button, the resume prompt, the update notice
+/// and sign-out with it — so a patient who had already answered "English" three
+/// times was asked a fourth. The choice is remembered (`LanguageStore`) and this
+/// screen appears on a first run, or when the patient opens it from their
+/// profile to change the answer.
+///
+/// Everything else that used to live here now lives on the home screen.
 library;
 
 import 'package:flutter/material.dart';
@@ -10,12 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme.dart';
-import '../../storage/database.dart';
 import '../../l10n/strings.dart';
-import '../flow.dart';
-import '../intake_host.dart';
-import 'hospital_screen.dart';
-import 'sign_in_screen.dart';
 
 /// Endonyms — each language named in its own script.
 ///
@@ -33,34 +37,22 @@ const languageNames = {
   'pa': 'ਪੰਜਾਬੀ',
 };
 
-class StartScreen extends ConsumerWidget {
-  const StartScreen({super.key});
+class LanguageScreen extends ConsumerWidget {
+  const LanguageScreen({super.key, this.returnWhenChosen = false});
+
+  /// True when opened from the profile, where choosing means "go back".
+  ///
+  /// False on a first run, where there is nothing to go back to — the app
+  /// itself is waiting on the answer, and popping would leave a black screen.
+  final bool returnWhenChosen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = Strings.of(context);
     final selected = ref.watch(languageProvider);
-    final signedIn = ref.watch(signedInProvider);
-
-    // §4: if the bundle names a schema this app cannot produce, refuse to start
-    // an intake and tell the patient to update. **No partial compatibility** —
-    // a record that is half of a newer contract is one the backend will either
-    // reject or, worse, accept and misread.
-    final bundle = ref.watch(currentBundleProvider);
-    final mustUpdate = bundle != null && !bundle.isUsable;
-
-    // `--dart-define=MEDIKIOSK_DEV_SIGN_IN=<phone>` signs in without a screen.
-    // Announced on screen for the same reason the mocked OTP delivery is: a
-    // demo that presents a development shortcut as a real sign-in is a claim
-    // nobody in the room can check.
-    final autoSignIn = ref.watch(configProvider).autoSignIn;
-    // `isLoading`, never "has no value yet". A development shortcut that fails
-    // must not leave Continue disabled forever — the ordinary sign-in screen is
-    // still there, and reaching it is the correct outcome when the shortcut
-    // could not reach the backend.
-    final waitingForAutoSignIn = autoSignIn && signedIn.isLoading;
 
     return Scaffold(
+      appBar: returnWhenChosen ? AppBar(title: Text(strings.profileLanguage)) : null,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(Sizes.gutter),
@@ -80,8 +72,7 @@ class StartScreen extends ConsumerWidget {
                 padding: const EdgeInsets.only(bottom: Sizes.gap),
                 child: OutlinedButton(
                   key: Key('language.${entry.key}'),
-                  onPressed: () =>
-                      ref.read(languageProvider.notifier).state = entry.key,
+                  onPressed: () => _choose(context, ref, entry.key),
                   style: OutlinedButton.styleFrom(
                     backgroundColor: selected == entry.key
                         ? Theme.of(context).colorScheme.secondaryContainer
@@ -90,128 +81,21 @@ class StartScreen extends ConsumerWidget {
                   child: Text(entry.value),
                 ),
               ),
-            const SizedBox(height: Sizes.gutter),
-            if (mustUpdate)
-              Padding(
-                padding: const EdgeInsets.only(bottom: Sizes.gap),
-                child: Text(
-                  strings.updateRequired,
-                  key: const Key('start.updateRequired'),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ),
-            if (autoSignIn)
-              Padding(
-                padding: const EdgeInsets.only(bottom: Sizes.gap),
-                child: Text(
-                  strings.mockNotice,
-                  key: const Key('start.devSignIn'),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-            if (!mustUpdate) _ResumePrompt(language: selected),
-            FilledButton(
-              key: const Key('start.continue'),
-              // Disabled until the automatic sign-in has resolved, or an early
-              // tap lands on the sign-in screen this define exists to skip.
-              onPressed: mustUpdate || waitingForAutoSignIn
-                  ? null
-                  : () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => signedIn.valueOrNull == true
-                              ? const HospitalScreen()
-                              : const SignInScreen(),
-                        ),
-                      ),
-              child: Text(strings.continueLabel),
-            ),
-            if (signedIn.valueOrNull == true)
-              Padding(
-                padding: const EdgeInsets.only(top: Sizes.gap),
-                child: TextButton(
-                  key: const Key('start.signOut'),
-                  // §10: this wipes the device, not just the token. A patient
-                  // on a borrowed phone must be able to leave nothing behind,
-                  // and must be able to do it from the first screen rather than
-                  // having to find it inside an intake.
-                  onPressed: () async {
-                    await ref.read(authProvider).signOut();
-                    ref
-                      ..invalidate(signedInProvider)
-                      ..invalidate(resumableDraftProvider)
-                      ..invalidate(carryForwardProvider);
-                  },
-                  child: Text(strings.signOut),
-                ),
-              ),
           ],
         ),
       ),
     );
   }
-}
 
-/// "Continue where you left off" — 2/3 §5, §15 item 7.
-///
-/// Offered only when there is something to resume that is still worth
-/// resuming. A draft older than a week says so instead and offers nothing: the
-/// answers in it have gone stale, and silently submitting week-old answers
-/// about how long a pain has lasted would be worse than asking again.
-class _ResumePrompt extends ConsumerWidget {
-  const _ResumePrompt({required this.language});
-
-  final String language;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final strings = Strings.of(context);
-    final draft = ref.watch(resumableDraftProvider).valueOrNull;
-    if (draft == null) return const SizedBox.shrink();
-
-    if (DateTime.now().difference(draft.updatedAt) > draftMaxAge) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: Sizes.gap),
-        child: Text(
-          strings.draftTooOld,
-          key: const Key('start.draftTooOld'),
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Sizes.gap),
-      child: OutlinedButton(
-        key: const Key('start.resume'),
-        onPressed: () => _resume(context, ref, draft),
-        child: Text(strings.resumeDraft),
-      ),
-    );
-  }
-
-  Future<void> _resume(BuildContext context, WidgetRef ref, Draft draft) async {
-    final bundle = ref.read(currentBundleProvider);
-    if (bundle == null) return;
-    final database = await ref.read(databaseProvider.future);
-    final queue = await ref.read(submissionQueueProvider.future);
-    final documents = await ref.read(documentStoreProvider.future);
-
-    final flow = IntakeFlow.resume(
-      database: database,
-      queue: queue,
-      documents: documents,
-      bundle: bundle,
-      draft: draft,
-      appVersion: ref.read(configProvider).appVersion,
-    );
-    // Null when the content version moved under the draft. Starting a fresh
-    // intake is the only safe answer: answers recorded against questions that
-    // have since changed are answers to questions nobody can now read.
-    if (flow == null || !context.mounted) return;
-    ref.read(languageProvider.notifier).state = draft.language;
-    await Navigator.of(context).push(intakeRoute(flow));
+  /// Tapping a language *is* the answer.
+  ///
+  /// There was a Continue button under this list, and it did nothing a second
+  /// tap on the language could not: nine buttons followed by a tenth to confirm
+  /// which of the nine you meant.
+  Future<void> _choose(BuildContext context, WidgetRef ref, String code) async {
+    ref.read(languageProvider.notifier).state = code;
+    await ref.read(languageStoreProvider).write(code);
+    ref.invalidate(storedLanguageProvider);
+    if (returnWhenChosen && context.mounted) Navigator.of(context).pop();
   }
 }

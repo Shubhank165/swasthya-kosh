@@ -68,5 +68,61 @@
   "doneLabel": "पूर्ण",
   "@doneLabel": {
     "description": "Closes the finished intake and returns to the start"
+  },
+  "homeTab": "होम",
+  "@homeTab": {
+    "description": ""
+  },
+  "documentsTab": "दस्तावेज़",
+  "@documentsTab": {
+    "description": ""
+  },
+  "visitsTab": "मेरी विज़िट",
+  "@visitsTab": {
+    "description": ""
+  },
+  "profileTab": "प्रोफ़ाइल",
+  "@profileTab": {
+    "description": ""
+  },
+  "newIntakeTitle": "नई विज़िट शुरू करें",
+  "@newIntakeTitle": {
+    "description": ""
+  },
+  "newIntakeSubtitle": "डॉक्टर से मिलने से पहले कुछ सवालों के जवाब दें",
+  "@newIntakeSubtitle": {
+    "description": ""
+  },
+  "ayushTitle": "आयुष मूल्यांकन",
+  "@ayushTitle": {
+    "description": ""
+  },
+  "notAvailableYet": "अभी उपलब्ध नहीं",
+  "@notAvailableYet": {
+    "description": ""
+  },
+  "noDocumentsYet": "अभी कोई दस्तावेज़ नहीं",
+  "@noDocumentsYet": {
+    "description": ""
+  },
+  "noVisitsYet": "अभी कोई विज़िट नहीं",
+  "@noVisitsYet": {
+    "description": ""
+  },
+  "profilePhone": "फ़ोन",
+  "@profilePhone": {
+    "description": ""
+  },
+  "profileLanguage": "भाषा",
+  "@profileLanguage": {
+    "description": ""
+  },
+  "profileAbha": "आभा पता",
+  "@profileAbha": {
+    "description": ""
+  },
+  "notLinked": "लिंक नहीं है",
+  "@notLinked": {
+    "description": ""
   }
 }

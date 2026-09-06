@@ -96,6 +96,34 @@ class DocumentOut(ApiModel):
     url: str | None = None
 
 
+class PatientDocumentOut(ApiModel):
+    """One document, as its own patient may see it.
+
+    **Deliberately narrower than `DocumentOut`.** No confidence figure and no
+    extracted content of any kind: §8 keeps unverified extraction away from the
+    patient, because a value read off a prescription and shown back to them
+    without a physician between is a diagnosis surface.
+
+    What is left is the photograph, when it was added, whether the hospital has
+    processed it, and — where it was refused — why, which is the one piece of
+    feedback a patient can actually act on by taking the picture again.
+
+    `kind` stays. It is a document type, not a finding: telling somebody the
+    page they photographed was filed as a prescription asserts nothing about
+    their health.
+    """
+
+    document_id: str
+    kind: DocumentKind
+    status: str
+    page_count: int = 1
+    rejection_reason: str | None = None
+    uploaded_at: datetime | None = None
+    processed_at: datetime | None = None
+    #: Short-lived and never public.
+    url: str | None = None
+
+
 class ContradictionOut(ApiModel):
     field_id: str
     kind: str

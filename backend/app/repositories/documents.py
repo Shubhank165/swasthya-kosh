@@ -87,6 +87,29 @@ class DocumentRepository:
             raise NotFoundError(f"no document {document_id!r} at this hospital")
         return row
 
+    async def for_intakes(
+        self, *, hospital_id: str, intake_ids: Sequence[str]
+    ) -> Sequence[DocumentRecordRow]:
+        """Documents across several intakes, newest first.
+
+        For a patient looking at their own document library, where the intakes
+        are the ones their session resolves to. `hospital_id` is in the outer
+        WHERE for the tenancy guard, and the intake list is what scopes it to
+        one patient — a caller cannot widen it by asking, because they never
+        supply it.
+        """
+        if not intake_ids:
+            return []
+        result = await self._session.execute(
+            select(DocumentRecordRow)
+            .where(
+                DocumentRecordRow.hospital_id == hospital_id,
+                DocumentRecordRow.intake_id.in_(list(intake_ids)),
+            )
+            .order_by(DocumentRecordRow.uploaded_at.desc())
+        )
+        return list(result.scalars())
+
     async def for_intake(
         self, *, hospital_id: str, intake_id: str
     ) -> Sequence[DocumentRecordRow]:

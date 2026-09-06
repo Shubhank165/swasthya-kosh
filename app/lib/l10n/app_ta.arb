@@ -68,5 +68,61 @@
   "doneLabel": "முடிந்தது",
   "@doneLabel": {
     "description": "Closes the finished intake and returns to the start"
+  },
+  "homeTab": "முகப்பு",
+  "@homeTab": {
+    "description": ""
+  },
+  "documentsTab": "ஆவணங்கள்",
+  "@documentsTab": {
+    "description": ""
+  },
+  "visitsTab": "எனது வருகைகள்",
+  "@visitsTab": {
+    "description": ""
+  },
+  "profileTab": "சுயவிவரம்",
+  "@profileTab": {
+    "description": ""
+  },
+  "newIntakeTitle": "புதிய வருகையைத் தொடங்கு",
+  "@newIntakeTitle": {
+    "description": ""
+  },
+  "newIntakeSubtitle": "மருத்துவரைப் பார்ப்பதற்கு முன் சில கேள்விகளுக்குப் பதிலளிக்கவும்",
+  "@newIntakeSubtitle": {
+    "description": ""
+  },
+  "ayushTitle": "ஆயுஷ் மதிப்பீடு",
+  "@ayushTitle": {
+    "description": ""
+  },
+  "notAvailableYet": "இன்னும் கிடைக்கவில்லை",
+  "@notAvailableYet": {
+    "description": ""
+  },
+  "noDocumentsYet": "இன்னும் ஆவணங்கள் இல்லை",
+  "@noDocumentsYet": {
+    "description": ""
+  },
+  "noVisitsYet": "இன்னும் வருகைகள் இல்லை",
+  "@noVisitsYet": {
+    "description": ""
+  },
+  "profilePhone": "தொலைபேசி",
+  "@profilePhone": {
+    "description": ""
+  },
+  "profileLanguage": "மொழி",
+  "@profileLanguage": {
+    "description": ""
+  },
+  "profileAbha": "ஆபா முகவரி",
+  "@profileAbha": {
+    "description": ""
+  },
+  "notLinked": "இணைக்கப்படவில்லை",
+  "@notLinked": {
+    "description": ""
   }
 }

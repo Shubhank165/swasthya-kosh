@@ -7,12 +7,13 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.api.auth import RequireKioskOrStaff, RequirePatient, RequireStaff
-from app.api.deps import IdentityServiceDep
+from app.api.deps import DocumentServiceDep, IdentityServiceDep
 from app.core.errors import NotFoundError
 from app.domain.record import PatientRef, PatientRefType
 from app.schemas.api import (
     ABHALinkRequest,
     HistoryResponse,
+    PatientDocumentOut,
     ResolveRequest,
     ResolveResponse,
 )
@@ -122,6 +123,72 @@ async def my_history(
         ref, hospital_id=principal.hospital_id, limit=limit
     )
     return HistoryResponse.model_validate(history.to_dict())
+
+
+@router.get(
+    "/me/documents",
+    response_model=list[PatientDocumentOut],
+    summary="The signed-in patient's own uploaded documents",
+)
+async def my_documents(
+    principal: RequirePatient,
+    identity: IdentityServiceDep,
+    documents: DocumentServiceDep,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+) -> list[PatientDocumentOut]:
+    """The document library behind the app's Documents tab — stage 4.
+
+    **Registered before `/{ref}/...` for the same reason `me/history` is.**
+    FastAPI matches in registration order, so were this second, a request for
+    `/patients/me/documents` would bind `ref="me"` on a staff route.
+
+    **The patient comes from the session, never from the request.** There is no
+    path parameter here: the intakes are resolved from `principal.patient_ref`,
+    which is the peppered HMAC the token was issued against, and the document
+    query is scoped to exactly those. A caller cannot widen it, because they
+    never supply the scope.
+
+    `list_documents` on the intake router exists and is staff-only, which is
+    correct for what it returns — confidence figures and everything the evidence
+    panel needs. This returns strictly less (`PatientDocumentOut`), because a
+    patient looking at their own scans must not be handed a machine's reading of
+    them (§8).
+    """
+    if principal.patient_ref is None:  # pragma: no cover - guarded by the role
+        raise NotFoundError("this session has no patient reference")
+    ref = PatientRef(type=PatientRefType.PHONE, value=principal.patient_ref)
+    history = await identity.history(
+        ref, hospital_id=principal.hospital_id, limit=limit
+    )
+    rows = await documents.list_for_intakes(
+        hospital_id=principal.hospital_id,
+        intake_ids=[str(intake["intake_id"]) for intake in history.intakes],
+    )
+
+    from app.domain.record import DocumentKind, DocumentStatus
+
+    out: list[PatientDocumentOut] = []
+    for row in rows:
+        url: str | None = None
+        # A row with no bytes is a reading the device produced on its own; there
+        # is no stored image to sign a URL for.
+        if row.byte_size > 0:
+            url = await documents.signed_url(
+                hospital_id=principal.hospital_id, document_id=row.id
+            )
+        out.append(
+            PatientDocumentOut(
+                document_id=row.id,
+                kind=DocumentKind(row.kind),
+                status=DocumentStatus(row.status).value,
+                page_count=row.page_count,
+                rejection_reason=row.rejection_reason,
+                uploaded_at=row.uploaded_at,
+                processed_at=row.processed_at,
+                url=url,
+            )
+        )
+    return out
 
 
 @router.get(
