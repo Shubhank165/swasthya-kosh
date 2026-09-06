@@ -1,0 +1,98 @@
+# Problem areas — the options on fixed question 1, and the domains everything
+# adaptive hangs off.
+#
+# **These are areas a patient can recognise in themselves, not diagnostic
+# categories.** "Digestive problem" is something somebody knows they have;
+# "gastroenteritis" is a conclusion, and asking a patient to pick one is asking
+# them to do the practitioner's job before the practitioner has seen them.
+#
+# The list is deliberately shorter than a symptom index. Fourteen options is
+# already a lot to read on a phone with a fever, and every extra one buys less
+# than it costs — the specific questions come after, once the area is known.
+#
+# `general` is not on the list because it is not a choice: it is the domain
+# holding the history every patient is asked for regardless.
+#
+# clinical_source: engineer-authored from standard OPD case-taking order;
+# pending AIIA mentor review. Every entry is on CLINICAL_REVIEW_QUEUE.md.
+
+version: 1
+
+domains:
+  - id: fever
+    label_key: domain.fever
+    # Broad on purpose. A patient who says "fever" may mean anything from a
+    # measured 39°C to feeling hot, and the difference is what the questions
+    # after this one are for.
+    priority: 9
+
+  - id: pain
+    label_key: domain.pain
+    # The general pain domain. Headache and joint pain are separate because a
+    # patient distinguishes them without prompting and the follow-up questions
+    # differ; everything else — abdomen, chest, back — routes through here and
+    # is separated by the site question.
+    priority: 9
+
+  - id: headache
+    label_key: domain.headache
+    priority: 8
+
+  - id: respiratory
+    label_key: domain.respiratory
+    priority: 9
+
+  - id: digestive
+    label_key: domain.digestive
+    priority: 8
+
+  - id: bowel
+    label_key: domain.bowel
+    # Separate from `digestive` because patients report them separately and
+    # because bowel habit is core AYUSH history asked of everyone anyway.
+    priority: 8
+
+  - id: urinary
+    label_key: domain.urinary
+    priority: 7
+
+  - id: skin
+    label_key: domain.skin
+    priority: 6
+
+  - id: fatigue
+    label_key: domain.fatigue
+    priority: 6
+
+  - id: sleep
+    label_key: domain.sleep
+    priority: 6
+
+  - id: joint
+    label_key: domain.joint
+    priority: 7
+
+  - id: menstrual
+    label_key: domain.menstrual
+    # Offered rather than assumed. The precondition is on the question, not
+    # here: a domain list that changes shape by sex is one that has decided
+    # something about the patient before asking them.
+    priority: 7
+
+  - id: mental
+    label_key: domain.mental
+    # "How you have been feeling in yourself" rather than a mental-health
+    # label. The wording is in localization and it matters: an option a patient
+    # will not tick is an option that collects nothing.
+    priority: 7
+
+  - id: bleeding
+    label_key: domain.bleeding
+    priority: 10
+
+  - id: other
+    label_key: domain.other
+    # The escape hatch, and it must exist. A patient whose problem is not on
+    # the list needs somewhere to say so, and a free-text description is worth
+    # far more to a practitioner than a wrong tick.
+    priority: 5

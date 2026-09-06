@@ -1,0 +1,537 @@
+# The questions specific to one problem area.
+#
+# These fill the slots in `domain_slots` — the things the shared symptom
+# template cannot cover because they only mean something inside one domain.
+# "What colour is the sputum" is not a general question with a domain attached;
+# it is only a question at all if the patient is coughing.
+#
+# Every one carries `requires: {slot: <domain>.present, equals: true}`. That is
+# §9 and it is not a formality: "how high did your temperature get" asked of
+# somebody who never mentioned fever is a question that invents a symptom by
+# asking about it, and patients answer questions they are asked.
+#
+# `<domain>.present` is set by the answer to fixed question 1, so a domain the
+# patient did not tick has none of this reachable.
+#
+# clinical_source: engineer-authored; pending AIIA mentor review.
+
+version: 1
+
+questions:
+  # --- fever -------------------------------------------------------------------
+
+  - id: fever.measured
+    answer_type: boolean
+    extracts: [fever.measured]
+    domains: [fever]
+    priority: 7
+    burden: 1
+    requires: {slot: fever.present, equals: true}
+
+  # Both units offered. An Indian household thermometer reads Fahrenheit, and a
+  # Celsius-only box does not stop that patient answering — it invites them to
+  # type 101 into it, which is a fever recorded as hypothermia. Nothing is
+  # converted; the unit travels with the number.
+  - id: fever.maximum_temperature
+    answer_type: numeric
+    extracts: [fever.maximum_temperature]
+    domains: [fever]
+    priority: 8
+    burden: 1
+    unit: fahrenheit
+    units: [fahrenheit, celsius]
+    # Wide enough for both scales, because the range is checked *before* the
+    # unit is known. 90-110 is the Fahrenheit range and it rejected every
+    # Celsius answer the question invites — a patient who typed 39 was told
+    # nothing and their reading was dropped. Discriminating between the two is
+    # the unit inference's job (the ranges do not overlap anywhere a person is
+    # alive); this is only a sanity bound against a typo.
+    minimum: 30
+    maximum: 110
+    requires:
+      all:
+        - {slot: fever.present, equals: true}
+        - {slot: fever.measured, equals: true}
+
+  - id: fever.chills
+    answer_type: boolean
+    extracts: [fever.chills]
+    domains: [fever]
+    priority: 7
+    burden: 1
+    requires: {slot: fever.present, equals: true}
+
+  - id: fever.fever_pattern
+    answer_type: single_select
+    extracts: [fever.fever_pattern]
+    domains: [fever]
+    priority: 7
+    burden: 1
+    options: [continuous, once_daily, twice_daily, alternate_days, irregular]
+    requires: {slot: fever.present, equals: true}
+
+  # --- pain --------------------------------------------------------------------
+
+  - id: pain.site
+    answer_type: single_select
+    extracts: [pain.site]
+    domains: [pain]
+    priority: 10
+    burden: 1
+    options:
+      [head, neck, chest, upper_abdomen, lower_abdomen, back, limb, joint, pelvis, other]
+    requires: {slot: pain.present, equals: true}
+
+  # Structured text rather than a list of adjectives. "A burning pain on the
+  # right side that gets worse after eating" is one sentence carrying character,
+  # site and an aggravating factor, and it is what somebody in pain actually
+  # types; the interpreter takes all three out of it (§13).
+  - id: pain.description
+    answer_type: structured_text
+    extracts: [pain.character, pain.site, pain.aggravating, pain.radiation]
+    domains: [pain]
+    priority: 9
+    burden: 2
+    requires: {slot: pain.present, equals: true}
+
+  - id: pain.character
+    answer_type: single_select
+    extracts: [pain.character]
+    domains: [pain]
+    priority: 8
+    burden: 1
+    options: [burning, cramping, stabbing, dull_ache, throbbing, pressing, shooting, other]
+    requires: {slot: pain.present, equals: true}
+
+  - id: pain.radiation
+    answer_type: free_text
+    extracts: [pain.radiation]
+    domains: [pain]
+    priority: 8
+    burden: 1
+    requires: {slot: pain.present, equals: true}
+
+  # --- headache ----------------------------------------------------------------
+
+  - id: headache.site
+    answer_type: single_select
+    extracts: [headache.site]
+    domains: [headache]
+    priority: 8
+    burden: 1
+    options: [frontal, temporal, occipital, one_sided, whole_head, around_eyes]
+    requires: {slot: headache.present, equals: true}
+
+  - id: headache.character
+    answer_type: single_select
+    extracts: [headache.character]
+    domains: [headache]
+    priority: 7
+    burden: 1
+    options: [throbbing, pressing, band_like, stabbing, dull_ache, other]
+    requires: {slot: headache.present, equals: true}
+
+  - id: headache.light_sound_sensitivity
+    answer_type: boolean
+    extracts: [headache.light_sound_sensitivity]
+    domains: [headache]
+    priority: 6
+    burden: 1
+    requires: {slot: headache.present, equals: true}
+
+  - id: headache.vision_change
+    answer_type: boolean
+    extracts: [headache.vision_change]
+    domains: [headache]
+    priority: 8
+    burden: 1
+    requires: {slot: headache.present, equals: true}
+
+  # --- respiratory ---------------------------------------------------------------
+
+  - id: respiratory.cough_type
+    answer_type: single_select
+    extracts: [respiratory.cough_type]
+    domains: [respiratory]
+    priority: 8
+    burden: 1
+    options: [dry, productive, both]
+    requires: {slot: respiratory.present, equals: true}
+
+  - id: respiratory.sputum_colour
+    answer_type: single_select
+    extracts: [respiratory.sputum_colour]
+    domains: [respiratory]
+    priority: 7
+    burden: 1
+    options: [clear, white, yellow, green, blood_stained]
+    requires:
+      all:
+        - {slot: respiratory.present, equals: true}
+        - {slot: respiratory.cough_type, any_of: [productive, both]}
+
+  - id: respiratory.breathlessness
+    answer_type: single_select
+    extracts: [respiratory.breathlessness]
+    domains: [respiratory]
+    priority: 9
+    burden: 1
+    options: [none, on_exertion, at_rest, lying_flat]
+    requires: {slot: respiratory.present, equals: true}
+
+  - id: respiratory.wheeze
+    answer_type: boolean
+    extracts: [respiratory.wheeze]
+    domains: [respiratory]
+    priority: 6
+    burden: 1
+    requires: {slot: respiratory.present, equals: true}
+
+  # --- digestive -----------------------------------------------------------------
+
+  - id: digestive.relation_to_food
+    answer_type: single_select
+    extracts: [digestive.relation_to_food]
+    domains: [digestive]
+    priority: 8
+    burden: 1
+    options: [worse_after_eating, better_after_eating, worse_when_empty, no_relation]
+    requires: {slot: digestive.present, equals: true}
+
+  - id: digestive.nausea_vomiting
+    answer_type: multi_select
+    extracts: [digestive.nausea, digestive.vomiting]
+    domains: [digestive]
+    priority: 8
+    burden: 1
+    options: [nausea, vomiting, neither]
+    requires: {slot: digestive.present, equals: true}
+
+  - id: digestive.appetite_change
+    answer_type: single_select
+    extracts: [digestive.appetite_change]
+    domains: [digestive]
+    priority: 7
+    burden: 1
+    options: [reduced, increased, unchanged]
+    requires: {slot: digestive.present, equals: true}
+
+  - id: digestive.acidity
+    answer_type: boolean
+    extracts: [digestive.acidity]
+    domains: [digestive]
+    priority: 7
+    burden: 1
+    requires: {slot: digestive.present, equals: true}
+
+  # --- bowel ---------------------------------------------------------------------
+
+  - id: bowel.stool_frequency
+    answer_type: free_text
+    extracts: [bowel.stool_frequency]
+    domains: [bowel]
+    priority: 8
+    burden: 1
+    requires: {slot: bowel.present, equals: true}
+
+  - id: bowel.consistency
+    answer_type: single_select
+    extracts: [bowel.consistency]
+    domains: [bowel]
+    priority: 8
+    burden: 1
+    options: [hard, formed, loose, watery, mixed]
+    requires: {slot: bowel.present, equals: true}
+
+  - id: bowel.blood_in_stool
+    answer_type: boolean
+    extracts: [bowel.blood_in_stool]
+    domains: [bowel]
+    priority: 10
+    burden: 1
+    requires: {slot: bowel.present, equals: true}
+
+  - id: bowel.incomplete_evacuation
+    answer_type: boolean
+    extracts: [bowel.incomplete_evacuation]
+    domains: [bowel]
+    priority: 6
+    burden: 1
+    requires: {slot: bowel.present, equals: true}
+
+  # --- urinary -------------------------------------------------------------------
+
+  - id: urinary.burning
+    answer_type: boolean
+    extracts: [urinary.burning]
+    domains: [urinary]
+    priority: 8
+    burden: 1
+    requires: {slot: urinary.present, equals: true}
+
+  - id: urinary.frequency_change
+    answer_type: single_select
+    extracts: [urinary.frequency_change]
+    domains: [urinary]
+    priority: 7
+    burden: 1
+    options: [more_often, less_often, unchanged]
+    requires: {slot: urinary.present, equals: true}
+
+  - id: urinary.blood_in_urine
+    answer_type: boolean
+    extracts: [urinary.blood_in_urine]
+    domains: [urinary]
+    priority: 10
+    burden: 1
+    requires: {slot: urinary.present, equals: true}
+
+  - id: urinary.urine_colour
+    answer_type: single_select
+    extracts: [urinary.urine_colour]
+    domains: [urinary]
+    priority: 6
+    burden: 1
+    options: [pale, normal, dark_yellow, reddish, cloudy]
+    requires: {slot: urinary.present, equals: true}
+
+  - id: urinary.night_urination
+    answer_type: boolean
+    extracts: [urinary.night_urination]
+    domains: [urinary]
+    priority: 6
+    burden: 1
+    requires: {slot: urinary.present, equals: true}
+
+  # --- skin ----------------------------------------------------------------------
+
+  - id: skin.lesion_type
+    answer_type: single_select
+    extracts: [skin.lesion_type]
+    domains: [skin]
+    priority: 8
+    burden: 1
+    options: [rash, patches, boils, blisters, dryness, discolouration, ulcer, other]
+    requires: {slot: skin.present, equals: true}
+
+  - id: skin.itching
+    answer_type: boolean
+    extracts: [skin.itching]
+    domains: [skin]
+    priority: 7
+    burden: 1
+    requires: {slot: skin.present, equals: true}
+
+  - id: skin.distribution
+    answer_type: free_text
+    extracts: [skin.distribution]
+    domains: [skin]
+    priority: 7
+    burden: 1
+    requires: {slot: skin.present, equals: true}
+
+  - id: skin.spreading
+    answer_type: boolean
+    extracts: [skin.spreading]
+    domains: [skin]
+    priority: 7
+    burden: 1
+    requires: {slot: skin.present, equals: true}
+
+  # --- fatigue -------------------------------------------------------------------
+
+  - id: fatigue.effect_on_activity
+    answer_type: free_text
+    extracts: [fatigue.effect_on_activity]
+    domains: [fatigue]
+    priority: 8
+    burden: 2
+    requires: {slot: fatigue.present, equals: true}
+
+  - id: fatigue.weight_change
+    answer_type: single_select
+    extracts: [fatigue.weight_change]
+    domains: [fatigue]
+    priority: 7
+    burden: 1
+    options: [lost, gained, unchanged, unsure]
+    requires: {slot: fatigue.present, equals: true}
+
+  # --- sleep ---------------------------------------------------------------------
+
+  - id: sleep.difficulty
+    answer_type: single_select
+    extracts: [sleep.difficulty]
+    domains: [sleep]
+    priority: 8
+    burden: 1
+    options: [falling_asleep, staying_asleep, waking_early, too_much_sleep]
+    requires: {slot: sleep.present, equals: true}
+
+  - id: sleep.hours
+    answer_type: numeric
+    extracts: [sleep.hours]
+    domains: [sleep]
+    priority: 7
+    burden: 1
+    unit: hour
+    minimum: 0
+    maximum: 24
+    requires: {slot: sleep.present, equals: true}
+
+  - id: sleep.refreshed
+    answer_type: boolean
+    extracts: [sleep.refreshed]
+    domains: [sleep]
+    priority: 6
+    burden: 1
+    requires: {slot: sleep.present, equals: true}
+
+  # --- joint ---------------------------------------------------------------------
+
+  - id: joint.joints_affected
+    answer_type: free_text
+    extracts: [joint.joints_affected]
+    domains: [joint]
+    priority: 9
+    burden: 1
+    requires: {slot: joint.present, equals: true}
+
+  - id: joint.swelling
+    answer_type: boolean
+    extracts: [joint.swelling]
+    domains: [joint]
+    priority: 8
+    burden: 1
+    requires: {slot: joint.present, equals: true}
+
+  - id: joint.stiffness_timing
+    answer_type: single_select
+    extracts: [joint.stiffness_timing]
+    domains: [joint]
+    priority: 8
+    burden: 1
+    options: [morning, evening, after_rest, after_activity, none]
+    requires: {slot: joint.present, equals: true}
+
+  - id: joint.movement_limited
+    answer_type: boolean
+    extracts: [joint.movement_limited]
+    domains: [joint]
+    priority: 7
+    burden: 1
+    requires: {slot: joint.present, equals: true}
+
+  # --- menstrual -------------------------------------------------------------------
+
+  - id: menstrual.cycle_regular
+    answer_type: boolean
+    extracts: [menstrual.cycle_regular]
+    domains: [menstrual]
+    priority: 8
+    burden: 1
+    requires: {slot: menstrual.present, equals: true}
+
+  - id: menstrual.cycle_length
+    answer_type: numeric
+    extracts: [menstrual.cycle_length]
+    domains: [menstrual]
+    priority: 6
+    burden: 1
+    unit: day
+    minimum: 10
+    maximum: 120
+    requires: {slot: menstrual.present, equals: true}
+
+  - id: menstrual.flow
+    answer_type: single_select
+    extracts: [menstrual.flow]
+    domains: [menstrual]
+    priority: 7
+    burden: 1
+    options: [light, normal, heavy, very_heavy]
+    requires: {slot: menstrual.present, equals: true}
+
+  - id: menstrual.pain_with_periods
+    answer_type: boolean
+    extracts: [menstrual.pain_with_periods]
+    domains: [menstrual]
+    priority: 7
+    burden: 1
+    requires: {slot: menstrual.present, equals: true}
+
+  - id: menstrual.last_period
+    answer_type: date
+    extracts: [menstrual.last_period]
+    domains: [menstrual]
+    priority: 8
+    burden: 1
+    requires: {slot: menstrual.present, equals: true}
+
+  # --- mental ---------------------------------------------------------------------
+
+  - id: mental.mood
+    answer_type: single_select
+    extracts: [mental.mood]
+    domains: [mental]
+    priority: 8
+    burden: 1
+    options: [low, anxious, irritable, restless, numb, mixed]
+    requires: {slot: mental.present, equals: true}
+
+  - id: mental.effect_on_daily_life
+    answer_type: free_text
+    extracts: [mental.effect_on_daily_life]
+    domains: [mental]
+    priority: 8
+    burden: 2
+    requires: {slot: mental.present, equals: true}
+
+  - id: mental.appetite_or_sleep_affected
+    answer_type: boolean
+    extracts: [mental.appetite_or_sleep_affected]
+    domains: [mental]
+    priority: 7
+    burden: 1
+    requires: {slot: mental.present, equals: true}
+
+  # --- bleeding ---------------------------------------------------------------------
+
+  - id: bleeding.site
+    answer_type: single_select
+    extracts: [bleeding.site]
+    domains: [bleeding]
+    priority: 10
+    burden: 1
+    options: [nose, gums, cough, vomit, stool, urine, vaginal, skin, wound, other]
+    requires: {slot: bleeding.present, equals: true}
+
+  - id: bleeding.amount
+    answer_type: single_select
+    extracts: [bleeding.amount]
+    domains: [bleeding]
+    priority: 9
+    burden: 1
+    options: [spotting, small, moderate, large, unable_to_say]
+    requires: {slot: bleeding.present, equals: true}
+
+  - id: bleeding.ongoing
+    answer_type: boolean
+    extracts: [bleeding.ongoing]
+    domains: [bleeding]
+    priority: 10
+    burden: 1
+    requires: {slot: bleeding.present, equals: true}
+
+  # --- other ------------------------------------------------------------------------
+  # The escape hatch from fixed question 1. A patient whose problem is not on
+  # the list has one thing to say and it is worth more than any tick they could
+  # have made instead.
+
+  - id: other.description
+    answer_type: structured_text
+    extracts: [other.description]
+    domains: [other]
+    priority: 10
+    burden: 2
+    requires: {slot: other.present, equals: true}
