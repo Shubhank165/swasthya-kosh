@@ -78,6 +78,48 @@ SECRET_PUSH_TOKEN="${SECRET_PUSH_TOKEN:-medikiosk-pubsub-push-token}"
 # have to be typed into devices.
 SECRET_PATIENT_PEPPER="${SECRET_PATIENT_PEPPER:-medikiosk-patient-ref-pepper}"
 
+# --- models -----------------------------------------------------------------
+# Which providers this deployment runs, and the preconditions for the cloud
+# ones. Defaults are the mocks, because a deployment that reaches a model by
+# default is a deployment nobody decided to make.
+#
+# There is no model id here. `OCR_MODEL_ID` and `REPAIR_MODEL_ID` are supplied
+# at deploy time and refused if missing — the same rule as everywhere else in
+# this repository: a model is configuration, not a literal, so changing one is a
+# deployment change with a name on it rather than a commit.
+OCR_PROVIDER="${OCR_PROVIDER:-mock}"
+REPAIR_PROVIDER="${REPAIR_PROVIDER:-mock}"
+OCR_MODEL_ID="${OCR_MODEL_ID:-}"
+REPAIR_MODEL_ID="${REPAIR_MODEL_ID:-}"
+
+# Zero Data Retention. This is an assertion the operator makes about the
+# project; nothing here can verify it, and the adapters refuse to construct
+# without it (see `app/adapters/ocr/gemini.py`). It is a separate flag from the
+# provider precisely so that turning a model on is two decisions, not one.
+VERTEX_ZDR_ENABLED="${VERTEX_ZDR_ENABLED:-false}"
+
+uses_cloud_models=false
+[[ "${OCR_PROVIDER}" == "gemini" || "${REPAIR_PROVIDER}" == "vertex" ]] && uses_cloud_models=true
+
+if [[ "${uses_cloud_models}" == "true" ]]; then
+  if [[ "${VERTEX_ZDR_ENABLED}" != "true" ]]; then
+    echo "OCR_PROVIDER=${OCR_PROVIDER} REPAIR_PROVIDER=${REPAIR_PROVIDER} sends" >&2
+    echo "patient documents and patient answers to a model, and" >&2
+    echo "VERTEX_ZDR_ENABLED is not true. Confirm Zero Data Retention for" >&2
+    echo "${PROJECT_ID} in ${REGION} first, then set it explicitly." >&2
+    exit 1
+  fi
+  if [[ "${OCR_PROVIDER}" == "gemini" && -z "${OCR_MODEL_ID}" ]]; then
+    echo "OCR_PROVIDER=gemini needs OCR_MODEL_ID. The model id is not in this" >&2
+    echo "repository by design; pass it on the deploy command." >&2
+    exit 1
+  fi
+  if [[ "${REPAIR_PROVIDER}" == "vertex" && -z "${REPAIR_MODEL_ID}" ]]; then
+    echo "REPAIR_PROVIDER=vertex needs REPAIR_MODEL_ID." >&2
+    exit 1
+  fi
+fi
+
 VPC_NETWORK="${VPC_NETWORK:-default}"
 VPC_SUBNET="${VPC_SUBNET:-default}"
 PRIVATE_RANGE_NAME="${PRIVATE_RANGE_NAME:-medikiosk-sql-range}"

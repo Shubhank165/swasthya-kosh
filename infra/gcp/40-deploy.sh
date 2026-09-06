@@ -40,6 +40,32 @@ common=(
 # and none contains a semicolon.
 ENV_SHARED="ENVIRONMENT=production;CLINICAL_CONTENT_DIR=/app/clinical;LOG_JSON=true;STORAGE_BACKEND=gcs;GCS_BUCKET=${BUCKET};GCP_PROJECT=${PROJECT_ID};DOCUMENT_QUEUE=pubsub;PUBSUB_TOPIC=${TOPIC};VERTEX_PROJECT=${PROJECT_ID};VERTEX_REGION=${REGION};ALLOW_HEADER_AUTH=false"
 
+# Which providers this revision runs. Both services get the same string: they
+# run the same image, `/readyz` on either has to say what that service would
+# actually do, and a worker that reports `ocr: mock` while reading documents
+# with a model is worse than no report at all.
+#
+# `config.sh` has already refused the deploy if a cloud provider was selected
+# without ZDR or without a model id, so by here these are either the mocks or a
+# combination somebody decided on.
+ENV_MODELS="OCR_PROVIDER=${OCR_PROVIDER};REPAIR_PROVIDER=${REPAIR_PROVIDER};VERTEX_ZDR_ENABLED=${VERTEX_ZDR_ENABLED}"
+[[ -n "${OCR_MODEL_ID}" ]] && ENV_MODELS="${ENV_MODELS};OCR_MODEL_ID=${OCR_MODEL_ID}"
+[[ -n "${REPAIR_MODEL_ID}" ]] && ENV_MODELS="${ENV_MODELS};REPAIR_MODEL_ID=${REPAIR_MODEL_ID}"
+ENV_SHARED="${ENV_SHARED};${ENV_MODELS}"
+
+# Repair runs on the API, during ingest, not on the worker — a payload that
+# fails its contract has to be repaired before the response, and there is no
+# document involved. So the API needs Vertex access too, which the provisioning
+# script only grants the worker. Idempotent, and skipped entirely when repair is
+# a mock, so a mock-only deployment does not quietly acquire the permission.
+if [[ "${REPAIR_PROVIDER}" == "vertex" ]]; then
+  say "Granting ${API_SERVICE} access to Vertex (REPAIR_PROVIDER=vertex)"
+  gc projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member="serviceAccount:${API_SA}" \
+    --role=roles/aiplatform.user --condition=None >/dev/null
+  echo "    ${API_SA%%@*} -> roles/aiplatform.user"
+fi
+
 # --- API --------------------------------------------------------------------
 # min-instances 0: an OPD is not a 24-hour service and a cold start between
 # patients costs nobody anything.
@@ -152,5 +178,11 @@ fi
 echo "    worker route absent from the public API (404) — as intended"
 
 say "Deployed ${TAG}"
+echo "  ocr    ${OCR_PROVIDER}"
+echo "  repair ${REPAIR_PROVIDER}"
+if [[ "${uses_cloud_models}" == "true" ]]; then
+  echo "  NOTE: this revision sends patient documents and patient answers to"
+  echo "        Vertex in ${REGION}. VERTEX_ZDR_ENABLED=true is your assertion."
+fi
 echo "  API    ${API_URL}"
 echo "  worker ${WORKER_URL} (not publicly invocable)"
