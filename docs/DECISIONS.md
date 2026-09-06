@@ -840,6 +840,85 @@ reviewed by a clinician:
 speaking OPD. The templates are marked, the review queue names them, and nothing
 in them states a diagnosis or gives advice.
 
+## 60. One version registry, not two
+
+`app/normalize/registry.py` maps a schema version to its normalizer.
+`app/services/repair.py` kept its own map of version to *contract*. §4.2 of 1/3
+promised that adding a version costs "two new files and one registry line", and
+it was two lines in two files that nothing checked against each other.
+
+Validation runs before normalisation, so registering a version in the normalizer
+map alone produces a backend that can map a payload it will never accept. That
+is what happened to schema 0.2: the Flutter app sent it, the contract map did not
+have it, every intake from the phone was stored raw as `needs_manual_review`, and
+**nothing failed anywhere** — ingest answers an unparseable payload with a 200 by
+design, and the app checks the status code.
+
+The registry now lives in `app/contracts/kiosk/__init__.py` and `repair.py`
+imports it. A test asserts the two key sets are identical, so a half-registered
+version fails the build rather than shipping.
+
+**Closed off:** a normalizer that validates its own input. Keeping validation
+separate is what makes the repair path possible at all — repair needs a schema to
+validate the model's output against, and it needs it *before* normalisation has
+run.
+
+## 61. The client's intake id is a request; the backend's response is the answer
+
+The kiosk contract specifies a UUID for `intake_id`. Where a client sends
+something else, `intake_uuid()` derives a stable UUID rather than rejecting a
+completed interview — the identifier format is not worth losing seven minutes of
+a patient's answers over.
+
+The consequence is that **the id a client sent is not necessarily the id the
+intake has**, and everything posted after ingest — the consent artefact, the
+document upload — has to use the one that came back. The Flutter app did not, so
+its document uploads 404'd against an intake that did not exist. After the record
+had been accepted: the patient saw a successful submission and the doctor never
+saw the prescription.
+
+The response's `intake_id` is now authoritative in the app, and it is persisted
+on the receipt rather than held in memory, because a queued upload can be retried
+days later from a cold start.
+
+**Closed off:** making the backend echo the client's id. It would have hidden the
+re-keying rather than removed it, and the derived UUID is what every foreign key
+in the database already points at.
+
+## 62. Verification lives on the report row, and the read path has to carry it
+
+The report builder is pure: same record, byte-identical output. Physician
+verification is not a property of the record — it is an act with an actor and a
+timestamp — so it lives on the stored report row, and `upsert` preserves it
+across a regeneration.
+
+But the report is regenerated on **every** read, which is right: a document that
+arrived an hour after ingest changes the document section, and a physician
+reading a stale report is worse than one waiting 200ms. So the freshly built
+report carried no sign-off, and every re-read of a verified record showed it as
+an unverified draft.
+
+`ReportService.build` now reads the verification off the stored row and attaches
+it. Found by the dashboard's Playwright journey walking login → worklist →
+acknowledge → report → evidence → amend → verify in one pass; no unit test on
+either side had reason to read a report back after signing it.
+
+## 63. The dashboard is in the compose stack
+
+`docker-compose.yml` is the demo path if the venue wifi fails, and until 3/3 it
+produced a working kiosk-to-report flow with nothing to *read* the report on —
+a demonstration of the half of the system nobody watches.
+
+An nginx image serving the built assets, with `/api` and `/ws` proxied to the
+API, so the page, the API and the socket are one origin. That is the shape the
+deployment has and the shape `dashboard/vite.config.ts` reproduces in
+development, which means the dashboard never learns about a second origin: no
+CORS configuration to get wrong, and the refresh cookie stays first-party.
+
+**Closed off:** serving the dashboard from the FastAPI process. It would have
+made the API a static file server, and it would have coupled a frontend rebuild
+to a backend deploy.
+
 ## 33. Known gaps
 
 - **Authentication for staff is a header stand-in.** `X-User-Id` /
@@ -853,7 +932,17 @@ in them states a diagnosis or gives advice.
 - **The FHIR bundle is served but not pushed.** `GET /intakes/{id}/fhir` returns
   a validated R4 bundle; delivering it into a hospital HMIS needs a real
   endpoint to integrate against.
-- **No S3-compatible object store**, per decision 27.
+- **No S3-compatible object store**, per decision 27. The local path is
+  `LocalObjectStore` on a named volume, which is what makes the compose stack a
+  complete pipeline offline; a MinIO container would add an adapter with nothing
+  to talk to it.
+- **The dashboard is English only.** 3/3 §9 asks for the doctor-facing UI in
+  English and Hindi. The patient's own words are shown verbatim in their own
+  script throughout — the rule that matters clinically, and the one that is
+  tested — but the chrome around them is not translated. An ARB file and a locale
+  switch, not a redesign.
+- **iOS is unverified** and stays that way without a Mac. Android-only is a
+  reasonable scope statement for this build; implying iOS works is not.
 - **The evaluation harness is shelved, not repurposed.** §3 of the brief kept it
   for reuse in §13; the migration was started and left half-done —
   `evaluation/run.py` imported a module that was never written, and it had not

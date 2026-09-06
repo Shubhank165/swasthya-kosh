@@ -50,6 +50,18 @@ backend/uploads/
 # scripts run from a checkout, not from inside the image.
 docs/
 infra/
+# …except the two files the dashboard image copies in. `infra/` is excluded
+# wholesale because the deploy scripts have no business being inside a running
+# container; these are build inputs, which is a different thing.
+!infra/docker/dashboard.nginx.conf
+!infra/docker/dashboard.Dockerfile
 *.md
 Makefile
 docker-compose.yml
+
+# The dashboard's dependency tree. The image installs its own from the lockfile
+# in its build stage; this one is somebody's laptop, and it is 300 MB.
+dashboard/node_modules/
+dashboard/dist/
+dashboard/test-results/
+dashboard/playwright-report/

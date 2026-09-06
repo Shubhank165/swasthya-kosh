@@ -5,6 +5,9 @@
 # and no credential with a value baked in. `docker compose up` must produce a
 # working kiosk-to-report flow or this file is broken.
 #
+# `docker compose up` brings up Postgres, migrations, the seeder, the API on
+# :8000 and the doctor's dashboard on :5173 — the whole path a demo walks.
+#
 # Local defaults are the mock ones — OCR_PROVIDER=mock serves cached results for
 # the fixture documents, ABHA_PROVIDER=mock stamps every response `"source":
 # "mock"` so a mocked government integration is never shown as live, and
@@ -97,6 +100,31 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+    restart: unless-stopped
+
+  # The screen the demo is about — 3/3 §4.
+  #
+  # Without it this stack produced a working kiosk-to-report flow with nothing
+  # to read the report on, which made the wifi-failure path a demonstration of
+  # the half of the system nobody watches. Static assets behind nginx, with
+  # `/api` and `/ws` proxied to the API so the page, the API and the socket are
+  # one origin — the same shape the deployment has, and the same shape
+  # `dashboard/vite.config.ts` reproduces in development.
+  dashboard:
+    build:
+      context: .
+      dockerfile: infra/docker/dashboard.Dockerfile
+    ports:
+      - "${DASHBOARD_PORT:-5173}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   # The OCR worker's *deployment shape*, available locally under

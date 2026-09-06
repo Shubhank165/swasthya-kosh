@@ -1,4 +1,4 @@
-# MediKiosk — clinical intake backend
+# MediKiosk — clinical intake for AYUSH OPDs
 
 Ayurveda-first pre-consultation clinical intake for Indian AYUSH hospital OPDs.
 SIH 2026, PS 26047, Ministry of Ayush / All India Institute of Ayurveda.
@@ -31,13 +31,18 @@ make dev
 ```
 
 Compose brings up Postgres, runs the migrations as their own one-shot service,
-seeds the demo facility, and then starts the API — in that order, with the API
-waiting on the two jobs completing successfully.
+seeds the demo facility, starts the API, and then serves the doctor's dashboard
+beside it — in that order, each waiting on the last.
 
 ```bash
-curl localhost:8000/readyz     # says which providers are live and which shape this is
+open  localhost:5173           # the dashboard: worklist, report, evidence
+curl  localhost:8000/readyz    # says which providers are live and which shape this is
 open  localhost:8000/docs
 ```
+
+The dashboard proxies `/api` and `/ws` to the API, so the page, the API and the
+socket are one origin — the same shape the deployment has. Nothing in this stack
+needs a Google account or a network.
 
 `KIOSK_TOKENS` is a JSON object mapping each kiosk's token to its hospital:
 `{"<token>":"aiia-delhi"}`. `aiia-delhi` is the id the seeder creates. There is
@@ -117,9 +122,25 @@ holds it.
 
 ```bash
 make check        # ruff, mypy, and the offline suite — what `make deploy` runs first
-make test         # 358 tests, no network
+make test         # 483 tests, no network
 make test-all     # + the FHIR bundle against the published HAPI validator
 ```
+
+The other two parts, each with a suite that runs against a real backend rather
+than a stub:
+
+```bash
+cd dashboard && npm test && npm run typecheck && npm run lint
+cd dashboard && npm run e2e            # Playwright; starts its own backend
+cd app       && flutter test           # 158 tests
+cd app       && flutter test test/live_backend_test.dart \
+                  --dart-define=MEDIKIOSK_LIVE=http://localhost:8000
+cd app       && flutter test integration_test/journey_test.dart -d <device>
+```
+
+The last two are the ones worth running before a demo. Each of them, the first
+time it was run, found something no unit test could — see
+`docs/CHECKPOINT_IMPL_3.md`.
 
 `mypy` is strict on `app.domain.*`, `app.normalize.*` and `app.contracts.*` — the
 parts a schema change touches and where a silent `None` is a clinical error — and
@@ -144,7 +165,10 @@ backend/app/
   db/tenancy.py    the guard that raises on an unscoped query
 backend/stale/     the previous build. Kept, not maintained, not deployed.
 clinical/          YAML a clinician can review in a pull request
-infra/             Dockerfile, cloudbuild, gcloud scripts
+infra/             Dockerfiles, cloudbuild, gcloud scripts
+
+app/               the patient's phone (Flutter). Touch only; no microphone.
+dashboard/         the doctor's screen (React). Renders; never computes.
 ```
 
 `clinical/` holds the report templates and field labels per language, the
@@ -160,19 +184,22 @@ POST   /api/v1/intakes/ingest                       one completed kiosk intervie
 GET    /api/v1/intakes/{id}
 GET    /api/v1/intakes/{id}/report                  ?language=
 POST   /api/v1/intakes/{id}/verify                  physician-only
+POST   /api/v1/intakes/{id}/facts/{fact_id}/verify  physician-only: accept/amend/reject
 GET    /api/v1/intakes/{id}/facts/{fact_id}/evidence
 POST   /api/v1/intakes/{id}/documents               upload a scan
 GET    /api/v1/intakes/{id}/documents
 POST   /api/v1/intakes/{id}/documents/results       results produced on the device
 GET    /api/v1/documents/content/{key}
 GET    /api/v1/fhir/intakes/{id}                    dual-coded R4 Bundle
-GET    /api/v1/worklist                             today's OPD, no clinical text
+GET    /api/v1/worklist                             ?department= &state=  no clinical text
 POST   /api/v1/patients/resolve
 GET    /api/v1/patients/{ref}/history
 POST   /api/v1/consent  ·  GET /api/v1/consent/{id}
 GET    /api/v1/terminology/{search,dual-codes,CodeSystem,ConceptMap,ValueSet}
+GET    /api/v1/alerts                               ?acknowledged=  unacknowledged first
 POST   /api/v1/alerts/{intake_id}/acknowledge
 GET    /api/v1/metrics/ingest
+GET    /api/v1/metrics/correction-rate              admin-only
 GET    /healthz  ·  /readyz
 WS     /ws/...                                      dashboard fan-out
 ```
@@ -215,17 +242,58 @@ rest — stays in region for the model in use.
 is enabled anywhere near real patient data.** It is decision 31 in
 `docs/DECISIONS.md`, and it is a decision for the team.
 
+## What can and cannot be claimed
+
+Worth having in the README rather than only in a slide deck, because the
+temptation to round these up is strongest ten minutes before a demo.
+
+**Can:**
+
+- Two intake paths — the Jetson kiosk and the patient's phone — produce the same
+  record. The backend normalises it, repairs it if malformed, reads the
+  documents, and renders a template-based report a physician verifies fact by
+  fact.
+- A whole intake has gone from the app's own code into a running backend and
+  come back accepted, including a photographed prescription through the real
+  multipart endpoint.
+- The eleven-screen app sequence passes on a physical Android device.
+- `docker compose up` produces the entire system offline.
+
+**Cannot:**
+
+- **"Nine languages."** Questions exist in nine; the consent notice is English
+  and Hindi only, so seven of the nine stop at the consent screen. That is the
+  correct failure — proceeding without consent would be worse — but the honest
+  claim is *"questions in nine languages, consent in two"* until a native speaker
+  translates the notice.
+- **The old evaluation figures.** 100% required-field recall, 100% red-flag
+  recall, zero unsupported assertions: those came from a harness that tested
+  question selection, which now runs on the Jetson, so they describe nothing this
+  backend does. The harness is in `backend/stale/`. The replacements are
+  **repair rate**, **completion rate** and **correction rate**, all three live and
+  all three reproducible. The correction rate reports `null` rather than `0.0`
+  until a physician has reviewed something — a zero on an empty denominator reads
+  as "never wrong".
+- **iOS.** Unverified, and it stays that way without a Mac. Android-only is a
+  reasonable scope statement; implying iOS works is not.
+- **Cloud document reading.** The Vertex processing region is unconfirmed, so the
+  adapters fail closed. It does not block the kiosk path — the Jetson reads
+  documents on-device and sends results up, so no image leaves the building — and
+  blocks only documents uploaded from the phone.
+- **Clinical sign-off.** Every red-flag rule carries `clinical_source: pending`.
+  See `docs/CLINICAL_REVIEW_QUEUE.md`.
+
 ## Not in this build
 
-Frontend applications; the Jetson and Raspberry Pi edge profiles; live ABDM,
-A-HMIS and FHIR credentials; an S3-compatible object store; pushing the FHIR
-bundle into a hospital HMIS. `docs/DECISIONS.md` §27 and §33 say why for each,
-and what it would take.
+The Jetson and Raspberry Pi edge profiles; live ABDM, A-HMIS and FHIR
+credentials; an S3-compatible object store; pushing the FHIR bundle into a
+hospital HMIS; queue management, which the hospital's own HMIS already does.
+`docs/DECISIONS.md` §27 and §33 say why for each, and what it would take.
 
 ## Reading further
 
 - `docs/DECISIONS.md` — every choice, and the option it closed off
-- `docs/CHECKPOINT_IMPL_1.md` — build state against the brief
+- `docs/CHECKPOINT_IMPL_1.md` · `_2` · `_3` — build state against each brief
 - `infra/gcp/README.md` — deployment
 - `backend/stale/README.md` — what the previous build was and why each piece moved
 

@@ -150,6 +150,11 @@ been executed**, because there is no device here and it cannot run on the host
 adapter**, apart from the ingest itself. The document upload has never run
 against the real multipart endpoint.
 
+> **Resolved in 3/3 (§B1): dropped.** Eleven screens in a fixed linear sequence
+> with one branch is not what go_router is for, and migrating six call sites
+> bought nothing. The dependency is gone from `pubspec.yaml`; navigation stays
+> `Navigator.push`. The paragraph below is left as it was written.
+
 **`go_router` is a dependency and is not used.** §13 names it in the stack;
 navigation is `Navigator.push` at six call sites. The intake itself is
 controller-driven by design — `IntakeHost` switches on `FlowStage` — so a router
@@ -162,6 +167,10 @@ not a defensible end state.
 ---
 
 ## Resume here
+
+*(Items 1 and 2 are closed — see `CHECKPOINT_IMPL_3.md`. Item 1 was run on a
+physical device and found a real defect; item 2 was settled by dropping the
+dependency.)*
 
 1. **Run `integration_test/journey_test.dart` on a device**, then tap through
    one intake by hand. Install the APK on an emulator, run the backend

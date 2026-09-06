@@ -35,15 +35,23 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.adapters.protocols import RepairProvider
-# The single registry. This module used to keep its own copy, which is how the
-# app's 0.2 payloads spent a fortnight being filed as `needs_manual_review` —
-# see the note in `app/contracts/kiosk/__init__.py`.
 from app.contracts.kiosk import CONTRACTS, contract_for
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-__all__ = ["CONTRACTS", "RepairOutcome", "contract_for", "repair", "safe_errors", "validate"]
+#: Re-exported. `CONTRACTS` and `contract_for` come from
+#: `app/contracts/kiosk/__init__.py`, which is the single registry — this module
+#: used to keep its own copy, and that is how the app's 0.2 payloads spent as
+#: long as the app has existed being filed as `needs_manual_review`.
+__all__ = [
+    "CONTRACTS",
+    "RepairOutcome",
+    "attempt",
+    "contract_for",
+    "safe_errors",
+    "validate",
+]
 
 
 @dataclass(frozen=True, slots=True)
