@@ -38,7 +38,7 @@ common=(
 #
 # `^;^` picks semicolon as the separator, because some values contain commas
 # and none contains a semicolon.
-ENV_SHARED="ENVIRONMENT=production;CLINICAL_CONTENT_DIR=/app/clinical;LOG_JSON=true;STORAGE_BACKEND=gcs;GCS_BUCKET=${BUCKET};GCP_PROJECT=${PROJECT_ID};DOCUMENT_QUEUE=pubsub;PUBSUB_TOPIC=${TOPIC};VERTEX_PROJECT=${PROJECT_ID};VERTEX_REGION=${REGION};ALLOW_HEADER_AUTH=false"
+ENV_SHARED="ENVIRONMENT=${DEPLOY_ENVIRONMENT};CLINICAL_CONTENT_DIR=/app/clinical;LOG_JSON=true;STORAGE_BACKEND=gcs;GCS_BUCKET=${BUCKET};GCP_PROJECT=${PROJECT_ID};DOCUMENT_QUEUE=pubsub;PUBSUB_TOPIC=${TOPIC};VERTEX_PROJECT=${PROJECT_ID};VERTEX_REGION=${REGION};ALLOW_HEADER_AUTH=false"
 
 # Which providers this revision runs. Both services get the same string: they
 # run the same image, `/readyz` on either has to say what that service would
@@ -178,11 +178,19 @@ fi
 echo "    worker route absent from the public API (404) — as intended"
 
 say "Deployed ${TAG}"
+echo "  env    ${DEPLOY_ENVIRONMENT}"
 echo "  ocr    ${OCR_PROVIDER}"
 echo "  repair ${REPAIR_PROVIDER}"
 if [[ "${uses_cloud_models}" == "true" ]]; then
   echo "  NOTE: this revision sends patient documents and patient answers to"
   echo "        Vertex in ${REGION}. VERTEX_ZDR_ENABLED=true is your assertion."
+fi
+if [[ "${DEPLOY_ENVIRONMENT}" != "production" ]]; then
+  echo "  WARNING: ENVIRONMENT=${DEPLOY_ENVIRONMENT} with the mock OTP sender."
+  echo "           The sign-in response carries the six-digit code, so anyone"
+  echo "           who knows a phone number can sign in as that patient. This is"
+  echo "           for testing the app against a deployment holding no real"
+  echo "           records. Redeploy without DEPLOY_ENVIRONMENT before it does."
 fi
 echo "  API    ${API_URL}"
 echo "  worker ${WORKER_URL} (not publicly invocable)"

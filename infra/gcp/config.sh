@@ -78,6 +78,18 @@ SECRET_PUSH_TOKEN="${SECRET_PUSH_TOKEN:-medikiosk-pubsub-push-token}"
 # have to be typed into devices.
 SECRET_PATIENT_PEPPER="${SECRET_PATIENT_PEPPER:-medikiosk-patient-ref-pepper}"
 
+# --- environment ------------------------------------------------------------
+# `production` everywhere it matters, and the one thing in the backend that keys
+# off it is the one that matters most: `PatientAuthService` returns the
+# six-digit OTP in the sign-in response when the sender is the mock **and** the
+# environment is not production. Outside production that is what lets a demo on
+# a laptop with no signal complete a sign-in; inside it, it would hand anyone
+# who knows a phone number a session as that patient.
+#
+# So it is a knob, because testing the app against a real deployment needs one,
+# and it is a knob that says what it costs on every deploy that uses it.
+DEPLOY_ENVIRONMENT="${DEPLOY_ENVIRONMENT:-production}"
+
 # --- models -----------------------------------------------------------------
 # Which providers this deployment runs, and the preconditions for the cloud
 # ones. Defaults are the mocks, because a deployment that reaches a model by

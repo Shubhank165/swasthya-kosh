@@ -81,6 +81,14 @@ make deploy
 ```
 
 The model ids are not in this repository and are refused if missing.
+
+To drive the **app** against a deployment, add `DEPLOY_ENVIRONMENT=staging`. The
+only thing in the backend that reads the environment is `PatientAuthService`,
+which returns the six-digit OTP in the sign-in response when the sender is the
+mock and the environment is not production — without it there is no SMS gateway
+and no code, so sign-in cannot complete. With it, anyone who knows a phone
+number can sign in as that patient, so it belongs on a deployment holding no
+real records and nowhere else. The deploy prints that back at you.
 `VERTEX_ZDR_ENABLED` is refused if a cloud provider is selected without it, in
 `infra/gcp/config.sh`, before an image is built — and setting it is an assertion
 you are making about the project, which nothing here can verify. Read the
