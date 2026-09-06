@@ -126,6 +126,7 @@ class Question {
     required this.prompts,
     this.options,
     this.unit,
+    this.units,
     this.minimum,
     this.maximum,
     this.required = true,
@@ -145,6 +146,7 @@ class Question {
         },
         options: (json['options'] as List<dynamic>?)?.map((v) => v.toString()).toList(),
         unit: json['unit'] as String?,
+        units: (json['units'] as List<dynamic>?)?.map((v) => v.toString()).toList(),
         minimum: (json['min'] as num?)?.toDouble(),
         maximum: (json['max'] as num?)?.toDouble(),
         required: json['required'] as bool? ?? true,
@@ -165,6 +167,10 @@ class Question {
   final Map<String, String> prompts;
   final List<String>? options;
   final String? unit;
+
+  /// Units the patient may answer in, with [unit] the default. Null or a single
+  /// entry means no choice is offered.
+  final List<String>? units;
   final double? minimum;
   final double? maximum;
   final bool required;

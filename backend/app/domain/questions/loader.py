@@ -125,6 +125,7 @@ def _question(
         answer_type=_answer_type(str(answer.get("type", "")), source, str(concept)),
         options=tuple(answer["options"]) if answer.get("options") else None,
         unit=answer.get("unit"),
+        units=_units(answer, source, str(concept)),
         minimum=answer.get("min"),
         maximum=answer.get("max"),
         prompts={lang: str(prompts[lang]) for lang in languages},
@@ -138,6 +139,30 @@ def _question(
         needs_clinical_review=bool(raw.get("needs_clinical_review", False)),
         current_state=bool(raw.get("current_state", False)),
     )
+
+
+def _units(
+    answer: Mapping[str, Any], source: str, concept: str
+) -> tuple[str, ...] | None:
+    """The alternative units a patient may answer in.
+
+    `unit` stays the default and has to appear in `units`; a list that does not
+    contain the default would leave the question with no unit selected until the
+    patient picked one, which is a way of losing an answer.
+    """
+    raw = answer.get("units")
+    if raw is None:
+        return None
+    units = tuple(str(u) for u in raw)
+    default = answer.get("unit")
+    if not default:
+        raise ContentError(f"{source}: field {concept!r} lists `units` but no `unit`")
+    if str(default) not in units:
+        raise ContentError(
+            f"{source}: field {concept!r} has unit {default!r}, which is not in "
+            f"its `units` {list(units)}"
+        )
+    return units
 
 
 def _questions_from(

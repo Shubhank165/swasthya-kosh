@@ -122,6 +122,18 @@ class Question(BaseModel):
     #: Choice options, or `None` for the types that have none.
     options: tuple[str, ...] | None = None
     unit: str | None = None
+    #: Alternative units the patient may answer in, `unit` first.
+    #:
+    #: Temperature is the case that forced this: an Indian OPD patient with a
+    #: home thermometer reads Fahrenheit, and a Celsius-only box means they
+    #: either convert in their head or type 101 into a field labelled °C.
+    #:
+    #: The chosen unit travels with the value; nothing converts it. That is the
+    #: same reasoning `Duration` gives for not normalising "about 2 weeks" into
+    #: seconds — and it is safe here because no red-flag rule compares a
+    #: temperature to a threshold. If one is ever written, it must read the
+    #: unit rather than assume it.
+    units: tuple[str, ...] | None = None
     minimum: float | None = None
     maximum: float | None = None
     prompts: Mapping[str, str]
@@ -158,6 +170,7 @@ class Question(BaseModel):
         }
         for key, value in (
             ("unit", self.unit),
+            ("units", list(self.units) if self.units else None),
             ("min", self.minimum),
             ("max", self.maximum),
         ):

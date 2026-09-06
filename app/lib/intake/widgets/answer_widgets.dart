@@ -35,26 +35,41 @@ Widget? buildAnswerWidget({
   required Question question,
   required OnAnswered onAnswered,
   Key? key,
-}) =>
-    switch (question.answerType) {
+}) {
+  // **Keyed by question, always.** Flutter keeps a `State` object when the same
+  // widget type appears in the same position on the next build, and every
+  // question in the interview renders one answer widget in exactly the same
+  // place. So walking from one free-text question to the next kept the previous
+  // `TextEditingController` — the patient's answer to "what medicines do you
+  // take" was sitting in the box when they were asked about allergies, ready to
+  // be confirmed as their answer to that.
+  //
+  // Text was the visible half. A part-filled multi-select and a dragged pain
+  // scale carried over the same way and were harder to notice.
+  //
+  // The key is the question id rather than the answer type: two consecutive
+  // free-text questions are the case that broke, and they share a type.
+  final resolved = key ?? ValueKey<String>(question.questionId);
+  return switch (question.answerType) {
       AnswerType.singleChoice => SingleChoiceAnswer(
-          key: key, question: question, onAnswered: onAnswered),
+          key: resolved, question: question, onAnswered: onAnswered),
       AnswerType.multiChoice => MultiChoiceAnswer(
-          key: key, question: question, onAnswered: onAnswered),
+          key: resolved, question: question, onAnswered: onAnswered),
       AnswerType.yesNoUnknown =>
-        YesNoAnswer(key: key, question: question, onAnswered: onAnswered),
+        YesNoAnswer(key: resolved, question: question, onAnswered: onAnswered),
       AnswerType.number =>
-        NumberAnswer(key: key, question: question, onAnswered: onAnswered),
+        NumberAnswer(key: resolved, question: question, onAnswered: onAnswered),
       AnswerType.scale =>
-        ScaleAnswer(key: key, question: question, onAnswered: onAnswered),
+        ScaleAnswer(key: resolved, question: question, onAnswered: onAnswered),
       AnswerType.duration =>
-        DurationAnswer(key: key, question: question, onAnswered: onAnswered),
+        DurationAnswer(key: resolved, question: question, onAnswered: onAnswered),
       AnswerType.date =>
-        DateAnswer(key: key, question: question, onAnswered: onAnswered),
+        DateAnswer(key: resolved, question: question, onAnswered: onAnswered),
       AnswerType.freeText =>
-        FreeTextAnswer(key: key, question: question, onAnswered: onAnswered),
+        FreeTextAnswer(key: resolved, question: question, onAnswered: onAnswered),
       AnswerType.unknown => null,
-    };
+  };
+}
 
 /// A tappable option row.
 ///
@@ -259,6 +274,20 @@ class NumberAnswer extends StatefulWidget {
 class _NumberAnswerState extends State<NumberAnswer> {
   final _controller = TextEditingController();
 
+  /// The unit the answer will be recorded in. Starts as the question's default
+  /// and changes only when the patient picks another, so an untouched question
+  /// records exactly what it would have before.
+  late String? _unit = widget.question.unit;
+
+  /// The alternatives, or empty when the question offers no choice.
+  ///
+  /// A single-entry list is not a choice and does not draw one — the toggle
+  /// appears only where the content author listed more than one unit.
+  List<String> get _units {
+    final units = widget.question.units ?? const [];
+    return units.length > 1 ? units : const [];
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -278,17 +307,36 @@ class _NumberAnswerState extends State<NumberAnswer> {
           // and no microphone key on most Android IMEs (§1 rule 8).
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           style: Theme.of(context).textTheme.bodyLarge,
-          decoration: InputDecoration(suffixText: widget.question.unit),
+          decoration: InputDecoration(suffixText: _unit),
           onChanged: (_) => setState(() {}),
         ),
+        if (_units.isNotEmpty) ...[
+          const SizedBox(height: Sizes.gap),
+          for (final unit in _units)
+            OptionTile(
+              key: Key('unit.$unit'),
+              label: optionLabel(unit),
+              selected: _unit == unit,
+              // Only the label changes. The number the patient typed is left
+              // exactly as typed and nothing is converted — 38.5 °C does not
+              // silently become 101.3 °F, and the record carries whichever
+              // unit was chosen alongside the figure.
+              onTap: () => setState(() => _unit = unit),
+            ),
+        ],
         const SizedBox(height: Sizes.gap),
         FilledButton(
           key: const Key('answer.confirm'),
           onPressed: _value == null
               ? null
               : () => widget.onAnswered(
-                    NumberValue(_value!, unit: widget.question.unit),
-                    _controller.text.trim(),
+                    NumberValue(_value!, unit: _unit),
+                    // The unit travels in the patient's own words too, so a
+                    // physician reading `original_text` sees "101 fahrenheit"
+                    // rather than a bare number whose unit lives elsewhere.
+                    _unit == null
+                        ? _controller.text.trim()
+                        : '${_controller.text.trim()} $_unit',
                   ),
           child: Text(strings.continueLabel),
         ),

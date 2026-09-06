@@ -24,7 +24,11 @@ fields:
   - concept: severity
     required: true
     priority: 30
-    answer: {type: quantity, unit: celsius}
+    # Celsius stays the default and the record keeps whichever the patient
+    # chose; nothing converts. A home thermometer in an Indian household
+    # usually reads Fahrenheit, and a °C-only box invites someone to type 101
+    # into it.
+    answer: {type: quantity, unit: celsius, units: [celsius, fahrenheit]}
     prompts:
       en: "If you have measured it, what was the highest temperature?"
       hi: "अगर आपने नापा है, तो सबसे ज़्यादा तापमान कितना था?"

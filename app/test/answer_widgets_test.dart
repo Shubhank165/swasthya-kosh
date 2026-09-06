@@ -18,17 +18,20 @@ Question q(
   String type, {
   List<String>? options,
   String? unit,
+  List<String>? units,
   double? min,
   double? max,
+  String questionId = 'q',
 }) =>
     Question(
-      questionId: 'q',
+      questionId: questionId,
       fieldId: 'f',
       section: 'hpi',
       answerType: AnswerType.parse(type),
       prompts: const {'en': 'A question'},
       options: options,
       unit: unit,
+      units: units,
       minimum: min,
       maximum: max,
     );
@@ -341,4 +344,166 @@ void main() {
       }
     });
   });
+
+  testWidgets('a temperature can be given in fahrenheit, and is not converted',
+      (tester) async {
+    // An Indian household thermometer reads Fahrenheit. A Celsius-only box
+    // does not stop that patient answering — it makes them type 101 into a
+    // field labelled °C, which is a fever recorded as hypothermia.
+    final question = q('number', unit: 'celsius', units: ['celsius', 'fahrenheit']);
+    AnswerValue? value;
+    String? text;
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      theme: buildTheme(),
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: buildAnswerWidget(
+            question: question,
+            onAnswered: (v, t) {
+              value = v;
+              text = t;
+            },
+          )!,
+        ),
+      ),
+    ));
+    await tester.enterText(find.byKey(const Key('answer.number')), '101');
+    await tester.tap(find.byKey(const Key('unit.fahrenheit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('answer.confirm')));
+    await tester.pumpAndSettle();
+
+    // 101, not 38.3. Converting would put a number in the record the patient
+    // never said, and `Duration` gives the same reason for not normalising
+    // "about two weeks" into seconds.
+    expect((value! as NumberValue).value, 101);
+    expect((value as NumberValue).unit, 'fahrenheit');
+    expect(text, '101 fahrenheit');
+  });
+
+  testWidgets('the default unit is recorded when the patient does not choose',
+      (tester) async {
+    final question = q('number', unit: 'celsius', units: ['celsius', 'fahrenheit']);
+    final (value, text) = await pumpAnswerWith(tester, question, '38.5');
+    expect((value! as NumberValue).unit, 'celsius');
+    expect(text, '38.5 celsius');
+  });
+
+  testWidgets('a question with one unit offers no choice', (tester) async {
+    // A toggle with a single option is a control that cannot do anything.
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      theme: buildTheme(),
+      home: Scaffold(
+        body: buildAnswerWidget(
+          question: q('number', unit: 'years'),
+          onAnswered: (_, __) {},
+        )!,
+      ),
+    ));
+    expect(find.byKey(const Key('unit.years')), findsNothing);
+  });
+
+  testWidgets('a new question starts with an empty text box', (tester) async {
+    // Flutter reuses a `State` when the same widget type lands in the same
+    // position, and every question renders its answer widget in the same
+    // position. Without a per-question key the previous answer was still in
+    // the box — so the reply to "which medicines do you take" was sitting
+    // there, pre-filled, when the next question asked about allergies.
+    Question showing = q('free_text', questionId: 'medications');
+    late StateSetter setOuter;
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      theme: buildTheme(),
+      home: Scaffold(
+        body: StatefulBuilder(
+          builder: (context, setState) {
+            setOuter = setState;
+            return buildAnswerWidget(
+              question: showing,
+              onAnswered: (_, __) {},
+            )!;
+          },
+        ),
+      ),
+    ));
+
+    await tester.enterText(find.byKey(const Key('answer.free_text')), 'Metformin 500mg');
+    await tester.pumpAndSettle();
+    expect(find.text('Metformin 500mg'), findsOneWidget);
+
+    setOuter(() => showing = q('free_text', questionId: 'allergies'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Metformin 500mg'), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byKey(const Key('answer.free_text'))).controller!.text,
+      isEmpty,
+    );
+  });
+
+  testWidgets('the same question keeps what the patient has typed so far',
+      (tester) async {
+    // The guard has to be narrow. Clearing on every rebuild would wipe the box
+    // each time the widget redraws, which is every keystroke.
+    Question showing = q('free_text', questionId: 'medications');
+    late StateSetter setOuter;
+
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      theme: buildTheme(),
+      home: Scaffold(
+        body: StatefulBuilder(
+          builder: (context, setState) {
+            setOuter = setState;
+            return buildAnswerWidget(question: showing, onAnswered: (_, __) {})!;
+          },
+        ),
+      ),
+    ));
+
+    await tester.enterText(find.byKey(const Key('answer.free_text')), 'Metformin');
+    setOuter(() => showing = q('free_text', questionId: 'medications'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Metformin'), findsOneWidget);
+  });
+
+}
+
+/// Type [entry] into the number box and confirm, returning what was recorded.
+Future<(AnswerValue?, String?)> pumpAnswerWith(
+  WidgetTester tester,
+  Question question,
+  String entry,
+) async {
+  AnswerValue? captured;
+  String? capturedText;
+  await tester.pumpWidget(MaterialApp(
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    theme: buildTheme(),
+    home: Scaffold(
+      body: SingleChildScrollView(
+        child: buildAnswerWidget(
+          question: question,
+          onAnswered: (value, text) {
+            captured = value;
+            capturedText = text;
+          },
+        )!,
+      ),
+    ),
+  ));
+  await tester.enterText(find.byKey(const Key('answer.number')), entry);
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('answer.confirm')));
+  await tester.pumpAndSettle();
+  return (captured, capturedText);
 }
