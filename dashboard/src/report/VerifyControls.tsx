@@ -16,6 +16,7 @@ import { useState } from 'react';
 
 import type { Fact, FactValue } from '../api/types';
 import type { FactAction } from '../api/queries';
+import { useT } from '../i18n';
 
 export function VerifyControls({
   fact,
@@ -26,12 +27,13 @@ export function VerifyControls({
   onAct: (action: FactAction) => void;
   pending: boolean;
 }) {
+  const t = useT();
   const [mode, setMode] = useState<'idle' | 'amending' | 'rejecting'>('idle');
 
   if (fact.physician_action === 'verified' || fact.physician_action === 'amended') {
     return (
       <span className="shrink-0 self-center text-xs text-verified">
-        {fact.physician_action === 'amended' ? 'corrected' : 'verified'}
+        {t(fact.physician_action === 'amended' ? 'verify.corrected' : 'verify.verified')}
       </span>
     );
   }
@@ -53,10 +55,7 @@ export function VerifyControls({
   if (mode === 'rejecting') {
     return (
       <div className="shrink-0 self-center rounded border border-conflict/40 bg-conflict-soft p-2 text-xs">
-        <p className="max-w-xs text-conflict">
-          This records that the field was <strong>never established</strong> —
-          not that the answer is no.
-        </p>
+        <p className="max-w-xs text-conflict">{t('verify.rejectWarning')}</p>
         <div className="mt-1 flex gap-1">
           <button
             type="button"
@@ -68,14 +67,14 @@ export function VerifyControls({
             }}
             className="rounded bg-conflict px-2 py-1 font-medium text-white"
           >
-            Confirm
+            {t('verify.confirm')}
           </button>
           <button
             type="button"
             onClick={() => setMode('idle')}
             className="rounded border border-line px-2 py-1 text-ink"
           >
-            Cancel
+            {t('verify.cancel')}
           </button>
         </div>
       </div>
@@ -85,24 +84,22 @@ export function VerifyControls({
   return (
     <span className="flex shrink-0 gap-1 self-center opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
       <Action
-        label="Accept"
+        label={t('verify.accept')}
         testId="accept"
         disabled={pending || fact.status !== 'answered'}
-        title={
-          fact.status === 'answered'
-            ? 'Confirm this as recorded'
-            : 'Nothing to confirm — this field was never answered'
-        }
+        title={t(
+          fact.status === 'answered' ? 'verify.acceptHint' : 'verify.acceptDisabled',
+        )}
         onClick={() => onAct({ factId: fact.fact_id, action: 'verified' })}
       />
       <Action
-        label="Amend"
+        label={t('verify.amend')}
         testId="amend"
         disabled={pending}
         onClick={() => setMode('amending')}
       />
       <Action
-        label="Reject"
+        label={t('verify.reject')}
         testId="reject"
         disabled={pending || fact.status !== 'answered'}
         onClick={() => setMode('rejecting')}
@@ -157,6 +154,7 @@ function AmendEditor({
   onCancel: () => void;
   pending: boolean;
 }) {
+  const t = useT();
   const existing = (fact.value ?? {}) as Record<string, unknown>;
   const kind = (existing.kind as string | undefined) ?? 'text';
   const [draft, setDraft] = useState(() => initialDraft(kind, existing));
@@ -177,17 +175,17 @@ function AmendEditor({
       <div className="flex items-center gap-1">
         {kind === 'boolean' ? (
           <select
-            aria-label="Corrected value"
+            aria-label={t('verify.value')}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             className="rounded border border-line bg-surface px-1.5 py-1 text-ink"
           >
-            <option value="true">yes</option>
-            <option value="false">no</option>
+            <option value="true">{t('verify.yes')}</option>
+            <option value="false">{t('verify.no')}</option>
           </select>
         ) : (
           <input
-            aria-label="Corrected value"
+            aria-label={t('verify.value')}
             value={draft}
             autoFocus
             onChange={(event) => setDraft(event.target.value)}
@@ -196,7 +194,7 @@ function AmendEditor({
         )}
         {(kind === 'duration' || kind === 'quantity') && (
           <input
-            aria-label="Unit"
+            aria-label={t('verify.unit')}
             value={unit}
             onChange={(event) => setUnit(event.target.value)}
             className="w-20 rounded border border-line bg-surface px-1.5 py-1 text-ink"
@@ -208,19 +206,19 @@ function AmendEditor({
           disabled={pending}
           className="rounded bg-accent px-2 py-1 font-medium text-white"
         >
-          Save
+          {t('verify.save')}
         </button>
         <button
           type="button"
           onClick={onCancel}
           className="rounded border border-line px-2 py-1 text-ink"
         >
-          Cancel
+          {t('verify.cancel')}
         </button>
       </div>
       <input
-        aria-label="Reason"
-        placeholder="Reason (optional)"
+        aria-label={t('verify.reason')}
+        placeholder={t('verify.reasonPlaceholder')}
         value={reason}
         onChange={(event) => setReason(event.target.value)}
         className="mt-1 w-full rounded border border-line bg-surface px-1.5 py-1 text-ink"
@@ -229,7 +227,10 @@ function AmendEditor({
           value; it does not revise what the patient said. */}
       {fact.original_text && (
         <p className="mt-1 max-w-xs text-ink-muted">
-          Heard: <span lang={fact.language ?? undefined}>{fact.original_text}</span>
+          {/* The label is translated; what the patient said is not, and it
+              carries its own `lang` so a screen reader pronounces it. */}
+          {t('verify.heard')}{' '}
+          <span lang={fact.language ?? undefined}>{fact.original_text}</span>
         </p>
       )}
     </form>

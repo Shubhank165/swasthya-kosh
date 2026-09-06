@@ -11,6 +11,7 @@
  * line arrive from the backend already decided (§1 rule 1, §12).
  */
 import { StateChip } from '../components/StateChip';
+import { useT, type Translate } from '../i18n';
 import type {
   Contradiction,
   ConflictSide,
@@ -39,9 +40,11 @@ export function ReportView({
   onSelectFact,
   renderActions,
 }: Props) {
+  const t = useT();
+  const label = t('report.aria');
   const sections = report.sections ?? [];
   return (
-    <article className="space-y-6" aria-label="Patient report">
+    <article className="space-y-6" aria-label={label}>
       {sections
         .filter((section) => section.lines.length > 0)
         .map((section) => (
@@ -189,16 +192,17 @@ function UnresolvedBlock({
   onSelectFact: (factId: string) => void;
   renderActions?: (factId: string) => React.ReactNode;
 }) {
+  const t = useT();
   return (
     <section aria-labelledby="section-unresolved" data-testid="unresolved-section">
       <h3
         id="section-unresolved"
         className="mb-2 text-xs font-semibold uppercase tracking-wide text-uncertain"
       >
-        Unresolved
+        {t('report.unresolved')}
       </h3>
       {lines.length === 0 ? (
-        <p className="px-2 text-sm text-ink-muted">Nothing unresolved.</p>
+        <p className="px-2 text-sm text-ink-muted">{t('report.nothingUnresolved')}</p>
       ) : (
         <ul className="space-y-1">
           {lines.map((line, index) => (
@@ -226,16 +230,17 @@ function ConflictsBlock({
   selectedFactId: string | null;
   onSelectFact: (factId: string) => void;
 }) {
+  const t = useT();
   return (
     <section aria-labelledby="section-conflicts" data-testid="conflicts-section">
       <h3
         id="section-conflicts"
         className="mb-2 text-xs font-semibold uppercase tracking-wide text-conflict"
       >
-        Conflicts
+        {t('report.conflicts')}
       </h3>
       {conflicts.length === 0 ? (
-        <p className="px-2 text-sm text-ink-muted">No conflicting accounts.</p>
+        <p className="px-2 text-sm text-ink-muted">{t('report.noConflicts')}</p>
       ) : (
         <ul className="space-y-2">
           {conflicts.map((conflict) => (
@@ -252,16 +257,18 @@ function ConflictsBlock({
                   and `resolution` is always "physician verification required". */}
               <div className="mt-1 grid gap-2 sm:grid-cols-2">
                 <ClaimCard
-                  heading="Reported today"
+                  heading={t('report.reportedToday')}
                   side={conflict.reported_today ?? null}
                   selectedFactId={selectedFactId}
                   onSelectFact={onSelectFact}
+                  t={t}
                 />
                 <ClaimCard
-                  heading="Already on record"
+                  heading={t('report.onRecord')}
                   side={conflict.from_record}
                   selectedFactId={selectedFactId}
                   onSelectFact={onSelectFact}
+                  t={t}
                 />
               </div>
               <p className="mt-1 text-xs text-conflict">{conflict.resolution}</p>
@@ -278,11 +285,13 @@ function ClaimCard({
   side,
   selectedFactId,
   onSelectFact,
+  t,
 }: {
   heading: string;
   side: ConflictSide | null;
   selectedFactId: string | null;
   onSelectFact: (factId: string) => void;
+  t: Translate;
 }) {
   if (side === null) {
     // A conflict can have only one side — a medicine on the prescription that
@@ -292,7 +301,7 @@ function ClaimCard({
     return (
       <div className="rounded border border-dashed border-line bg-surface p-2 text-sm">
         <p className="text-xs font-medium text-ink-muted">{heading}</p>
-        <p className="mt-0.5 text-ink-muted">Not mentioned in today's intake.</p>
+        <p className="mt-0.5 text-ink-muted">{t('report.notMentioned')}</p>
       </div>
     );
   }

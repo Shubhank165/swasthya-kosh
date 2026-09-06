@@ -13,9 +13,12 @@
  * written to localStorage, on this screen or any other.
  */
 import { useState, type FormEvent } from 'react';
+import { LocaleSwitch } from '../components/LocaleSwitch';
+import { useT } from '../i18n';
 import { DASHBOARD_ROLES, useSession, type DashboardRole } from './session';
 
 export function LoginPage() {
+  const t = useT();
   const signIn = useSession((state) => state.signIn);
   const endedBecause = useSession((state) => state.endedBecause);
   const [userId, setUserId] = useState('');
@@ -36,15 +39,22 @@ export function LoginPage() {
 
   return (
     <main className="mx-auto mt-20 max-w-sm">
-      <h1 className="text-xl font-semibold text-ink">MediKiosk</h1>
-      <p className="mt-1 text-sm text-ink-muted">Clinical dashboard</p>
+      <div className="flex items-baseline justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-semibold text-ink">{t('app.name')}</h1>
+          <p className="mt-1 text-sm text-ink-muted">{t('app.subtitle')}</p>
+        </div>
+        {/* Offered before sign-in, because a physician who reads Hindi should
+            not have to read an English form to get to a Hindi screen. */}
+        <LocaleSwitch />
+      </div>
 
       {endedBecause === 'idle' && (
         <p
           role="status"
           className="mt-4 rounded border border-uncertain/30 bg-uncertain-soft px-3 py-2 text-sm text-uncertain"
         >
-          Your session was cleared after a period without activity.
+          {t('login.endedIdle')}
         </p>
       )}
       {endedBecause === 'refused' && (
@@ -52,14 +62,20 @@ export function LoginPage() {
           role="status"
           className="mt-4 rounded border border-urgent/30 bg-urgent-soft px-3 py-2 text-sm text-urgent"
         >
-          The server refused that request. Sign in again.
+          {t('login.endedRefused')}
         </p>
       )}
 
       <form onSubmit={submit} className="mt-6 space-y-4">
-        <Field label="User ID" value={userId} onChange={setUserId} autoFocus required />
+        <Field
+          label={t('login.userId')}
+          value={userId}
+          onChange={setUserId}
+          autoFocus
+          required
+        />
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-ink">Role</span>
+          <span className="mb-1 block text-sm font-medium text-ink">{t('login.role')}</span>
           <select
             value={role}
             onChange={(event) => setRole(event.target.value as DashboardRole)}
@@ -72,9 +88,14 @@ export function LoginPage() {
             ))}
           </select>
         </label>
-        <Field label="Hospital ID" value={hospitalId} onChange={setHospitalId} required />
         <Field
-          label="Department (optional)"
+          label={t('login.hospitalId')}
+          value={hospitalId}
+          onChange={setHospitalId}
+          required
+        />
+        <Field
+          label={t('login.department')}
           value={department}
           onChange={setDepartment}
         />
@@ -82,16 +103,13 @@ export function LoginPage() {
           type="submit"
           className="w-full rounded bg-accent px-3 py-2 font-medium text-white hover:opacity-90"
         >
-          Open the worklist
+          {t('login.submit')}
         </button>
       </form>
 
       <p className="mt-6 rounded border border-line bg-surface-sunken p-3 text-xs text-ink-muted">
-        <strong className="text-ink">Stand-in sign-in.</strong> This screen sets
-        the backend&rsquo;s header principal, which is disabled in any
-        environment holding real patient data. It is not authentication and
-        makes no claim to be; the hospital&rsquo;s identity provider replaces it
-        and changes one file.
+        <strong className="text-ink">{t('login.standInTitle')}</strong>{' '}
+        {t('login.standIn')}
       </p>
     </main>
   );

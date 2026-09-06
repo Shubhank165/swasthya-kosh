@@ -919,6 +919,40 @@ CORS configuration to get wrong, and the refresh cookie stays first-party.
 made the API a static file server, and it would have coupled a frontend rebuild
 to a backend deploy.
 
+## 64. The dashboard translates its chrome and never its content
+
+§9 asks for the doctor-facing UI in English and Hindi, and §12 forbids
+translating the patient's own words in place. Both at once means the boundary
+has to be drawn somewhere explicit rather than left to whoever writes the next
+component.
+
+The line: **anything this repository wrote is chrome; anything the backend sent
+is content.** Column headings, buttons, refusals and warnings live in
+`src/i18n/strings.ts`. Transcripts, raw OCR readings, report lines, section
+titles, conflict statements, red-flag labels and criteria do not — they arrive in
+the language the interview happened in, and the locale a physician picks does not
+change what is requested from the API.
+
+Two cases sit near the line and are deliberately on the content side:
+
+- **Fact-state labels** ("not established", "reconstructed from unclear input").
+  They are read off the report's own markers and are part of the document's
+  meaning rather than its furniture. Translating "not established" is a
+  clinical-wording decision, and §B4 has a queue for those.
+- **Red-flag labels.** Every rule in `clinical/questions/redflags/` carries the
+  same fixed wording, which an AIIA mentor signs off. A locale switch is not the
+  place to reword it.
+
+The preference is held in memory, not `localStorage` — §12, and the same reason
+as the access token: a shared OPD terminal, and a preference that survives the
+tab being closed is one the next person inherits. The browser's own
+`Accept-Language` is the default.
+
+The Hindi strings are engineer-authored and are on the clinical review queue. A
+question that shifts meaning between languages silently changes what the record
+means; an interface word that shifts meaning silently changes what a control
+does, and no test catches either.
+
 ## 33. Known gaps
 
 - **Authentication for staff is a header stand-in.** `X-User-Id` /
@@ -936,11 +970,8 @@ to a backend deploy.
   `LocalObjectStore` on a named volume, which is what makes the compose stack a
   complete pipeline offline; a MinIO container would add an adapter with nothing
   to talk to it.
-- **The dashboard is English only.** 3/3 §9 asks for the doctor-facing UI in
-  English and Hindi. The patient's own words are shown verbatim in their own
-  script throughout — the rule that matters clinically, and the one that is
-  tested — but the chrome around them is not translated. An ARB file and a locale
-  switch, not a redesign.
+- **The dashboard's Hindi strings are engineer-authored** and await review, like
+  every other non-English string in this repository. See decision 64.
 - **iOS is unverified** and stays that way without a Mac. Android-only is a
   reasonable scope statement for this build; implying iOS works is not.
 - **The evaluation harness is shelved, not repurposed.** §3 of the brief kept it

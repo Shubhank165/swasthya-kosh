@@ -10,7 +10,13 @@
  * Everything shown here is already in the backend's
  * `GET /intakes/{id}/facts/{fact_id}/evidence` response. The work is
  * presentation — §1 rule 1 still holds, and nothing on this panel interprets.
+ *
+ * The **labels** follow the doctor's chosen interface language (§9). The
+ * **content** never does: the transcript, the raw OCR text and the tapped
+ * option are the patient's own, shown verbatim in their own script, with a
+ * translation beneath where one exists and never over the top of it.
  */
+import { useT, type StringKey } from '../i18n';
 
 export interface Evidence {
   channel: 'voice' | 'document' | 'app' | 'carried_forward' | 'entry' | string;
@@ -48,15 +54,11 @@ export function EvidencePanel({
   loading: boolean;
   onOpenIntake?: (intakeId: string) => void;
 }) {
-  if (loading) {
-    return <Frame title="Evidence"><p className="text-ink-muted">Loading…</p></Frame>;
-  }
+  if (loading) return <Frame titleKey="evidence.label"><Muted textKey="common.loading" /></Frame>;
   if (!evidence) {
     return (
-      <Frame title="Evidence">
-        <p className="text-ink-muted">
-          Select any line in the report to see where it came from.
-        </p>
+      <Frame titleKey="evidence.label">
+        <Muted textKey="evidence.empty" />
       </Frame>
     );
   }
@@ -74,25 +76,41 @@ export function EvidencePanel({
       return <EntryEvidence evidence={evidence} />;
     default:
       return (
-        <Frame title="Evidence">
-          <p className="text-ink-muted">No source recorded for this fact.</p>
+        <Frame titleKey="evidence.label">
+          <Muted textKey="evidence.none" />
         </Frame>
       );
   }
 }
 
-function Frame({ title, children }: { title: string; children: React.ReactNode }) {
+function Muted({ textKey }: { textKey: StringKey }) {
+  const t = useT();
+  return <p className="text-ink-muted">{t(textKey)}</p>;
+}
+
+function Frame({
+  titleKey,
+  children,
+}: {
+  titleKey: StringKey;
+  children: React.ReactNode;
+}) {
+  const t = useT();
   return (
-    <aside aria-label="Evidence" className="rounded border border-line bg-surface p-4">
-      <h2 className="mb-3 text-sm font-semibold text-ink">{title}</h2>
+    <aside
+      aria-label={t('evidence.label')}
+      className="rounded border border-line bg-surface p-4"
+    >
+      <h2 className="mb-3 text-sm font-semibold text-ink">{t(titleKey)}</h2>
       {children}
     </aside>
   );
 }
 
 function VoiceEvidence({ evidence }: { evidence: Evidence }) {
+  const t = useT();
   return (
-    <Frame title="What was said">
+    <Frame titleKey="evidence.voiceTitle">
       <div data-testid="evidence-voice" className="space-y-3">
         {evidence.question && (
           <p className="text-sm text-ink-muted">{evidence.question}</p>
@@ -110,12 +128,16 @@ function VoiceEvidence({ evidence }: { evidence: Evidence }) {
         )}
         {typeof evidence.asr_confidence === 'number' && (
           <p className="text-xs text-ink-faint">
-            Recognition confidence {Math.round(evidence.asr_confidence * 100)}%
+            {t('evidence.asrConfidence', {
+              percent: Math.round(evidence.asr_confidence * 100),
+            })}
           </p>
         )}
         {(evidence.context?.length ?? 0) > 0 && (
           <details className="text-sm">
-            <summary className="cursor-pointer text-ink-muted">Surrounding turns</summary>
+            <summary className="cursor-pointer text-ink-muted">
+              {t('evidence.surrounding')}
+            </summary>
             <ul className="mt-2 space-y-2">
               {evidence.context!.map((turn, index) => (
                 <li key={index} className="border-l border-line pl-2">
@@ -132,19 +154,20 @@ function VoiceEvidence({ evidence }: { evidence: Evidence }) {
 }
 
 function DocumentEvidence({ evidence }: { evidence: Evidence }) {
+  const t = useT();
   const box = evidence.bounding_box;
   return (
-    <Frame title="Where it was read">
+    <Frame titleKey="evidence.documentTitle">
       <div data-testid="evidence-document" className="space-y-3">
         <div className="relative overflow-hidden rounded border border-line bg-surface-sunken">
           {evidence.image_url ? (
             <img
               src={evidence.image_url}
-              alt={`Document page ${evidence.page ?? 1}`}
+              alt={t('evidence.page', { page: evidence.page ?? 1 })}
               className="w-full"
             />
           ) : (
-            <p className="p-4 text-sm text-ink-muted">Image unavailable.</p>
+            <p className="p-4 text-sm text-ink-muted">{t('evidence.imageUnavailable')}</p>
           )}
           {box && (
             // Percentages, so the box tracks the image at any zoom rather than
@@ -163,15 +186,15 @@ function DocumentEvidence({ evidence }: { evidence: Evidence }) {
           )}
         </div>
         <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-sm">
-          <dt className="text-ink-muted">Extracted</dt>
+          <dt className="text-ink-muted">{t('evidence.extracted')}</dt>
           <dd className="text-ink">{evidence.extracted_value ?? '—'}</dd>
           {/* The raw text beside the extraction, always. A value the physician
               cannot compare with what is on the paper is an assertion. */}
-          <dt className="text-ink-muted">Raw text</dt>
+          <dt className="text-ink-muted">{t('evidence.rawText')}</dt>
           <dd className="font-mono text-xs text-ink-muted">{evidence.raw_text ?? '—'}</dd>
           {typeof evidence.ocr_confidence === 'number' && (
             <>
-              <dt className="text-ink-muted">Confidence</dt>
+              <dt className="text-ink-muted">{t('evidence.confidence')}</dt>
               <dd className="text-ink">{Math.round(evidence.ocr_confidence * 100)}%</dd>
             </>
           )}
@@ -182,8 +205,9 @@ function DocumentEvidence({ evidence }: { evidence: Evidence }) {
 }
 
 function AppEvidence({ evidence }: { evidence: Evidence }) {
+  const t = useT();
   return (
-    <Frame title="What the patient tapped">
+    <Frame titleKey="evidence.appTitle">
       <div data-testid="evidence-app" className="space-y-3">
         <p className="text-sm text-ink-muted">{evidence.question}</p>
         <p className="rounded border border-line bg-surface-sunken px-3 py-2 text-lg text-ink">
@@ -191,15 +215,16 @@ function AppEvidence({ evidence }: { evidence: Evidence }) {
         </p>
         {/* No confidence score, and its absence is deliberate: a tap has none,
             and inventing 1.0 would make it look like a perfectly-heard answer. */}
-        <p className="text-xs text-ink-faint">Answered by tapping, in the patient app.</p>
+        <p className="text-xs text-ink-faint">{t('evidence.tapped')}</p>
       </div>
     </Frame>
   );
 }
 
 function EntryEvidence({ evidence }: { evidence: Evidence }) {
+  const t = useT();
   return (
-    <Frame title="Entered by a person">
+    <Frame titleKey="evidence.entryTitle">
       <div data-testid="evidence-entry" className="space-y-3">
         <p className="rounded border border-line bg-surface-sunken px-3 py-2 text-lg text-ink">
           {evidence.transcript ?? '—'}
@@ -208,8 +233,9 @@ function EntryEvidence({ evidence }: { evidence: Evidence }) {
             here is the act of entry and the person who performed it; there is
             no transcript to check it against and the panel does not imply one. */}
         <p className="text-xs text-ink-faint">
-          Recorded by {evidence.entered_by ?? 'a member of staff'}. No recording
-          or document stands behind this line.
+          {t('evidence.enteredBy', {
+            actor: evidence.entered_by ?? t('evidence.someStaff'),
+          })}
         </p>
       </div>
     </Frame>
@@ -223,19 +249,22 @@ function CarriedForwardEvidence({
   evidence: Evidence;
   onOpenIntake?: (intakeId: string) => void;
 }) {
+  const t = useT();
   return (
-    <Frame title="From a previous visit">
+    <Frame titleKey="evidence.carriedTitle">
       <div data-testid="evidence-carried" className="space-y-3">
         <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-sm">
-          <dt className="text-ink-muted">Recorded</dt>
+          <dt className="text-ink-muted">{t('evidence.recorded')}</dt>
           <dd className="text-ink">{evidence.originally_recorded ?? '—'}</dd>
-          <dt className="text-ink-muted">Confirmed today</dt>
+          <dt className="text-ink-muted">{t('evidence.confirmedToday')}</dt>
+          {/* Three values, and they stay three in both languages: confirmed,
+              contradicted, and never asked. */}
           <dd className="text-ink">
             {evidence.confirmed_today === true
-              ? 'Yes, by the patient'
+              ? t('evidence.confirmedYes')
               : evidence.confirmed_today === false
-                ? 'No'
-                : 'Not asked'}
+                ? t('evidence.confirmedNo')
+                : t('evidence.confirmedNotAsked')}
           </dd>
         </dl>
         {evidence.from_intake_id && onOpenIntake && (
@@ -244,7 +273,7 @@ function CarriedForwardEvidence({
             className="text-sm text-accent underline"
             onClick={() => onOpenIntake(evidence.from_intake_id!)}
           >
-            Open that visit
+            {t('evidence.openVisit')}
           </button>
         )}
       </div>

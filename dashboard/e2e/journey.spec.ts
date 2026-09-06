@@ -174,3 +174,37 @@ test('no clinical text reaches the browser console', async ({ page }) => {
   expect(log).not.toMatch(/[ऀ-ॿ]/);
   expect(log.toLowerCase()).not.toContain('metformin');
 });
+
+
+test('the doctor can work in Hindi, and the record stays in the patient\u2019s words', async ({
+  page,
+}) => {
+  // §9. The chrome switches; the record does not. The seeded intake is a Hindi
+  // interview, so a Hindi-reading physician and an English-reading one are
+  // looking at exactly the same clinical text with different furniture around
+  // it — which is the property, and the thing a screenshot cannot prove.
+  await signIn(page);
+  await page.getByTestId('locale-switch').selectOption('hi');
+
+  await expect(page.getByRole('heading', { name: 'कार्य-सूची' })).toBeVisible();
+  await expect(page.getByTestId('connection-state')).toHaveAttribute(
+    'data-status',
+    'live',
+  );
+
+  await page.getByTestId('worklist-row').first().click();
+  // The draft warning, in Hindi.
+  await expect(page.getByText('मसौदा रिपोर्ट — चिकित्सक सत्यापन आवश्यक')).toBeVisible();
+  // Unresolved is still a full section, still not a disclosure.
+  const unresolved = page.getByTestId('unresolved-section');
+  await expect(unresolved).toBeVisible();
+  await expect(unresolved.locator('details')).toHaveCount(0);
+
+  // And what the patient actually said is untouched, in their own script.
+  await expect(page.getByText('पेट में दर्द', { exact: false }).first()).toBeVisible();
+
+  // Back to English, and the same record is still there.
+  await page.getByTestId('locale-switch').selectOption('en');
+  await expect(page.getByText(/draft report — requires physician verification/i)).toBeVisible();
+  await expect(page.getByText('पेट में दर्द', { exact: false }).first()).toBeVisible();
+});

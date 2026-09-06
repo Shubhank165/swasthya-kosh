@@ -25,12 +25,14 @@ import {
 import type { Fact, PhysicianReport } from '../api/types';
 import { useSession } from '../auth/session';
 import { EvidencePanel } from '../evidence/EvidencePanel';
+import { useT } from '../i18n';
 import { evidenceFromApi } from '../evidence/fromApi';
 import { ReportView } from './ReportView';
 import { VerifyControls } from './VerifyControls';
 import { HeaderStrip } from './HeaderStrip';
 
 export function ReportPage() {
+  const t = useT();
   const { intakeId = '' } = useParams();
   const session = useSession((state) => state.session);
   const isPhysician = session?.role === 'physician' || session?.role === 'admin';
@@ -75,16 +77,16 @@ export function ReportPage() {
   if (intake.isError || report.isError) {
     return (
       <p role="alert" className="text-urgent">
-        This record could not be loaded.{' '}
+        {t('report.loadError')}{' '}
         <Link to="/" className="underline">
-          Back to the worklist
+          {t('report.backToWorklist')}
         </Link>
       </p>
     );
   }
 
   if (!intake.data || !report.data) {
-    return <p className="text-ink-muted">Loading the record…</p>;
+    return <p className="text-ink-muted">{t('report.loading')}</p>;
   }
 
   const body = report.data.report as unknown as PhysicianReport;
@@ -94,11 +96,9 @@ export function ReportPage() {
       <HeaderStrip intake={intake.data} />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),minmax(320px,26rem)]">
-        <section aria-label="Report" className="rounded border border-line bg-surface p-4">
+        <section aria-label={t('report.label')} className="rounded border border-line bg-surface p-4">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-ink">
-              Draft report — requires physician verification
-            </h2>
+            <h2 className="text-sm font-semibold text-ink">{t('report.draft')}</h2>
             {isPhysician && (
               <button
                 type="button"
@@ -107,21 +107,20 @@ export function ReportPage() {
                 onClick={() => verifyRecord.mutate({})}
                 className="rounded border border-verified px-3 py-1.5 text-sm font-medium text-verified hover:bg-verified/10"
               >
-                Verify everything settled
+                {t('report.verifyAll')}
               </button>
             )}
           </div>
 
           {report.data.physician_verified_by && (
             <p className="mb-3 rounded border border-verified/30 bg-verified-soft px-2 py-1 text-sm text-verified">
-              Verified by {report.data.physician_verified_by}.
+              {t('report.verifiedBy', { actor: report.data.physician_verified_by })}
             </p>
           )}
 
           {verifyFact.isError && (
             <p role="alert" className="mb-3 text-sm text-urgent">
-              That change was not recorded. Someone else may have edited this
-              line — reload the report before acting on it again.
+              {t('report.writeError')}
             </p>
           )}
 
@@ -137,7 +136,7 @@ export function ReportPage() {
               into the HMIS. The backend renders it; nothing here re-renders. */}
           <details className="mt-6">
             <summary className="cursor-pointer text-xs text-ink-muted">
-              Plain-text report
+              {t('report.plainText')}
             </summary>
             <pre className="mt-2 whitespace-pre-wrap rounded bg-surface-sunken p-3 text-xs text-ink">
               {report.data.text}

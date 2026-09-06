@@ -8,33 +8,36 @@
  *
  * So: a full-page refusal, no layout chrome, and nothing fetched behind it.
  */
+import { useT, type StringKey } from '../i18n';
+
 export function Refusal({
-  title = 'Not available to this account',
+  titleKey = 'refusal.title',
+  detailKey = 'refusal.detail',
   detail,
   onSignOut,
 }: {
-  title?: string;
+  titleKey?: StringKey;
+  detailKey?: StringKey;
+  /** Already-translated text, for the one case built from a role list. */
   detail?: string;
   onSignOut?: () => void;
 }) {
+  const t = useT();
   return (
     <main
       role="alert"
       data-testid="refusal"
       className="mx-auto mt-24 max-w-md rounded border border-line bg-surface p-6 text-center"
     >
-      <h1 className="text-lg font-semibold text-ink">{title}</h1>
-      <p className="mt-2 text-sm text-ink-muted">
-        {detail ??
-          'This screen shows patient records and is limited to clinical staff. Nothing has been loaded.'}
-      </p>
+      <h1 className="text-lg font-semibold text-ink">{t(titleKey)}</h1>
+      <p className="mt-2 text-sm text-ink-muted">{detail ?? t(detailKey)}</p>
       {onSignOut && (
         <button
           type="button"
           onClick={onSignOut}
           className="mt-4 rounded border border-line px-3 py-1.5 text-sm text-ink hover:bg-surface-sunken"
         >
-          Sign in as someone else
+          {t('refusal.signOut')}
         </button>
       )}
     </main>

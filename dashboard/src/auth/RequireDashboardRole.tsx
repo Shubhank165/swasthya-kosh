@@ -11,6 +11,7 @@
  */
 import type { ReactNode } from 'react';
 import { Refusal } from '../components/Refusal';
+import { useT } from '../i18n';
 import { canSeeClinicalContent, useSession, type DashboardRole } from './session';
 import { LoginPage } from './LoginPage';
 
@@ -24,14 +25,15 @@ export function RequireDashboardRole({
 }) {
   const session = useSession((state) => state.session);
   const signOut = useSession((state) => state.signOut);
+  const t = useT();
 
   if (session === null) return <LoginPage />;
 
   if (!canSeeClinicalContent(session)) {
     return (
       <Refusal
-        title="This account cannot open clinical records"
-        detail="Patient and kiosk credentials are issued to a phone and to a device in a corridor. Neither may read a worklist or a report."
+        titleKey="refusal.notClinicalTitle"
+        detailKey="refusal.notClinical"
         onSignOut={() => signOut()}
       />
     );
@@ -40,8 +42,11 @@ export function RequireDashboardRole({
   if (allow && !allow.includes(session.role)) {
     return (
       <Refusal
-        title="Not available to this role"
-        detail={`This screen is limited to ${allow.join(' or ')}. Nothing has been loaded.`}
+        titleKey="refusal.roleTitle"
+        // The role names stay in English in both locales: they are the words
+        // the hospital's own systems use, and translating an identifier makes
+        // it harder to match against a badge or an IdP group.
+        detail={`${t('refusal.roleTitle')}: ${allow.join(' / ')}. ${t('refusal.detail')}`}
         onSignOut={() => signOut()}
       />
     );

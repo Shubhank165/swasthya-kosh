@@ -6,8 +6,8 @@
 backend     make check    -> lint, typecheck, 483 passed (1 network test deselected)
 dashboard   tsc --noEmit  -> clean
             eslint        -> clean
-            vitest        -> 56 passed
-            playwright    -> 6 passed, against a real backend
+            vitest        -> 64 passed
+            playwright    -> 7 passed, against a real backend
 app         flutter analyze -> No issues found
             flutter test  -> 158 passed, 3 skipped (the live ones)
             flutter test test/live_backend_test.dart --dart-define=MEDIKIOSK_LIVE=…
@@ -36,16 +36,24 @@ Brief: `MEDIKIOSK_IMPL_3of3_DASHBOARD.md`.
 | 6 | Correction rate, admin-scoped | **Done** |
 | 7 | WebSocket, refetch-on-reconnect, connection state shown | **Done** |
 | 8 | Roles; `patient` and `kiosk` refused; idle timeout; no token in storage | **Done** |
-| 9 | English UI, semantic HTML, keyboard-workable report | **Done** |
-| 9 | **Hindi doctor-facing UI** | **Not done** — see below |
+| 9 | Semantic HTML, keyboard-workable report | **Done** |
+| 9 | Doctor-facing UI in English **and Hindi** | **Done** |
 | 10 | The four backend additions | **Done** |
 | 11 | Tests 1–10 | **Done** |
 
-**Not done, and stated rather than implied:** §9 asks for the doctor-facing UI
-in English *and Hindi*. It is English only. The patient's own words are shown
-verbatim in their own script throughout, which is the rule that actually matters
-clinically and is tested; the chrome around them is not translated. Adding it is
-an ARB file and a locale switch, not a redesign.
+**The interface translates; the record never does.** The chrome switches between
+English and Hindi. A transcript, a raw OCR reading, a report line, a section
+title and a red-flag label do not — they arrive from the backend in the language
+the interview happened in, and a locale switch is not the place to reword a
+clinical string an AIIA mentor signs off. Asserted in `test/i18n.test.tsx` and
+again in the Playwright journey, because it is the kind of rule that quietly
+stops being true when somebody adds a string next month.
+
+The Hindi strings are engineer-authored and are on `CLINICAL_REVIEW_QUEUE.md`
+like every other non-English string here. They are interface words —
+"acknowledge", "amend", "worklist" — and one that is subtly wrong makes a control
+mean something different to a Hindi-reading physician than to an English-reading
+one.
 
 **Sign-in is a stand-in and says so on screen.** There is no identity provider
 integration, so the form sets the backend's header principal — which

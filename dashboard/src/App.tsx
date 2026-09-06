@@ -9,6 +9,8 @@
 import { NavLink, Route, Routes } from 'react-router-dom';
 
 import { AlertsPage } from './alerts/AlertsPage';
+import { LocaleSwitch } from './components/LocaleSwitch';
+import { useT } from './i18n';
 import { MetricsPage } from './admin/MetricsPage';
 import { RequireDashboardRole } from './auth/RequireDashboardRole';
 import { useIdleTimeout } from './auth/useIdleTimeout';
@@ -37,10 +39,7 @@ export function App() {
                 </RequireDashboardRole>
               }
             />
-            <Route
-              path="*"
-              element={<p className="text-ink-muted">No such screen.</p>}
-            />
+            <Route path="*" element={<NoSuchScreen />} />
           </Routes>
         </main>
       </div>
@@ -48,28 +47,38 @@ export function App() {
   );
 }
 
+function NoSuchScreen() {
+  const t = useT();
+  return <p className="text-ink-muted">{t('nav.noScreen')}</p>;
+}
+
 function TopBar() {
+  const t = useT();
   const session = useSession((state) => state.session);
   const signOut = useSession((state) => state.signOut);
 
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-2">
-        <span className="font-semibold text-ink">MediKiosk</span>
+        <span className="font-semibold text-ink">{t('app.name')}</span>
         <nav className="flex gap-3 text-sm">
-          <Tab to="/" label="Worklist" />
-          <Tab to="/alerts" label="Alerts" />
-          {session?.role === 'admin' && <Tab to="/metrics" label="Quality" />}
+          <Tab to="/" label={t('nav.worklist')} />
+          <Tab to="/alerts" label={t('nav.alerts')} />
+          {session?.role === 'admin' && <Tab to="/metrics" label={t('nav.quality')} />}
         </nav>
         <span className="ml-auto text-xs text-ink-muted">
+          {/* The user id, the role and the hospital id, untranslated: they are
+              identifiers, and a physician checking they are signed in as
+              themselves needs the string their badge says. */}
           {session?.userId} · {session?.role} · {session?.hospitalId}
         </span>
+        <LocaleSwitch />
         <button
           type="button"
           onClick={() => signOut()}
           className="rounded border border-line px-2 py-1 text-xs text-ink hover:bg-surface-sunken"
         >
-          Sign out
+          {t('nav.signOut')}
         </button>
       </div>
     </header>
@@ -98,6 +107,7 @@ function Tab({ to, label }: { to: string; label: string }) {
  * does; a modal would take the keystroke that dismissed it.
  */
 function IdleWarning({ enabled }: { enabled: boolean }) {
+  const t = useT();
   const { warning, secondsLeft, staySignedIn } = useIdleTimeout(enabled);
   if (!warning) return null;
   return (
@@ -106,9 +116,9 @@ function IdleWarning({ enabled }: { enabled: boolean }) {
       data-testid="idle-warning"
       className="border-b border-uncertain/40 bg-uncertain-soft px-4 py-2 text-sm text-uncertain"
     >
-      This session clears in {secondsLeft}s. Any key or click keeps it open.{' '}
+      {t('idle.warning', { seconds: secondsLeft ?? 0 })}{' '}
       <button type="button" onClick={staySignedIn} className="underline">
-        Stay signed in
+        {t('idle.stay')}
       </button>
     </div>
   );

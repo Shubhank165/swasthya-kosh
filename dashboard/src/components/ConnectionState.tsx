@@ -6,33 +6,36 @@
  * current and is twenty minutes old is the specific failure worth a permanent
  * pixel on this screen.
  */
+import { useT, type StringKey } from '../i18n';
 import type { ConnectionStatus } from '../lib/realtime';
 
-const COPY: Record<ConnectionStatus, { text: string; className: string; glyph: string }> = {
+const COPY: Record<ConnectionStatus, { key: StringKey; className: string; glyph: string }> = {
   live: {
-    text: 'Live',
+    key: 'connection.live',
     glyph: '●',
     className: 'text-verified',
   },
   connecting: {
-    text: 'Connecting…',
+    key: 'connection.connecting',
     glyph: '◌',
     className: 'text-ink-muted',
   },
   reconnecting: {
-    // Deliberately alarming wording. "Reconnecting" alone reads as fine.
-    text: 'Not updating — reconnecting',
+    // Deliberately alarming wording in both languages. "Reconnecting" alone
+    // reads as fine, and the list behind it is not.
+    key: 'connection.reconnecting',
     glyph: '▲',
     className: 'text-uncertain',
   },
   offline: {
-    text: 'Not updating — no connection',
+    key: 'connection.offline',
     glyph: '▲',
     className: 'text-urgent',
   },
 };
 
 export function ConnectionState({ status }: { status: ConnectionStatus }) {
+  const t = useT();
   const copy = COPY[status];
   return (
     <span
@@ -42,7 +45,7 @@ export function ConnectionState({ status }: { status: ConnectionStatus }) {
       className={`inline-flex items-center gap-1.5 text-xs font-medium ${copy.className}`}
     >
       <span aria-hidden="true">{copy.glyph}</span>
-      {copy.text}
+      {t(copy.key)}
     </span>
   );
 }

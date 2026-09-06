@@ -12,17 +12,19 @@
  * `unresolved_fields` and the fact list are both the backend's.
  */
 import type { Intake } from '../api/types';
+import { useT, type StringKey } from '../i18n';
 import { dateAndTime, humanise } from '../lib/format';
 
-const IDENTIFICATION: Record<string, string> = {
-  abha: 'ABHA-verified',
-  hospital_id: 'Hospital ID',
-  phone: 'Phone, in the app',
-  aadhaar_last4: 'Aadhaar last four',
-  guest: 'Guest — identity not established',
+const IDENTIFICATION: Record<string, StringKey> = {
+  abha: 'id.abha',
+  hospital_id: 'id.hospital_id',
+  phone: 'id.phone',
+  aadhaar_last4: 'id.aadhaar_last4',
+  guest: 'id.guest',
 };
 
 export function HeaderStrip({ intake }: { intake: Intake }) {
+  const t = useT();
   const facts = intake.facts ?? [];
   const answered = facts.filter((fact) => fact.status === 'answered').length;
   const total = facts.length;
@@ -39,39 +41,41 @@ export function HeaderStrip({ intake }: { intake: Intake }) {
           data-testid="active-red-flag"
           className="mb-3 rounded border border-urgent/40 bg-urgent-soft px-3 py-2 text-sm font-medium text-urgent"
         >
-          {unacknowledged.length} unacknowledged urgent clinical review{' '}
-          {unacknowledged.length === 1 ? 'criterion' : 'criteria'} on this
-          intake.
+          {unacknowledged.length === 1
+            ? t('header.activeFlagsOne')
+            : t('header.activeFlags', { count: unacknowledged.length })}
         </p>
       )}
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-        <Item label="Reference">
+        <Item label={t('header.reference')}>
           <span className="font-mono">{intake.intake_id.slice(0, 8)}</span>
         </Item>
-        <Item label="Identified by">
-          {IDENTIFICATION[refType] ?? humanise(refType)}
+        <Item label={t('header.identifiedBy')}>
+          {IDENTIFICATION[refType] ? t(IDENTIFICATION[refType]!) : humanise(refType)}
         </Item>
-        <Item label="Intake language">{intake.language}</Item>
-        <Item label="Source">
-          {refType === 'phone' ? 'Patient app' : 'Kiosk or counter'}
+        {/* The intake language is a tag — `hi`, `ta` — not a word to translate:
+            it says which language the record below is in. */}
+        <Item label={t('header.language')}>{intake.language}</Item>
+        <Item label={t('header.source')}>
+          {refType === 'phone' ? t('header.sourceApp') : t('header.sourceKiosk')}
         </Item>
-        <Item label="Department">
+        <Item label={t('header.department')}>
           {intake.department_code ? humanise(intake.department_code) : '—'}
         </Item>
-        <Item label="Received">{dateAndTime(intake.received_at)}</Item>
-        <Item label="Intake status">{humanise(intake.status)}</Item>
-        <Item label="Coverage">
+        <Item label={t('header.received')}>{dateAndTime(intake.received_at)}</Item>
+        <Item label={t('header.intakeStatus')}>{humanise(intake.status)}</Item>
+        <Item label={t('header.coverage')}>
           {/* The count, not a percentage. */}
           <span data-testid="coverage">
-            {answered} of {total} answered
+            {t('header.answered', { answered, total })}
           </span>
         </Item>
       </dl>
 
       {intake.demo && (
         <p className="mt-2 rounded border border-uncertain/30 bg-uncertain-soft px-2 py-1 text-xs text-uncertain">
-          This deployment is serving demonstration data.
+          {t('header.demo')}
         </p>
       )}
     </header>

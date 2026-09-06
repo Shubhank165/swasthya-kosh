@@ -23,15 +23,16 @@ import type { WorklistEntry, WorklistState } from '../api/types';
 import { WORKLIST_STATES } from '../api/types';
 import { useSession } from '../auth/session';
 import { ConnectionState } from '../components/ConnectionState';
+import { useT, type StringKey, type Translate } from '../i18n';
 import { useWorklistSocket } from '../lib/realtime';
 import { humanise, timeOfDay } from '../lib/format';
 
-const STATE_LABELS: Record<WorklistState, string> = {
-  ready: 'Ready',
-  partial: 'Interview incomplete',
-  red_flag_pending: 'Urgent review criterion',
-  needs_review: 'Needs review',
-  seen: 'Seen',
+const STATE_KEYS: Record<WorklistState, StringKey> = {
+  ready: 'state.ready',
+  partial: 'state.partial',
+  red_flag_pending: 'state.red_flag_pending',
+  needs_review: 'state.needs_review',
+  seen: 'state.seen',
 };
 
 /** Shape, not colour alone — §4.2, and the same rule applies to the list. */
@@ -44,6 +45,7 @@ const STATE_STYLES: Record<WorklistState, string> = {
 };
 
 export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
+  const t = useT();
   const session = useSession((state) => state.session);
   const [department, setDepartment] = useState<string | null>(
     session?.departmentCode ?? null,
@@ -81,9 +83,12 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
     <div className="space-y-4">
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-ink">Worklist</h1>
+          <h1 className="text-lg font-semibold text-ink">{t('worklist.title')}</h1>
           <p className="text-sm text-ink-muted">
-            {department ? humanise(department) : 'All departments'} · arrival order
+            {/* The department code is the hospital's own identifier and is not
+                translated; the words around it are. */}
+            {department ? humanise(department) : t('worklist.allDepartments')} ·{' '}
+            {t('worklist.arrivalOrder')}
           </p>
         </div>
         <ConnectionState status={status} />
@@ -93,13 +98,14 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
           urgency is visible without pretending the queue was rearranged. */}
       {pending.length > 0 && (
         <section
-          aria-label="Unacknowledged urgent review criteria"
+          aria-label={t('worklist.alertBandLabel')}
           data-testid="alert-band"
           className="rounded border border-urgent/40 bg-urgent-soft p-3"
         >
           <h2 className="text-sm font-semibold text-urgent">
-            {pending.length} unacknowledged urgent clinical review{' '}
-            {pending.length === 1 ? 'criterion' : 'criteria'}
+            {pending.length === 1
+              ? t('worklist.alertBandOne')
+              : t('worklist.alertBand', { count: pending.length })}
           </h2>
           <ul className="mt-2 space-y-1">
             {pending.map((entry) => (
@@ -108,33 +114,32 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
                   to={`/intakes/${entry.intake_id}`}
                   className="text-sm text-urgent underline"
                 >
-                  {entry.intake_id.slice(0, 8)} · arrived {timeOfDay(entry.arrived_at)}
+                  {entry.intake_id.slice(0, 8)} · {t('worklist.arrived')}{' '}
+                  {timeOfDay(entry.arrived_at)}
                 </Link>
               </li>
             ))}
           </ul>
           <Link to="/alerts" className="mt-2 inline-block text-xs text-urgent underline">
-            Open the alerts view to acknowledge
+            {t('worklist.openAlerts')}
           </Link>
         </section>
       )}
 
       {needsManualReview.length > 0 && (
         <p className="rounded border border-repaired/30 bg-repaired-soft px-3 py-2 text-sm text-repaired">
-          {needsManualReview.length} intake
-          {needsManualReview.length === 1 ? '' : 's'} the repair path could not
-          rescue. A person needs to look before the patient is seen.
+          {t('worklist.manualReview', { count: needsManualReview.length })}
         </p>
       )}
 
       <fieldset className="flex flex-wrap items-center gap-2">
-        <legend className="sr-only">Filter by state</legend>
+        <legend className="sr-only">{t('worklist.filterLegend')}</legend>
         <label className="text-sm text-ink-muted">
-          Department{' '}
+          {t('worklist.department')}{' '}
           <input
             value={department ?? ''}
             onChange={(event) => setDepartment(event.target.value || null)}
-            placeholder="all"
+            placeholder={t('worklist.departmentAll')}
             className="ml-1 rounded border border-line bg-surface px-2 py-1 text-ink"
           />
         </label>
@@ -145,41 +150,39 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
               checked={states.includes(state)}
               onChange={() => toggleState(state)}
             />
-            {STATE_LABELS[state]}
+            {t(STATE_KEYS[state])}
           </label>
         ))}
       </fieldset>
 
-      {worklist.isLoading && <p className="text-ink-muted">Loading…</p>}
+      {worklist.isLoading && <p className="text-ink-muted">{t('common.loading')}</p>}
       {worklist.isError && (
         <p role="alert" className="text-urgent">
-          The worklist could not be loaded.
+          {t('worklist.error')}
         </p>
       )}
 
       <table className="w-full border-collapse text-sm">
-        <caption className="sr-only">
-          Intakes waiting for a doctor, oldest arrival first
-        </caption>
+        <caption className="sr-only">{t('worklist.caption')}</caption>
         <thead>
           <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-muted">
-            <th scope="col" className="py-2 pr-3">Reference</th>
-            <th scope="col" className="py-2 pr-3">Arrived</th>
-            <th scope="col" className="py-2 pr-3">Source</th>
-            <th scope="col" className="py-2 pr-3">Intake</th>
-            <th scope="col" className="py-2 pr-3">State</th>
-            <th scope="col" className="py-2 pr-3">Unresolved</th>
-            <th scope="col" className="py-2 pr-3">Conflicts</th>
+            <th scope="col" className="py-2 pr-3">{t('worklist.colReference')}</th>
+            <th scope="col" className="py-2 pr-3">{t('worklist.colArrived')}</th>
+            <th scope="col" className="py-2 pr-3">{t('worklist.colSource')}</th>
+            <th scope="col" className="py-2 pr-3">{t('worklist.colIntake')}</th>
+            <th scope="col" className="py-2 pr-3">{t('worklist.colState')}</th>
+            <th scope="col" className="py-2 pr-3">{t('worklist.colUnresolved')}</th>
+            <th scope="col" className="py-2 pr-3">{t('worklist.colConflicts')}</th>
           </tr>
         </thead>
         <tbody>
           {entries.map((entry) => (
-            <Row key={entry.intake_id} entry={entry} />
+            <Row key={entry.intake_id} entry={entry} t={t} />
           ))}
           {entries.length === 0 && !worklist.isLoading && (
             <tr>
               <td colSpan={7} className="py-6 text-center text-ink-muted">
-                Nothing waiting.
+                {t('worklist.empty')}
               </td>
             </tr>
           )}
@@ -190,15 +193,14 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
           department look quiet. */}
       {hidden > 0 && (
         <p className="text-xs text-ink-muted">
-          {hidden} more intake{hidden === 1 ? '' : 's'} in this window hidden by
-          the state filter.
+          {t('worklist.hidden', { count: hidden })}
         </p>
       )}
     </div>
   );
 }
 
-function Row({ entry }: { entry: WorklistEntry }) {
+function Row({ entry, t }: { entry: WorklistEntry; t: Translate }) {
   const state = entry.state as WorklistState;
   return (
     <tr className="border-b border-line/60 hover:bg-surface-sunken">
@@ -218,14 +220,14 @@ function Row({ entry }: { entry: WorklistEntry }) {
       <td className="py-2 pr-3 tabular-nums text-ink-muted">
         {timeOfDay(entry.arrived_at)}
       </td>
-      <td className="py-2 pr-3 text-ink-muted">{sourceOf(entry)}</td>
+      <td className="py-2 pr-3 text-ink-muted">{sourceOf(entry, t)}</td>
       <td className="py-2 pr-3 text-ink-muted">{humanise(entry.intake_status)}</td>
       <td className="py-2 pr-3">
         <span
           data-state={state}
           className={`inline-flex rounded border px-1.5 py-0.5 text-xs font-medium ${STATE_STYLES[state]}`}
         >
-          {STATE_LABELS[state] ?? state}
+          {STATE_KEYS[state] ? t(STATE_KEYS[state]) : state}
           {entry.unacknowledged_alerts > 0 && ` (${entry.unacknowledged_alerts})`}
         </span>
       </td>
@@ -247,6 +249,8 @@ function Row({ entry }: { entry: WorklistEntry }) {
  * corridor has no phone number to sign in with. Stated as an inference rather
  * than dressed up as a field the backend sent.
  */
-function sourceOf(entry: WorklistEntry): string {
-  return entry.patient_ref_type === 'phone' ? 'App' : 'Kiosk or counter';
+function sourceOf(entry: WorklistEntry, t: Translate): string {
+  return entry.patient_ref_type === 'phone'
+    ? t('worklist.sourceApp')
+    : t('worklist.sourceKiosk');
 }

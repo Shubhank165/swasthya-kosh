@@ -12,15 +12,17 @@
  * reviewed facts is not evidence of anything.
  */
 import { useCorrectionRate } from '../api/queries';
+import { useT } from '../i18n';
 
 export function MetricsPage() {
+  const t = useT();
   const metrics = useCorrectionRate();
 
-  if (metrics.isLoading) return <p className="text-ink-muted">Loading…</p>;
+  if (metrics.isLoading) return <p className="text-ink-muted">{t('common.loading')}</p>;
   if (metrics.isError || !metrics.data) {
     return (
       <p role="alert" className="text-urgent">
-        These counters could not be loaded.
+        {t('metrics.error')}
       </p>
     );
   }
@@ -31,54 +33,44 @@ export function MetricsPage() {
   return (
     <div className="max-w-2xl space-y-4">
       <header>
-        <h1 className="text-lg font-semibold text-ink">Extraction quality</h1>
-        <p className="text-sm text-ink-muted">
-          How often a physician had to correct what the pipeline recorded.
-        </p>
+        <h1 className="text-lg font-semibold text-ink">{t('metrics.title')}</h1>
+        <p className="text-sm text-ink-muted">{t('metrics.subtitle')}</p>
       </header>
 
       <section className="rounded border border-line bg-surface p-4">
         <p className="text-xs uppercase tracking-wide text-ink-faint">
-          Correction rate
+          {t('metrics.correctionRate')}
         </p>
         <p className="mt-1 text-3xl font-semibold tabular-nums text-ink">
           {rate === null || rate === undefined ? (
-            <span className="text-xl text-ink-muted">Not yet measurable</span>
+            <span className="text-xl text-ink-muted">{t('metrics.notMeasurable')}</span>
           ) : (
             `${Math.round(rate * 1000) / 10}%`
           )}
         </p>
         <p className="mt-1 text-sm text-ink-muted">
-          {/* Denominator first. It is what decides whether the rate means
-              anything, and quoting a rate without it is how a number from four
-              facts ends up on a slide beside one from four thousand. */}
-          {data.amended} amended and {data.rejected} rejected, out of{' '}
-          <strong className="text-ink">{data.facts_reviewed}</strong> facts a
-          physician reviewed across {data.intakes_reviewed} intake
-          {data.intakes_reviewed === 1 ? '' : 's'}.
+          {/* The denominator is never dropped. It is what decides whether the
+              rate means anything, and quoting a rate without it is how a number
+              from four facts ends up on a slide beside one from four thousand. */}
+          {t('metrics.breakdown', {
+            amended: data.amended,
+            rejected: data.rejected,
+            reviewed: data.facts_reviewed,
+            intakes: data.intakes_reviewed,
+          })}
         </p>
       </section>
 
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Counter label="Reviewed" value={data.facts_reviewed} />
-        <Counter label="Confirmed as recorded" value={data.verified} />
-        <Counter label="Amended" value={data.amended} />
-        <Counter label="Rejected" value={data.rejected} />
+        <Counter label={t('metrics.reviewed')} value={data.facts_reviewed} />
+        <Counter label={t('metrics.verified')} value={data.verified} />
+        <Counter label={t('metrics.amended')} value={data.amended} />
+        <Counter label={t('metrics.rejected')} value={data.rejected} />
       </dl>
 
       <p className="rounded border border-line bg-surface-sunken p-3 text-xs text-ink-muted">
-        The denominator is facts a physician actually looked at, not every fact
-        stored. A field nobody reviewed says nothing about extraction quality,
-        and counting it would let this number be improved by ingesting more
-        intakes rather than by extracting better. A field acted on twice counts
-        once, with the latest action winning.
-        {(rate === null || rate === undefined) && (
-          <>
-            {' '}
-            Until it has data behind it, this figure — and the ones the retired
-            evaluation harness produced — should not appear on a slide.
-          </>
-        )}
+        {t('metrics.note')}
+        {(rate === null || rate === undefined) && <> {t('metrics.noteEmpty')}</>}
       </p>
     </div>
   );

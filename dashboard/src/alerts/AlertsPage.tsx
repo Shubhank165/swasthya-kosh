@@ -24,9 +24,11 @@ import { Link } from 'react-router-dom';
 import { useAcknowledgeAlert, useAlerts } from '../api/queries';
 import type { Alert } from '../api/types';
 import { useSession } from '../auth/session';
+import { useT } from '../i18n';
 import { dateAndTime, humanise } from '../lib/format';
 
 export function AlertsPage() {
+  const t = useT();
   const session = useSession((state) => state.session);
   // Everything by default, with the backend's unacknowledged-first ordering.
   //
@@ -45,11 +47,8 @@ export function AlertsPage() {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-lg font-semibold text-ink">Urgent review criteria</h1>
-        <p className="text-sm text-ink-muted">
-          Criteria that fired on the device during the interview. Unacknowledged
-          first. The device screened a questionnaire; it did not examine anyone.
-        </p>
+        <h1 className="text-lg font-semibold text-ink">{t('alerts.title')}</h1>
+        <p className="text-sm text-ink-muted">{t('alerts.subtitle')}</p>
       </header>
 
       <label className="flex items-center gap-2 text-sm text-ink-muted">
@@ -58,13 +57,13 @@ export function AlertsPage() {
           checked={hideAcknowledged}
           onChange={(event) => setHideAcknowledged(event.target.checked)}
         />
-        Hide ones already acknowledged
+        {t('alerts.hideAcknowledged')}
       </label>
 
-      {alerts.isLoading && <p className="text-ink-muted">Loading…</p>}
+      {alerts.isLoading && <p className="text-ink-muted">{t('common.loading')}</p>}
       {alerts.isError && (
         <p role="alert" className="text-urgent">
-          Alerts could not be loaded.
+          {t('alerts.error')}
         </p>
       )}
 
@@ -74,9 +73,7 @@ export function AlertsPage() {
         ))}
         {rows.length === 0 && !alerts.isLoading && (
           <li className="rounded border border-line bg-surface p-4 text-ink-muted">
-            {hideAcknowledged
-              ? 'Nothing outstanding.'
-              : 'No criteria have fired in this window.'}
+            {t(hideAcknowledged ? 'alerts.noneOutstanding' : 'alerts.noneFired')}
           </li>
         )}
       </ul>
@@ -85,6 +82,7 @@ export function AlertsPage() {
 }
 
 function AlertCard({ alert }: { alert: Alert }) {
+  const t = useT();
   const acknowledge = useAcknowledgeAlert();
   const [note, setNote] = useState('');
   const [confirmingEscalation, setConfirmingEscalation] = useState(false);
@@ -112,35 +110,40 @@ function AlertCard({ alert }: { alert: Alert }) {
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className={`text-sm font-semibold ${outstanding ? 'text-urgent' : 'text-ink'}`}>
-          {/* The rule's own wording. Never a condition name. */}
-          {alert.label ?? 'Urgent clinical review criterion triggered'}
+          {/* **The rule's own wording, from the content, and never
+              translated here.** It is a clinical string an AIIA mentor signs
+              off; a locale switch is not the place to reword it, and §B4 has a
+              queue for the ones that need a clinician. The fallback below is
+              the same fixed wording every rule in `clinical/questions/redflags/`
+              already carries. */}
+          {alert.label ?? t('alerts.defaultLabel')}
         </h2>
         <span className="text-xs text-ink-muted">
-          fired {dateAndTime(alert.received_at)}
+          {t('alerts.fired', { when: dateAndTime(alert.received_at) })}
           {alert.fired_at_turn !== null && alert.fired_at_turn !== undefined
-            ? ` · turn ${alert.fired_at_turn}`
+            ? ` · ${t('alerts.turn', { turn: alert.fired_at_turn })}`
             : ''}
         </span>
       </div>
 
       <dl className="mt-2 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-sm">
-        <dt className="text-ink-muted">Intake</dt>
+        <dt className="text-ink-muted">{t('alerts.intake')}</dt>
         <dd>
           <Link to={`/intakes/${alert.intake_id}`} className="text-accent underline">
             {alert.intake_id.slice(0, 8)}
           </Link>{' '}
           <span className="text-ink-faint">
-            · {humanise(alert.intake_status)} · arrived{' '}
+            · {humanise(alert.intake_status)} · {t('alerts.arrived')}{' '}
             {dateAndTime(alert.arrived_at)}
           </span>
         </dd>
         {/* The answers that met the rule. This is what lets a clinician judge
             it — the label alone says only that something fired. */}
-        <dt className="text-ink-muted">Criteria met</dt>
+        <dt className="text-ink-muted">{t('alerts.criteria')}</dt>
         <dd className="text-ink">
           {(alert.criteria_met ?? []).map(humanise).join(', ') || '—'}
         </dd>
-        <dt className="text-ink-muted">Rule</dt>
+        <dt className="text-ink-muted">{t('alerts.rule')}</dt>
         <dd className="font-mono text-xs text-ink-muted">
           {alert.rule_id}
           {alert.engine_version ? ` · ${alert.engine_version}` : ''}
@@ -150,7 +153,7 @@ function AlertCard({ alert }: { alert: Alert }) {
       {outstanding ? (
         <div className="mt-3 space-y-2">
           <label className="block text-sm">
-            <span className="mb-1 block text-ink-muted">Note (optional)</span>
+            <span className="mb-1 block text-ink-muted">{t('alerts.note')}</span>
             <input
               value={note}
               onChange={(event) => setNote(event.target.value)}
@@ -167,7 +170,7 @@ function AlertCard({ alert }: { alert: Alert }) {
               onClick={() => record(false)}
               className="rounded border border-urgent px-3 py-1.5 text-sm font-medium text-urgent hover:bg-urgent/10"
             >
-              Acknowledge — I have seen this
+              {t('alerts.acknowledge')}
             </button>
             {confirmingEscalation ? (
               <button
@@ -177,7 +180,7 @@ function AlertCard({ alert }: { alert: Alert }) {
                 onClick={() => record(true)}
                 className="rounded bg-urgent px-3 py-1.5 text-sm font-medium text-white"
               >
-                Confirm: I have escalated this to triage
+                {t('alerts.escalateConfirm')}
               </button>
             ) : (
               <button
@@ -186,27 +189,23 @@ function AlertCard({ alert }: { alert: Alert }) {
                 onClick={() => setConfirmingEscalation(true)}
                 className="rounded border border-line px-3 py-1.5 text-sm text-ink hover:bg-surface-sunken"
               >
-                Record an escalation
+                {t('alerts.escalate')}
               </button>
             )}
           </div>
-          <p className="text-xs text-ink-faint">
-            Acknowledging records that you looked. It notifies nobody and moves
-            nothing. Escalation is something you do, in person; this only
-            records that you did.
-          </p>
+          <p className="text-xs text-ink-faint">{t('alerts.twoActs')}</p>
           {acknowledge.isError && (
             <p role="alert" className="text-sm text-urgent">
-              That could not be recorded. It may already have been acknowledged
-              by someone else — reload before acting.
+              {t('alerts.conflict')}
             </p>
           )}
         </div>
       ) : (
         <p className="mt-3 text-sm text-ink-muted">
-          Acknowledged by{' '}
-          <span className="font-medium text-ink">{alert.acknowledged_by}</span> at{' '}
-          {dateAndTime(alert.acknowledged_at)}
+          {t('alerts.acknowledgedBy', {
+            actor: alert.acknowledged_by ?? '',
+            when: dateAndTime(alert.acknowledged_at),
+          })}
           {alert.acknowledgement_note ? ` — ${alert.acknowledgement_note}` : ''}
         </p>
       )}

@@ -32,7 +32,8 @@ knowing.
 - **It never hides unresolved or conflicting facts** behind a toggle. Those are
   full sections. The honesty of this system is the product.
 - **It never translates the patient's own words in place.** Verbatim, in the
-  original script, with a translation beneath.
+  original script, with a translation beneath. The doctor's interface switches
+  between English and Hindi; the record does not switch with it.
 - **It never puts a token in localStorage**, and never a clinical string in the
   console.
 
@@ -49,6 +50,7 @@ knowing.
 | `src/report/VerifyControls.tsx` | Accept, amend, reject — three acts, and rejecting is never a "no". |
 | `src/evidence/fromApi.ts` | Where the backend's `FactChannel` vocabulary becomes what the physician is about to look at. |
 | `.eslintrc.cjs` | Two of the rules are project rules: no `localStorage`, no `console`. |
+| `src/i18n/strings.ts` | English and Hindi. **Chrome only** — the record is never translated; see the note at the top of the file. |
 
 
 ## Sign-in is a stand-in, and says so on screen
