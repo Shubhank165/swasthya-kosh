@@ -61,18 +61,22 @@ duration_units:
   - hour
   - hours
   day:
-  - రోజు
+  - రోజుల
   - రోజులు
+  - రోజు
   - day
   - days
   week:
-  - వారం
+  - వారాల
   - వారాలు
+  - వార
+  - వారం
   - week
   - weeks
   month:
-  - నెల
+  - నెలల
   - నెలలు
+  - నెల
   - month
   - months
   year:

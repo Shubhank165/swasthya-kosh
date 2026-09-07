@@ -56,18 +56,21 @@ duration_units:
   - hour
   - hours
   day:
-  - ದಿನ
   - ದಿನಗಳ
+  - ದಿನಗಳಿಂದ
+  - ದಿನ
   - day
   - days
   week:
-  - ವಾರ
   - ವಾರಗಳ
+  - ವಾರಗಳಿಂದ
+  - ವಾರ
   - week
   - weeks
   month:
-  - ತಿಂಗಳು
   - ತಿಂಗಳ
+  - ತಿಂಗಳಿಂದ
+  - ತಿಂಗಳು
   - month
   - months
   year:

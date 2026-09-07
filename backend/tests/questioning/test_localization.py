@@ -32,6 +32,11 @@ def localization() -> Localization:
     return Localization.load(CONTENT)
 
 
+@pytest.fixture(scope="module")
+def vocabularies() -> Vocabularies:
+    return Vocabularies.load(CONTENT)
+
+
 class TestEveryLanguageIsComplete:
     def test_all_nine_banks_exist(self) -> None:
         for language in LANGUAGES:
@@ -112,10 +117,6 @@ class TestEveryLanguageIsComplete:
 class TestEveryLanguageCanParse:
     """§24. Each language brings its own normalisation layer."""
 
-    @pytest.fixture(scope="class")
-    def vocabularies(self) -> Vocabularies:
-        return Vocabularies.load(CONTENT)
-
     @pytest.mark.parametrize("language", LANGUAGES)
     def test_it_has_a_yes_and_a_no(
         self, language: str, vocabularies: Vocabularies
@@ -161,6 +162,87 @@ class TestEveryLanguageCanParse:
         duration = find_duration(f"3 {day_words[0]}", vocabulary)
         assert duration is not None, (language, day_words[0])
         assert duration.unit == "day"
+
+
+class TestInflectedForms:
+    """The failure mode that stays after the tokeniser is fixed.
+
+    Tamil, Telugu and Kannada attach "for"/"since" to the noun: `நாட்கள்` + `ஆக`
+    becomes `நாட்களாக`, with the final pulli replaced — so the literal word from
+    the vocabulary is not a substring of what the patient wrote. The vocabulary
+    carries the stem for exactly this reason.
+
+    This is what "the other languages are thinner" actually means: not broken
+    machinery, missing surface forms, found one at a time by writing the
+    sentence a patient would write.
+    """
+
+    @pytest.mark.parametrize(
+        ("language", "text", "value", "unit"),
+        [
+            ("hi", "दो हफ्ते से", 2, "week"),
+            ("bn", "তিন সপ্তাহে", 3, "week"),
+            ("ta", "மூன்று நாட்களாக", 3, "day"),
+            ("ta", "ஒரு வாரமாக", 1, "week"),
+            ("ta", "இரண்டு மாதங்களாக", 2, "month"),
+            ("te", "మూడు రోజులుగా", 3, "day"),
+            ("te", "రెండు వారాలుగా", 2, "week"),
+            ("mr", "दोन आठवड्यांपासून", 2, "week"),
+            ("gu", "બે અઠવાડિયાથી", 2, "week"),
+            ("kn", "ಮೂರು ದಿನಗಳಿಂದ", 3, "day"),
+            ("kn", "ಎರಡು ವಾರಗಳಿಂದ", 2, "week"),
+            ("pa", "ਦੋ ਹਫ਼ਤਿਆਂ ਤੋਂ", 2, "week"),
+        ],
+    )
+    def test_a_declined_duration_still_parses(
+        self,
+        language: str,
+        text: str,
+        value: float,
+        unit: str,
+        vocabularies: Vocabularies,
+    ) -> None:
+        from app.questioning_agent.interpretation.duration_parser import find_duration
+
+        duration = find_duration(text, vocabularies[language])
+        assert duration is not None, (language, text)
+        assert (duration.value, duration.unit) == (value, unit)
+
+    @pytest.mark.parametrize(
+        ("language", "text", "expected"),
+        [
+            ("hi", "हाँ, तीन दिन से बुखार है", True),
+            ("hi", "नहीं, बुखार नहीं है", False),
+            ("bn", "হ্যাঁ, তিন দিন ধরে জ্বর", True),
+            ("bn", "না, জ্বর নেই", False),
+            ("ta", "ஆம், மூன்று நாட்களாக காய்ச்சல்", True),
+            ("ta", "இல்லை, காய்ச்சல் இல்லை", False),
+            ("te", "అవును, మూడు రోజులుగా జ్వరం", True),
+            ("te", "లేదు, జ్వరం లేదు", False),
+            ("mr", "होय, तीन दिवसांपासून ताप", True),
+            ("mr", "नाही, ताप नाही", False),
+            ("gu", "હા, ત્રણ દિવસથી તાવ", True),
+            ("gu", "ના, તાવ નથી", False),
+            ("kn", "ಹೌದು, ಮೂರು ದಿನಗಳಿಂದ ಜ್ವರ", True),
+            ("kn", "ಇಲ್ಲ, ಜ್ವರ ಇಲ್ಲ", False),
+            ("pa", "ਹਾਂ, ਤਿੰਨ ਦਿਨਾਂ ਤੋਂ ਬੁਖ਼ਾਰ", True),
+            ("pa", "ਨਹੀਂ, ਬੁਖ਼ਾਰ ਨਹੀਂ ਹੈ", False),
+        ],
+    )
+    def test_a_whole_sentence_reads_correctly(
+        self,
+        language: str,
+        text: str,
+        expected: bool,
+        vocabularies: Vocabularies,
+    ) -> None:
+        """A sentence, not a word. Every one of these denials contains the
+        symptom word, which is the trap §16 exists for."""
+        from app.questioning_agent.interpretation.boolean_parser import parse_boolean
+
+        assert parse_boolean(text, "fever.present", vocabularies[language]).value is (
+            expected
+        ), (language, text)
 
 
 class TestSwitchingLanguage:
