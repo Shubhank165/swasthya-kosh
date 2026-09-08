@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medikiosk_app/content/bundle.dart';
 import 'package:medikiosk_app/core/theme.dart';
@@ -10,6 +11,11 @@ import 'package:medikiosk_app/intake/screens/question_screen.dart';
 import 'package:medikiosk_app/intake/screens/urgent_care_screen.dart';
 
 Widget wrap(Widget child, {Locale locale = const Locale('en'), double scale = 1}) =>
+    ProviderScope(
+      child: _app(child, locale: locale, scale: scale),
+    );
+
+Widget _app(Widget child, {required Locale locale, required double scale}) =>
     MaterialApp(
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,

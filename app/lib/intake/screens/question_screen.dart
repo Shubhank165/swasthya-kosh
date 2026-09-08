@@ -12,6 +12,8 @@ import 'package:flutter/material.dart';
 import '../../content/bundle.dart';
 import '../../core/theme.dart';
 import '../../l10n/strings.dart';
+import '../../voice/read_aloud.dart';
+import '../../voice/read_aloud_button.dart';
 import '../widgets/answer_actions.dart';
 import '../widgets/answer_widgets.dart';
 
@@ -45,6 +47,13 @@ class QuestionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = Strings.of(context);
     final prompt = question.promptFor(language);
+    final spoken = spokenTextForQuestion(
+      prompt: prompt,
+      optionLabels: [
+        for (final code in question.options ?? const <String>[])
+          question.labelForOption(code, language) ?? '',
+      ],
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -80,6 +89,17 @@ class QuestionScreen extends StatelessWidget {
                   // clinical question in a language they did not choose.
                   prompt ?? question.fieldId,
                   style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              // Read-aloud for the patient who chose a script they cannot read.
+              // Absent when the device has no voice for that language — never
+              // spoken in another one.
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: ReadAloudButton(
+                  utteranceKey: question.questionId,
+                  text: spoken,
+                  language: language,
                 ),
               ),
               const SizedBox(height: Sizes.gutter),
