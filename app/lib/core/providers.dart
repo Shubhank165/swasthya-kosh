@@ -22,6 +22,7 @@ import '../identity/history_repository.dart';
 import '../identity/hospital_repository.dart';
 import '../storage/database.dart';
 import '../submit/queue.dart';
+import '../submit/record.dart';
 import 'api.dart';
 import 'config.dart';
 import 'secure_key.dart';
@@ -99,6 +100,17 @@ final patientDocumentsProvider = FutureProvider<List<PatientDocument>>(
 final signedInPhoneProvider = FutureProvider<String?>(
   (ref) => ref.watch(authProvider).phone(),
 );
+
+/// The signed-in patient's opaque reference, or [PatientRef.guest] when there is
+/// no session. This is what an intake is filed against: the backend links a
+/// record to a patient by it, and an intake submitted without it is orphaned —
+/// it never appears in the patient's own history or documents.
+final patientRefProvider = FutureProvider<PatientRef>((ref) async {
+  final stored = await ref.watch(sessionStoreProvider).patientRef();
+  return stored == null || stored.isEmpty
+      ? const PatientRef.guest()
+      : PatientRef.phone(stored);
+});
 
 /// Past visits, for the visits tab — stage 4.
 final visitsProvider = FutureProvider<List<Visit>>(

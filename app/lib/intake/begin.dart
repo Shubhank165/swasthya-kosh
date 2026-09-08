@@ -219,6 +219,7 @@ class _ReturningPatientGateState extends ConsumerState<ReturningPatientGate> {
     final consent = ref.read(consentGrantProvider);
     final grantingParty = ref.read(grantingPartyProvider);
     final reporter = ref.read(reporterProvider);
+    final patientRef = await ref.read(patientRefProvider.future);
 
     final flow = await IntakeFlow.begin(
       database: database,
@@ -232,6 +233,7 @@ class _ReturningPatientGateState extends ConsumerState<ReturningPatientGate> {
       reporter: reporter,
       appVersion: ref.read(configProvider).appVersion,
       confirmed: confirmed,
+      patientRef: patientRef,
       // A hospital that already holds facts about this patient has seen them
       // before, which is what makes the Ayurveda section the current-state
       // subset rather than the full module (§5 screen 8).

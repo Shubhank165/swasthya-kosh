@@ -127,6 +127,7 @@ class _ResumeCard extends ConsumerWidget {
     final database = await ref.read(databaseProvider.future);
     final queue = await ref.read(submissionQueueProvider.future);
     final documents = await ref.read(documentStoreProvider.future);
+    final patientRef = await ref.read(patientRefProvider.future);
 
     final flow = IntakeFlow.resume(
       database: database,
@@ -135,6 +136,7 @@ class _ResumeCard extends ConsumerWidget {
       bundle: bundle,
       draft: draft,
       appVersion: ref.read(configProvider).appVersion,
+      patientRef: patientRef,
     );
     // Null when the content moved under the draft. Starting fresh is the only
     // safe answer: answers to questions that have since changed are answers
