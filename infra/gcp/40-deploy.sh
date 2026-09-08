@@ -66,6 +66,17 @@ if [[ "${REPAIR_PROVIDER}" == "vertex" ]]; then
   echo "    ${API_SA%%@*} -> roles/aiplatform.user"
 fi
 
+# A signed GCS download URL for a patient's own scan (`GET /patients/me/documents`)
+# is V4-signed, which needs a private key. On Cloud Run the credentials are a
+# bearer token with none, so the API signs through the IAM `signBlob` API — which
+# needs the service account to be able to mint a signature as itself. The cloud
+# deployment always stores documents in GCS (see ENV_SHARED below).
+say "Granting ${API_SERVICE} self-signBlob (for signed document URLs)"
+gc iam service-accounts add-iam-policy-binding "${API_SA}" \
+  --member="serviceAccount:${API_SA}" \
+  --role=roles/iam.serviceAccountTokenCreator >/dev/null
+echo "    ${API_SA%%@*} -> roles/iam.serviceAccountTokenCreator (on itself)"
+
 # --- API --------------------------------------------------------------------
 # min-instances 0: an OPD is not a 24-hour service and a cold start between
 # patients costs nobody anything.

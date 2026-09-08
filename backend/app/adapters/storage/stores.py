@@ -128,13 +128,35 @@ class GCSObjectStore:
 
     async def signed_url(self, key: str, *, ttl_seconds: int) -> str:
         blob = self._bucket().blob(key)
-        url: str = await asyncio.to_thread(
-            blob.generate_signed_url,
-            version="v4",
-            expiration=timedelta(seconds=ttl_seconds),
-            method="GET",
-        )
-        return url
+        return await asyncio.to_thread(self._signed_url, blob, ttl_seconds)
+
+    def _signed_url(self, blob: Any, ttl_seconds: int) -> str:
+        kwargs: dict[str, Any] = {
+            "version": "v4",
+            "expiration": timedelta(seconds=ttl_seconds),
+            "method": "GET",
+        }
+        # On Cloud Run the ambient credentials are a bearer token from the
+        # metadata server with no private key, so V4 signing cannot happen in
+        # process — `generate_signed_url` raises "you need a private key to sign
+        # credentials". Handing it the service account's email and a live access
+        # token makes it sign through the IAM `signBlob` API instead. The
+        # service account needs `roles/iam.serviceAccountTokenCreator` on itself
+        # for that call; `40-deploy.sh` grants it. Key-based credentials (a local
+        # run with GOOGLE_APPLICATION_CREDENTIALS) have `signer_email` and sign
+        # themselves, so this branch is skipped for them.
+        assert self._client is not None
+        creds = getattr(self._client, "_credentials", None)
+        if creds is not None and not hasattr(creds, "signer_email"):
+            from google.auth.transport.requests import Request
+
+            if not getattr(creds, "token", None):
+                creds.refresh(Request())
+            email = getattr(creds, "service_account_email", None)
+            if email and email != "default":
+                kwargs["service_account_email"] = email
+                kwargs["access_token"] = creds.token
+        return str(blob.generate_signed_url(**kwargs))
 
     async def delete(self, key: str) -> None:
         blob = self._bucket().blob(key)
