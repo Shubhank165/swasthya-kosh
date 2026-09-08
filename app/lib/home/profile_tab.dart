@@ -93,10 +93,13 @@ class ProfileTab extends ConsumerWidget {
           onPressed: () async {
             await ref.read(authProvider).signOut();
             await ref.read(languageStoreProvider).clear();
+            await ref.read(hospitalStoreProvider).clear();
+            ref.read(selectedHospitalProvider.notifier).state = null;
             ref
               ..invalidate(signedInProvider)
               ..invalidate(storedLanguageProvider)
               ..invalidate(resumableDraftProvider)
+              ..invalidate(hospitalContextProvider)
               ..invalidate(visitsProvider)
               ..invalidate(patientDocumentsProvider)
               ..invalidate(carryForwardProvider);

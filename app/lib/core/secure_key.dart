@@ -149,3 +149,42 @@ class LanguageStore {
     } on Object {/* nothing to clear */}
   }
 }
+
+/// The hospital the patient last chose, remembered between launches.
+///
+/// The Visits, Documents and Profile tabs read `GET /patients/me/*`, which the
+/// backend scopes to one hospital and refuses without an `X-Hospital-Id`
+/// header. Outside an intake there is no hospital picker on screen, so without
+/// this the header is absent, the call is a 401, and the tabs render empty for
+/// a patient who does have a history. Cleared on sign-out with everything else.
+class HospitalStore {
+  HospitalStore({FlutterSecureStorage? storage})
+      : _storage = storage ??
+            const FlutterSecureStorage(
+              aOptions: AndroidOptions(encryptedSharedPreferences: true),
+            );
+
+  static const _key = 'medikiosk.session.hospital_id';
+
+  final FlutterSecureStorage _storage;
+
+  Future<String?> read() async {
+    try {
+      return await _storage.read(key: _key);
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> write(String hospitalId) async {
+    try {
+      await _storage.write(key: _key, value: hospitalId);
+    } on Object {/* best effort — an auto-select still covers a single-site app */}
+  }
+
+  Future<void> clear() async {
+    try {
+      await _storage.delete(key: _key);
+    } on Object {/* nothing to clear */}
+  }
+}

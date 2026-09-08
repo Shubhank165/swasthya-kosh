@@ -7,6 +7,7 @@ library;
 
 import 'dart:io';
 
+import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -84,7 +85,10 @@ final historyRepositoryProvider = Provider<HistoryRepository>(
 /// What this hospital already holds about the signed-in patient — §5 screen 5.
 /// Empty for a guest and empty on any failure; it must never block an intake.
 final carryForwardProvider = FutureProvider<List<CarriedFact>>(
-  (ref) => ref.watch(historyRepositoryProvider).carryForward(),
+  (ref) async {
+    await ref.watch(hospitalContextProvider.future);
+    return ref.watch(historyRepositoryProvider).carryForward();
+  },
 );
 
 /// The document library behind the Documents tab — stage 4.
@@ -93,7 +97,10 @@ final patientDocumentsRepositoryProvider = Provider<PatientDocumentsRepository>(
 );
 
 final patientDocumentsProvider = FutureProvider<List<PatientDocument>>(
-  (ref) => ref.watch(patientDocumentsRepositoryProvider).list(),
+  (ref) async {
+    await ref.watch(hospitalContextProvider.future);
+    return ref.watch(patientDocumentsRepositoryProvider).list();
+  },
 );
 
 /// The number the current session was signed in with, or null.
@@ -112,9 +119,44 @@ final patientRefProvider = FutureProvider<PatientRef>((ref) async {
       : PatientRef.phone(stored);
 });
 
+final hospitalStoreProvider = Provider<HospitalStore>((ref) => HospitalStore());
+
+/// The hospital id remembered from the patient's last visit, or null.
+final storedHospitalIdProvider = FutureProvider<String?>(
+  (ref) => ref.watch(hospitalStoreProvider).read(),
+);
+
+/// Guarantees a hospital is selected before the `me/*` tabs hit the backend.
+///
+/// `GET /patients/me/{history,documents}` is hospital-scoped and 401s without an
+/// `X-Hospital-Id` header, which the API client only sends from
+/// [selectedHospitalProvider]. Nothing sets that outside the intake's hospital
+/// picker, so the Visits/Documents/Profile tabs would 401 and render empty for
+/// a patient who has a history. This seeds it from the remembered choice, or
+/// auto-selects when the deployment has exactly one hospital. Never throws — a
+/// failure here leaves the tabs exactly as they were.
+final hospitalContextProvider = FutureProvider<void>((ref) async {
+  if (ref.read(selectedHospitalProvider) != null) return;
+  try {
+    final hospitals = await ref.watch(hospitalsProvider.future);
+    if (hospitals.isEmpty) return;
+    final storedId = await ref.watch(storedHospitalIdProvider.future);
+    final chosen = hospitals.firstWhereOrNull((h) => h.id == storedId) ??
+        (hospitals.length == 1 ? hospitals.first : null);
+    if (chosen != null && ref.read(selectedHospitalProvider) == null) {
+      ref.read(selectedHospitalProvider.notifier).state = chosen;
+    }
+  } on Object {
+    // Offline or /hospitals unreachable: the tabs stay empty rather than error.
+  }
+});
+
 /// Past visits, for the visits tab — stage 4.
 final visitsProvider = FutureProvider<List<Visit>>(
-  (ref) => ref.watch(historyRepositoryProvider).visits(),
+  (ref) async {
+    await ref.watch(hospitalContextProvider.future);
+    return ref.watch(historyRepositoryProvider).visits();
+  },
 );
 
 /// Where captured pages live before they upload.

@@ -76,6 +76,10 @@ class HospitalScreen extends ConsumerWidget {
                             : '${hospital.displayName} — ${hospital.location}',
                         onTap: () {
                           ref.read(selectedHospitalProvider.notifier).state = hospital;
+                          // Remembered so the Visits/Documents/Profile tabs have
+                          // a hospital to scope `me/*` to on the next launch,
+                          // when there is no picker on screen to set one.
+                          ref.read(hospitalStoreProvider).write(hospital.id);
                           // The hospital's own default becomes the language
                           // unless the patient already chose one on the first
                           // screen, which they did — so this is deliberately
