@@ -102,6 +102,7 @@ class GCSObjectStore:
         self._bucket_name = bucket
         self._ttl = ttl_seconds
         self._client: Any | None = None
+        self._signing: Any | None = None
 
     def _bucket(self) -> Any:
         if self._client is None:
@@ -142,21 +143,39 @@ class GCSObjectStore:
         # credentials". Handing it the service account's email and a live access
         # token makes it sign through the IAM `signBlob` API instead. The
         # service account needs `roles/iam.serviceAccountTokenCreator` on itself
-        # for that call; `40-deploy.sh` grants it. Key-based credentials (a local
-        # run with GOOGLE_APPLICATION_CREDENTIALS) have `signer_email` and sign
-        # themselves, so this branch is skipped for them.
-        assert self._client is not None
-        creds = getattr(self._client, "_credentials", None)
-        if creds is not None and not hasattr(creds, "signer_email"):
-            from google.auth.transport.requests import Request
-
-            if not getattr(creds, "token", None):
-                creds.refresh(Request())
+        # for that call; `40-deploy.sh` grants it.
+        creds = self._signing_credentials()
+        if creds is not None:
             email = getattr(creds, "service_account_email", None)
             if email and email != "default":
                 kwargs["service_account_email"] = email
                 kwargs["access_token"] = creds.token
         return str(blob.generate_signed_url(**kwargs))
+
+    def _signing_credentials(self) -> Any | None:
+        """A credential that can call IAM `signBlob`, or `None` to sign locally.
+
+        Not the storage client's own credential: that one is scoped to
+        `devstorage`, and the signBlob call is refused with
+        `ACCESS_TOKEN_SCOPE_INSUFFICIENT`. This asks for a `cloud-platform`
+        token instead. Returns `None` when the credential can sign in process
+        (a key file via GOOGLE_APPLICATION_CREDENTIALS), so a local run is
+        unchanged.
+        """
+        from google.auth.transport.requests import Request
+
+        if self._signing is None:
+            import google.auth
+
+            creds, _ = google.auth.default(
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+            if hasattr(creds, "signer_email"):
+                return None
+            self._signing = creds
+        if not self._signing.valid:
+            self._signing.refresh(Request())
+        return self._signing
 
     async def delete(self, key: str) -> None:
         blob = self._bucket().blob(key)
