@@ -92,6 +92,13 @@ API_URL="$(gc run services describe "${API_SERVICE}" --region="${REGION}" --form
 # which is 10 on a new project — and it rejects the deploy rather than clamping.
 # OCR is queue-driven and Pub/Sub redelivers, so a lower ceiling costs latency
 # under a burst, not work.
+#
+# Auth is the subscription's OIDC token (see the push-subscription block below)
+# checked by Cloud Run against this service's `--no-allow-unauthenticated` and
+# the `run.invoker` grant to the push SA — one control, and the real one. The
+# worker also has an optional static-token check (`worker.py`), but that reads
+# the same `Authorization` header the OIDC JWT now occupies, so binding
+# `PUBSUB_PUSH_TOKEN` here made every push a 403. It is deliberately not set.
 say "Deploying ${WORKER_SERVICE}"
 gc run deploy "${WORKER_SERVICE}" "${common[@]}" \
   --service-account="${WORKER_SA}" \
@@ -102,7 +109,7 @@ gc run deploy "${WORKER_SERVICE}" "${common[@]}" \
   --cpu=2 --memory=2Gi \
   --timeout=540s \
   --set-env-vars="^;^${ENV_SHARED};PUBSUB_PUSH_ENABLED=true" \
-  --set-secrets="DATABASE_URL=${SECRET_DATABASE_URL}:latest,PUBSUB_PUSH_TOKEN=${SECRET_PUSH_TOKEN}:latest"
+  --set-secrets="DATABASE_URL=${SECRET_DATABASE_URL}:latest"
 
 WORKER_URL="$(gc run services describe "${WORKER_SERVICE}" --region="${REGION}" --format='value(status.url)')"
 
