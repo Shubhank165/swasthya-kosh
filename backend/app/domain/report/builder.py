@@ -45,10 +45,12 @@ from app.domain.report.model import (
     PhysicianReport,
     ReportLine,
     ReportSection,
+    TimelineEntry,
 )
 from app.domain.report.templates import TemplateSet
 
-TEMPLATE_VERSION = "1.0"
+#: 1.1 adds the DOCUMENT TIMELINE section.
+TEMPLATE_VERSION = "1.1"
 
 #: Sections that appear in the report body, in render order. Fixed by the
 #: problem statement: chief complaint, HPI, past medical and surgical, drug and
@@ -292,6 +294,63 @@ def _document_notes(record: CanonicalRecord, templates: TemplateSet) -> tuple[Re
     return tuple(notes)
 
 
+def _document_timeline(
+    record: CanonicalRecord,
+    extractions: Sequence[DocumentExtraction],
+    templates: TemplateSet,
+) -> tuple[TimelineEntry, ...]:
+    """Place every processed document in time relative to this intake.
+
+    Anchored to `record.created_at` — the moment the intake became a record —
+    not to a live clock, so the report stays byte-deterministic. A document
+    dated before that is historical by exactly the number of days stated; one
+    with no legible date gets a line saying so, because "cannot be placed in
+    time" is itself the finding a physician needs.
+    """
+    intake_day = record.created_at.date()
+    entries: list[TimelineEntry] = []
+    for extraction in sorted(extractions, key=lambda e: e.document_id):
+        if extraction.was_rejected:
+            continue
+        fact_ids = tuple(
+            f.fact_id
+            for f in record.live_facts()
+            if isinstance(f.source, DocumentSource)
+            and f.source.document_id == extraction.document_id
+        )
+        doc_date = extraction.document_date
+        if doc_date is None:
+            entries.append(
+                TimelineEntry(
+                    document_id=extraction.document_id,
+                    dated=False,
+                    text=templates.format(
+                        "timeline_undated", document=extraction.document_id
+                    ),
+                    fact_ids=fact_ids,
+                )
+            )
+            continue
+        days = (intake_day - doc_date).days
+        key = "timeline_future" if days < 0 else "timeline_dated"
+        entries.append(
+            TimelineEntry(
+                document_id=extraction.document_id,
+                document_date=doc_date,
+                days_before_intake=days,
+                dated=True,
+                text=templates.format(
+                    key,
+                    document=extraction.document_id,
+                    date=doc_date.isoformat(),
+                    days=abs(days),
+                ),
+                fact_ids=fact_ids,
+            )
+        )
+    return tuple(entries)
+
+
 # --- assembly ----------------------------------------------------------------
 
 
@@ -352,6 +411,7 @@ def build(
         conflicts=tuple(record.contradictions),
         alerts=tuple(record.red_flags),
         interactions=interaction_lines,
+        document_timeline=_document_timeline(record, extractions, templates),
         document_notes=_document_notes(record, templates),
         contains_repaired=any(f.repaired for f in live),
         needs_verification=any(f.needs_verification for f in live)
@@ -391,6 +451,13 @@ def render_text(report: PhysicianReport, templates: TemplateSet) -> str:
         out.append(f"  {templates.text('nothing_outstanding')}")
     if report.document_notes:
         out.extend(f"  - {line.rendered()}" for line in report.document_notes)
+    out.append("")
+
+    out.append(templates.text("timeline_title").upper())
+    if report.document_timeline:
+        out.extend(f"  - {entry.text}" for entry in report.document_timeline)
+    else:
+        out.append(f"  {templates.text('timeline_none')}")
     out.append("")
 
     out.append(templates.text("conflicts_title").upper())

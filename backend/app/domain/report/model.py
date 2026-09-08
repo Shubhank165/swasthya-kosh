@@ -7,7 +7,7 @@ dashboard can walk is what makes every line clickable back to its evidence:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -65,6 +65,36 @@ class ReportSection(BaseModel):
         return not self.lines
 
 
+class TimelineEntry(BaseModel):
+    """Where one uploaded document sits in time relative to this intake.
+
+    A prescription or a certificate describes the patient on the day it was
+    written, which may be weeks before they answered today's questions. Reading
+    a value off it as though it were current — a diagnosis that has since
+    resolved, a medicine since stopped — is a mistake the report has to make
+    visible rather than leave to the reader to remember. `dated` is `False` when
+    no date could be read: that is stated as its own problem, because an undated
+    document cannot be placed on the timeline at all.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    document_id: str
+    #: The date printed on the document, ISO. `None` when none was legible.
+    document_date: date | None = None
+    #: Whole days between `document_date` and the intake. `None` when undated, or
+    #: negative when the document is dated after the intake (a clock or a
+    #: transcription problem worth surfacing).
+    days_before_intake: int | None = None
+    #: `False` -> the document carried no legible date. This is the problem the
+    #: line reports.
+    dated: bool = False
+    #: The rendered sentence, in the report's language.
+    text: str
+    #: The document-channel facts this document produced, for click-through.
+    fact_ids: tuple[str, ...] = ()
+
+
 class InteractionLine(BaseModel):
     """One sourced interaction pair. A request to look, never a recommendation."""
 
@@ -95,6 +125,10 @@ class PhysicianReport(BaseModel):
     conflicts: tuple[Contradiction, ...] = ()
     alerts: tuple[RedFlagEvent, ...] = ()
     interactions: tuple[InteractionLine, ...] = ()
+    #: One line per uploaded document placing it in time relative to this
+    #: intake, or naming the absence of a date. Drives the DOCUMENT TIMELINE
+    #: section.
+    document_timeline: tuple[TimelineEntry, ...] = ()
     document_notes: tuple[ReportLine, ...] = ()
     #: True when any fact was produced by the repair model.
     contains_repaired: bool = False

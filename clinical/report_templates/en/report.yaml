@@ -20,6 +20,7 @@ strings:
     Every line requires physician verification before use.
 
   unresolved_title: "Unresolved"
+  timeline_title: "Document timeline"
   conflicts_title: "Information conflicts"
   safety_title: "Safety"
   interactions_title: "Medicine review"
@@ -27,6 +28,10 @@ strings:
   nothing_recorded: "Nothing recorded."
   nothing_outstanding: "Nothing outstanding."
   no_conflicts: "No conflicts detected between today's answers and prior records."
+  timeline_none: "No documents to place in time."
+  timeline_dated: "{document} is dated {date} — {days} day(s) before this intake. Anything read from it describes the patient on that date, not necessarily today; confirm current status with the patient."
+  timeline_future: "{document} is dated {date}, which is {days} day(s) after this intake. Check the date on the document — one of the two is wrong."
+  timeline_undated: "{document} carries no legible date. It cannot be placed on the timeline; treat every value read from it as historical until the patient confirms it still holds."
   no_alerts: "No urgent clinical review criteria were triggered on the device."
   no_interactions: "No sourced interaction found among the medicines listed."
 

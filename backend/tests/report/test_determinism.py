@@ -252,3 +252,40 @@ class TestTheReportSaysNothingItShouldNot:
         assert "below the reference range printed on this report" in haemoglobin
         assert "anaemia" not in haemoglobin.lower()
         assert find_unsupported_assertions(haemoglobin) == ()
+
+
+class TestTheDocumentTimeline:
+    """Every uploaded document is placed in time, or its missing date is named."""
+
+    def _section(self, text: str, title: str) -> list[str]:
+        lines = text.splitlines()
+        start = lines.index(title)
+        end = next(
+            (i for i in range(start + 1, len(lines)) if lines[i] and lines[i].isupper()),
+            len(lines),
+        )
+        return [ln.strip().lstrip("- ") for ln in lines[start + 1 : end] if ln.strip()]
+
+    async def test_a_dated_document_states_how_long_before_the_intake(
+        self, rendered: dict[str, str]
+    ) -> None:
+        rows = self._section(rendered["en"], "DOCUMENT TIMELINE")
+        dated = [r for r in rows if "day(s) before this intake" in r]
+        assert dated, rows
+        assert all("not necessarily today" in r for r in dated)
+
+    async def test_an_undated_document_is_named_as_its_own_problem(
+        self, rendered: dict[str, str]
+    ) -> None:
+        """The low-confidence prescription fixture carries no legible date."""
+        rows = self._section(rendered["en"], "DOCUMENT TIMELINE")
+        undated = [r for r in rows if "no legible date" in r]
+        assert undated, rows
+        assert "treat every value read from it as historical" in undated[0]
+
+    async def test_the_timeline_renders_in_hindi_too(
+        self, rendered: dict[str, str]
+    ) -> None:
+        rows = self._section(rendered["hi"], "दस्तावेज़ समयरेखा")
+        assert rows
+        assert any("पठनीय तिथि नहीं" in r for r in rows)
