@@ -133,6 +133,8 @@ class Question {
     this.allowSkip = true,
     this.allowUnknown = true,
     this.precondition,
+    this.optionsFrom,
+    this.optionLabels = const {},
   });
 
   factory Question.fromJson(Map<String, dynamic> json) => Question(
@@ -155,6 +157,15 @@ class Question {
         precondition: json['precondition'] == null
             ? null
             : Condition.fromJson(json['precondition'] as Map<String, dynamic>),
+        optionsFrom: json['options_from'] as String?,
+        optionLabels: {
+          for (final entry
+              in (json['option_labels'] as Map<String, dynamic>? ?? {}).entries)
+            entry.key: {
+              for (final text in (entry.value as Map<String, dynamic>).entries)
+                text.key: text.value.toString(),
+            },
+        },
       );
 
   final String questionId;
@@ -177,6 +188,46 @@ class Question {
   final bool allowSkip;
   final bool allowUnknown;
   final Condition? precondition;
+
+  /// The field whose answer supplies this question's options, instead of
+  /// [options] — "which of these is worst" offers back what the patient just
+  /// ticked. The walker fills [options] in from it before the question is put,
+  /// so nothing downstream of the walker needs to know this exists.
+  final String? optionsFrom;
+
+  /// Option code to language to label, authored beside the questions.
+  ///
+  /// Empty for a bundle that carries no option text, which is what
+  /// [labelForOption] returning null means to the caller.
+  final Map<String, Map<String, String>> optionLabels;
+
+  /// The label for [code] in [language], or null when the content has none.
+  ///
+  /// No fallback to another language, for the same reason [promptFor] has
+  /// none: an option shown in English under a Tamil question is an answer the
+  /// patient may not have understood, recorded as though they had.
+  String? labelForOption(String code, String language) =>
+      optionLabels[code]?[language];
+
+  /// A copy with [options] replaced — how the walker resolves [optionsFrom].
+  Question withOptions(List<String> resolved) => Question(
+        questionId: questionId,
+        fieldId: fieldId,
+        section: section,
+        answerType: answerType,
+        prompts: prompts,
+        options: resolved,
+        unit: unit,
+        units: units,
+        minimum: minimum,
+        maximum: maximum,
+        required: required,
+        allowSkip: allowSkip,
+        allowUnknown: allowUnknown,
+        precondition: precondition,
+        optionsFrom: optionsFrom,
+        optionLabels: optionLabels,
+      );
 
   /// The prompt in [language], or `null` when this bundle has none.
   ///
@@ -294,7 +345,12 @@ class ContentBundle {
   static const supportedSchemaVersions = {'0.1', '0.2'};
 
   /// The bundle formats this app can read.
-  static const supportedBundleFormats = {'1'};
+  ///
+  /// `2` is the bundle compiled from the questioning engine's content. It adds
+  /// `options_from` and `option_labels`; a build that read it as a `1` would
+  /// render "which of these is worst" with no options at all, which is why the
+  /// number moved rather than the fields simply appearing.
+  static const supportedBundleFormats = {'1', '2'};
 
   bool get isUsable =>
       supportedSchemaVersions.contains(schemaVersion) &&

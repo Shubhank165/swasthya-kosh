@@ -231,6 +231,15 @@ class Settings(BaseSettings):
         return self.clinical_content_dir / "questions"
 
     @property
+    def questioning_dir(self) -> Path:
+        """The questioning engine's content — slots, questions, red flags.
+
+        Separate from `questions_dir`, which holds the hand-authored bundle the
+        engine replaces. Both are on disk while the old one still has readers.
+        """
+        return self.clinical_content_dir / "questioning"
+
+    @property
     def terminology_dir(self) -> Path:
         return self.clinical_content_dir / "terminology"
 

@@ -83,7 +83,11 @@ class QuestionScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: Sizes.gutter),
-              buildAnswerWidget(question: question, onAnswered: onAnswered) ??
+              buildAnswerWidget(
+                    question: question,
+                    language: language,
+                    onAnswered: onAnswered,
+                  ) ??
                   const SizedBox.shrink(),
               const SizedBox(height: Sizes.gutter),
               const Divider(),

@@ -37,6 +37,12 @@ x-app: &app
     # `{"<token>": "<hospital_id>"}`. Compose refuses to start without it: a
     # kiosk token with a default value is a kiosk token everyone knows.
     KIOSK_TOKENS: ${KIOSK_TOKENS:?set KIOSK_TOKENS in .env}
+    # Peppers the HMAC that stands in for a patient's phone number. Refused
+    # rather than defaulted for the same reason as the token above, and passed
+    # here at all because it was not: the stack came up healthy and every
+    # patient sign-in returned a 500 naming this variable, which is a long way
+    # to travel to find a missing line in a compose file.
+    PATIENT_REF_PEPPER: ${PATIENT_REF_PEPPER:?set PATIENT_REF_PEPPER in .env}
   volumes:
     - uploads:/app/backend/uploads
   depends_on:

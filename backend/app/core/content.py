@@ -28,6 +28,13 @@ from app.domain.ontology.concepts import ConceptRegistry
 from app.domain.questions.loader import load_questions
 from app.domain.questions.model import QuestionSet
 from app.domain.report.templates import TemplateError, TemplateRegistry, TemplateSet
+from app.questioning_agent.knowledge.information_schema import (
+    ContentError as EngineContentError,
+)
+from app.questioning_agent.knowledge.information_schema import SlotRegistry
+from app.questioning_agent.knowledge.questions import QuestionBank
+from app.questioning_agent.localization.localization_loader import Localization
+from app.questioning_agent.safety.triage import TriageRules
 
 
 def _read_yaml(path: Path) -> Any:
@@ -121,6 +128,47 @@ def load_templates(directory: Path, languages: list[str], default: str) -> Templ
 
 
 @dataclass(frozen=True, slots=True)
+class QuestioningContent:
+    """The questioning engine's registries, loaded once.
+
+    Held together because the bundle compiler needs all four and because loading
+    them separately in two places is how two callers end up disagreeing about
+    what the content says.
+    """
+
+    slots: SlotRegistry
+    bank: QuestionBank
+    localization: Localization
+    triage: TriageRules
+
+
+def load_questioning(directory: Path) -> QuestioningContent:
+    """Load the engine's content, through the engine's own loaders.
+
+    They validate as they go — an option with no text in one of the nine
+    languages, a prerequisite naming a slot that does not exist, a red-flag rule
+    reading a slot no question fills — and raise `ContentError` naming the file.
+    Startup is the right time to find that out.
+    """
+    if not directory.is_dir():
+        raise ContentError(f"questioning content directory not found: {directory}")
+    # The engine defines its own `ContentError` because it imports nothing from
+    # `app/`. Translated here rather than left to escape: the startup path
+    # catches this app's type, and an unrecognised exception from a content file
+    # is a stack trace where a named file and reason belong.
+    try:
+        slots = SlotRegistry.load(directory)
+        return QuestioningContent(
+            slots=slots,
+            bank=QuestionBank.load(directory, slots),
+            localization=Localization.load(directory),
+            triage=TriageRules.load(directory),
+        )
+    except EngineContentError as exc:
+        raise ContentError(str(exc)) from exc
+
+
+@dataclass(frozen=True, slots=True)
 class ClinicalContent:
     """Everything loaded from `clinical/`, validated and ready to use."""
 
@@ -133,6 +181,10 @@ class ClinicalContent:
     #: The question content the kiosk and the patient app both walk. Parsed and
     #: compiled here, never executed here — see clinical/questions/README.md.
     questions: QuestionSet
+    #: The questioning engine's content, loaded through the engine's own
+    #: registries so the bundle and the server-side engine cannot disagree about
+    #: what a question is. This is what `/content/bundle` now serves.
+    questioning: QuestioningContent
 
     def field_labels(self) -> dict[str, str]:
         """Field id -> display label, for the report builder.
@@ -180,6 +232,7 @@ def load_clinical_content(settings: Settings | None = None) -> ClinicalContent:
             content_version=settings.content_version,
             languages=settings.question_languages,
         ),
+        questioning=load_questioning(settings.questioning_dir),
     )
     _validate(content)
     return content

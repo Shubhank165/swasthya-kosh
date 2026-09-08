@@ -22,11 +22,27 @@
 # order; pending AIIA mentor review. The mapping of these to a practitioner's
 # own assessment is explicitly *not* claimed here.
 
+
+# `current_state: true` marks the three asked again on a **return visit** — 2/3
+# §5 screen 8. What a patient reports about their own constitution does not move
+# between two visits a fortnight apart; agni, koshtha and nidra are what a Vaidya
+# wants today's answer to.
+#
+# Which three is a clinical judgement, and it is not a new one: it was authored
+# against `clinical/questions/ayurveda/ayurveda_module.yaml` and is carried here
+# onto the questions that ask the same three things. Same decision, same review
+# status, different content set.
+#
+# clinical_source: carried from the hand-authored AYUSH module; pending AIIA
+# mentor review, like everything it came from.
+
 version: 1
 
 questions:
   - id: ayush.appetite
     answer_type: single_select
+    # Agni — asked again on a return visit. See `current_state` above.
+    current_state: true
     extracts: [ayush.appetite]
     priority: 8
     burden: 1
@@ -44,6 +60,8 @@ questions:
 
   - id: ayush.bowel_habit
     answer_type: single_select
+    # Koshtha — asked again on a return visit. See `current_state` above.
+    current_state: true
     extracts: [ayush.bowel_habit]
     priority: 8
     burden: 1
@@ -58,6 +76,8 @@ questions:
 
   - id: ayush.sleep_quality
     answer_type: single_select
+    # Nidra — asked again on a return visit. See `current_state` above.
+    current_state: true
     extracts: [ayush.sleep_quality]
     priority: 8
     burden: 1

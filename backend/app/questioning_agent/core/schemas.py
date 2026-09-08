@@ -130,6 +130,15 @@ class Question(Model):
     fixed_order: int | None = None
     #: Domains this question is only worth asking in. Empty means any.
     domains: tuple[str, ...] = ()
+    #: Asked again when the hospital has seen this patient before.
+    #:
+    #: Only the AYUSH module uses it. What a patient reports about their own
+    #: constitution does not move between two visits a fortnight apart; agni,
+    #: koshtha and nidra are exactly what a Vaidya wants today's answer to. The
+    #: engine does not read this — it ranks on what is still unknown, and a
+    #: return visit starts with a state that already holds the settled answers.
+    #: The offline bundle does, because the walker chooses between two plans.
+    current_state: bool = False
 
     @property
     def is_general(self) -> bool:

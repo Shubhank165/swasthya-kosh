@@ -34,6 +34,7 @@ typedef OnAnswered = void Function(AnswerValue value, String originalText);
 Widget? buildAnswerWidget({
   required Question question,
   required OnAnswered onAnswered,
+  String language = 'en',
   Key? key,
 }) {
   // **Keyed by question, always.** Flutter keeps a `State` object when the same
@@ -52,9 +53,15 @@ Widget? buildAnswerWidget({
   final resolved = key ?? ValueKey<String>(question.questionId);
   return switch (question.answerType) {
       AnswerType.singleChoice => SingleChoiceAnswer(
-          key: resolved, question: question, onAnswered: onAnswered),
+          key: resolved,
+          question: question,
+          language: language,
+          onAnswered: onAnswered),
       AnswerType.multiChoice => MultiChoiceAnswer(
-          key: resolved, question: question, onAnswered: onAnswered),
+          key: resolved,
+          question: question,
+          language: language,
+          onAnswered: onAnswered),
       AnswerType.yesNoUnknown =>
         YesNoAnswer(key: resolved, question: question, onAnswered: onAnswered),
       AnswerType.number =>
@@ -134,27 +141,37 @@ class OptionTile extends StatelessWidget {
   }
 }
 
-/// Human-readable text for an option code.
+/// Last-resort text for an option code.
 ///
-/// Option codes are content (`sudden`, `to_left_arm`), and the bundle carries
-/// no per-option translations. Rather than invent them — §16 — the code is
-/// de-underscored and sentence-cased for display, and the *code* is what is
-/// recorded. A content change that adds option labels would replace this
-/// function and nothing else.
+/// De-underscored and sentence-cased, which produces English. Used only where
+/// the content carries no label — units, and a bundle that predates option
+/// text — and never in preference to one, because "At rest" under a Tamil
+/// question is an answer the patient may not have understood, recorded as
+/// though they had. The *code* is what is recorded either way.
 String optionLabel(String code) {
   final words = code.replaceAll('_', ' ').trim();
   if (words.isEmpty) return code;
   return words[0].toUpperCase() + words.substring(1);
 }
 
+/// The label for an option, in the language the patient chose.
+///
+/// Prefers the content's own text — the questioning engine's bundle authors
+/// every option in all nine languages beside the question it belongs to — and
+/// falls back to [optionLabel] only when the bundle has none.
+String labelFor(Question question, String code, String language) =>
+    question.labelForOption(code, language) ?? optionLabel(code);
+
 class SingleChoiceAnswer extends StatelessWidget {
   const SingleChoiceAnswer({
     super.key,
     required this.question,
     required this.onAnswered,
+    this.language = 'en',
   });
 
   final Question question;
+  final String language;
   final OnAnswered onAnswered;
 
   @override
@@ -166,8 +183,11 @@ class SingleChoiceAnswer extends StatelessWidget {
         for (final option in options)
           OptionTile(
             key: Key('option.$option'),
-            label: optionLabel(option),
-            onTap: () => onAnswered(CodedValue(option), optionLabel(option)),
+            label: labelFor(question, option, language),
+            // The label recorded is the text the patient actually read (§9),
+            // which is why it is the localised one and not the code.
+            onTap: () => onAnswered(
+                CodedValue(option), labelFor(question, option, language)),
           ),
       ],
     );
@@ -179,9 +199,11 @@ class MultiChoiceAnswer extends StatefulWidget {
     super.key,
     required this.question,
     required this.onAnswered,
+    this.language = 'en',
   });
 
   final Question question;
+  final String language;
   final OnAnswered onAnswered;
 
   @override
@@ -201,7 +223,7 @@ class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
         for (final option in options)
           OptionTile(
             key: Key('option.$option'),
-            label: optionLabel(option),
+            label: labelFor(widget.question, option, widget.language),
             selected: _chosen.contains(option),
             onTap: () => setState(() {
               if (!_chosen.remove(option)) _chosen.add(option);
@@ -220,7 +242,10 @@ class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
                   final chosen = _chosen.toList()..sort();
                   widget.onAnswered(
                     CodedListValue(chosen),
-                    chosen.map(optionLabel).join(', '),
+                    chosen
+                        .map((c) =>
+                            labelFor(widget.question, c, widget.language))
+                        .join(', '),
                   );
                 },
           child: Text(strings.continueLabel),

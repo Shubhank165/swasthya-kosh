@@ -114,6 +114,7 @@ def _question(entry: Any, path: Path) -> Question:
             maximum=entry.get("maximum"),
             fixed_order=entry.get("fixed_order"),
             domains=tuple(str(d) for d in entry.get("domains") or ()),
+            current_state=bool(entry.get("current_state", False)),
         )
     except ContentError:
         raise

@@ -19,8 +19,9 @@ from fastapi import APIRouter, Header, Query, Response, status
 
 from app.api.deps import ContentDep
 from app.core.logging import get_logger
-from app.domain.questions.bundle import canonical_json, compile_bundle, etag_for
+from app.domain.questions.bundle import canonical_json, etag_for
 from app.normalize.registry import supported_versions
+from app.questioning_agent.output.bundle import compile_bundle
 
 logger = get_logger(__name__)
 
@@ -35,6 +36,24 @@ def _schema_version() -> str:
     truth for that would eventually disagree.
     """
     return supported_versions()[-1]
+
+
+def _compiled(content: ContentDep) -> dict[str, Any]:
+    """The bundle, compiled from the questioning engine's content.
+
+    **This is the engine's content, not the hand-authored set it replaces.** The
+    engine ranks questions per turn against what is already known, which needs
+    the state, which is on the phone — so what the phone gets is the questions,
+    their prerequisites and the red-flag rules, compiled into the plan its
+    walker already knows how to follow. `output/bundle.py` says what that costs.
+    """
+    return compile_bundle(
+        bank=content.questioning.bank,
+        slots=content.questioning.slots,
+        localization=content.questioning.localization,
+        triage=content.questioning.triage,
+        schema_version=_schema_version(),
+    )
 
 
 @router.get(
@@ -53,12 +72,14 @@ async def bundle(
     invalidates every cached copy. The version is what a human reads in a
     changelog; the ETag is what is actually enforced.
 
-    80 KB of Devanagari and English prompts on what may be a patient's mobile
-    data, fetched on every app launch. The 304 is not an optimisation detail —
-    it is the difference between an app that opens instantly on a bad connection
-    and one that does not.
+    190-odd KB of prompts and option text in nine languages, on what may be a
+    patient's mobile data, fetched on every app launch. It was 80 KB and two
+    languages before the engine's content replaced the hand-authored set; the
+    304 was worth having then and is worth more now. It is not an optimisation
+    detail — it is the difference between an app that opens instantly on a bad
+    connection and one that does not.
     """
-    compiled = compile_bundle(content.questions, schema_version=_schema_version())
+    compiled = _compiled(content)
     tag = etag_for(compiled)
 
     if if_none_match and tag in {t.strip() for t in if_none_match.split(",")}:
@@ -86,7 +107,7 @@ async def bundle(
 async def bundle_version(content: ContentDep) -> dict[str, Any]:
     """A cheap check for a client deciding whether to refresh on a metered
     connection."""
-    compiled = compile_bundle(content.questions, schema_version=_schema_version())
+    compiled = _compiled(content)
     return {
         "content_version": compiled["content_version"],
         "schema_version": compiled["schema_version"],

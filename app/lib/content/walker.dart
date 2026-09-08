@@ -285,6 +285,20 @@ class IntakeWalker {
         continue;
       }
 
+      final resolved = _withRuntimeOptions(question);
+      if (resolved == null) {
+        // A runtime-filled question whose source answer yielded no options.
+        // Putting it would show a list with nothing in it; recording it
+        // `not_asked` says plainly that it was never put.
+        _answers[id] = Answer(
+          questionId: id,
+          fieldId: question.fieldId,
+          status: FieldStatus.notAsked,
+          language: language,
+        );
+        continue;
+      }
+
       switch (_preconditionState(question)) {
         case Tri.no:
           _answers[id] = Answer(
@@ -301,10 +315,34 @@ class IntakeWalker {
           // it for a later pass rather than deciding on incomplete information.
           continue;
         case Tri.yes:
-          return question;
+          return resolved;
       }
     }
     return null;
+  }
+
+  /// A question whose options come from an earlier answer, with them filled in.
+  ///
+  /// Returns the question unchanged when it has no `options_from`, and null
+  /// when it has one that yielded nothing to offer. This is the whole of what
+  /// the adaptive engine's runtime options amount to on the phone: the second
+  /// fixed question offers back the problems ticked on the first, rather than
+  /// making somebody re-read a list of fifteen they have just finished reading.
+  Question? _withRuntimeOptions(Question question) {
+    final from = question.optionsFrom;
+    if (from == null) return question;
+
+    final answer = _byField[from];
+    if (answer == null || !answer.isSettled) return null;
+
+    final codes = switch (answer.value) {
+      CodedListValue(:final codes) => codes,
+      CodedValue(:final code) => [code],
+      TextValue(:final text) => [text],
+      _ => const <String>[],
+    };
+    if (codes.isEmpty) return null;
+    return question.withOptions(List.unmodifiable(codes));
   }
 
   Tri _preconditionState(Question question) {

@@ -74,6 +74,15 @@ class TriageRules:
     def __len__(self) -> int:
         return len(self._rules)
 
+    @property
+    def rules(self) -> tuple[Rule, ...]:
+        """The rules themselves, for compiling them somewhere they can be walked.
+
+        `check` is how the engine uses these. The offline bundle needs the rules
+        rather than the verdict, because the phone evaluates them itself.
+        """
+        return self._rules
+
     def check(self, state: PatientState) -> tuple[RedFlag, ...]:
         """Every rule that fires, critical first.
 
