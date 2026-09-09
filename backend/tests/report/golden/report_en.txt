@@ -52,9 +52,9 @@ UNRESOLVED
   - doc_000002 read with low confidence — verify against the original [low-confidence reading — verify against the original]
 
 DOCUMENT TIMELINE
-  - doc_000001 is dated 2026-08-14 — 25 day(s) before this intake. Anything read from it describes the patient on that date, not necessarily today; confirm current status with the patient.
+  - doc_000001 is dated 2026-08-14 — 20 day(s) before this intake. Anything read from it describes the patient on that date, not necessarily today; confirm current status with the patient.
   - doc_000002 carries no legible date. It cannot be placed on the timeline; treat every value read from it as historical until the patient confirms it still holds.
-  - doc_000003 is dated 2026-08-28 — 11 day(s) before this intake. Anything read from it describes the patient on that date, not necessarily today; confirm current status with the patient.
+  - doc_000003 is dated 2026-08-28 — 6 day(s) before this intake. Anything read from it describes the patient on that date, not necessarily today; confirm current status with the patient.
 
 INFORMATION CONFLICTS
   medication amlodipine

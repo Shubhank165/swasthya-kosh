@@ -193,7 +193,9 @@ backend/stale/     the previous build. Kept, not maintained, not deployed.
 clinical/          YAML a clinician can review in a pull request
 infra/             Dockerfiles, cloudbuild, gcloud scripts
 
-app/               the patient's phone (Flutter). Touch only; no microphone.
+app/               the patient's phone (Flutter). Touch, plus optional voice —
+                   read-aloud and speech input both run on the device; no audio
+                   is stored or sent (DECISIONS §68).
 dashboard/         the doctor's screen (React). Renders; never computes.
 ```
 

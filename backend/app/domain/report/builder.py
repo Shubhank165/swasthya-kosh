@@ -301,13 +301,15 @@ def _document_timeline(
 ) -> tuple[TimelineEntry, ...]:
     """Place every processed document in time relative to this intake.
 
-    Anchored to `record.created_at` — the moment the intake became a record —
-    not to a live clock, so the report stays byte-deterministic. A document
-    dated before that is historical by exactly the number of days stated; one
-    with no legible date gets a line saying so, because "cannot be placed in
-    time" is itself the finding a physician needs.
+    Anchored to when the patient finished the interview
+    (`completed_at`, device-stamped; `created_at` only if that is somehow
+    absent) — a field already on the record, never a live clock, so the report
+    stays byte-deterministic. A document dated before that is historical by
+    exactly the number of days stated; one with no legible date gets a line
+    saying so, because "cannot be placed in time" is itself the finding a
+    physician needs.
     """
-    intake_day = record.created_at.date()
+    intake_day = (record.completed_at or record.created_at).date()
     entries: list[TimelineEntry] = []
     for extraction in sorted(extractions, key=lambda e: e.document_id):
         if extraction.was_rejected:

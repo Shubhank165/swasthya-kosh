@@ -1,11 +1,11 @@
 /// Read a question aloud, on the device — 2/3 §11, §14.
 ///
-/// **Output only.** There is no microphone anywhere in this app, and
-/// `test/no_voice_test.dart` keeps it that way. This is the same warrant
-/// `flutter_tts` already carries for reading the consent notice, extended to
-/// every question so a patient who cannot read the script they chose can still
-/// hear it. The platform TTS engine runs on the device; nothing spoken or typed
-/// leaves it.
+/// **Output only.** This is the same warrant `flutter_tts` already carries for
+/// reading the consent notice, extended to every question so a patient who
+/// cannot read the script they chose can still hear it. The platform TTS engine
+/// runs on the device; nothing spoken leaves it. Voice *input* is handled
+/// separately by `lib/voice/transcribe.dart` and is also fully on-device —
+/// `test/on_device_voice_test.dart` holds both to that.
 ///
 /// **It never falls back to another language.** A Tamil question read by an
 /// en-US voice is a question the patient did not understand, played back as

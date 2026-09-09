@@ -2,11 +2,17 @@
     <!-- The app posts the intake to the hospital. Declared here rather than
          only in the debug manifest, where the Flutter tool puts it for hot
          reload: without it in `main`, a release build cannot reach the network
-         at all and every submission fails on the one build a patient installs.
-
-         There is deliberately no RECORD_AUDIO permission and there must never
-         be one — 2/3 §1 rule 1, asserted by `test/no_voice_test.dart`. -->
+         at all and every submission fails on the one build a patient installs. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- RECORD_AUDIO is for on-device voice input only — the mic feeds an
+         offline recogniser (sherpa_onnx) that runs on the phone, and the audio
+         is never written to disk or sent anywhere. See the DECISIONS entry that
+         reversed the touch-only stance and `test/on_device_voice_test.dart`,
+         which asserts no cloud speech package sits beside it and nothing in
+         lib/voice/ reaches the network. CAPTURE_AUDIO_OUTPUT and
+         MODIFY_AUDIO_SETTINGS remain forbidden. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
     <!-- `usesCleartextTraffic="false"` below: health answers never travel in
          plaintext. That is already the platform default above API 27, but a

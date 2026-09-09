@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medikiosk_app/content/answer.dart';
 import 'package:medikiosk_app/content/bundle.dart';
@@ -43,7 +44,7 @@ Future<(AnswerValue?, String?)> pumpAnswer(
 }) async {
   AnswerValue? captured;
   String? capturedText;
-  await tester.pumpWidget(MaterialApp(
+  await tester.pumpWidget(ProviderScope(child: MaterialApp(
     locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -59,7 +60,7 @@ Future<(AnswerValue?, String?)> pumpAnswer(
         )!,
       ),
     ),
-  ));
+  )));
   await tester.pumpAndSettle();
   return (captured, capturedText);
 }
@@ -70,7 +71,7 @@ void main() {
     // and the red-flag rules match on, so that is what must be recorded.
     AnswerValue? value;
     String? text;
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
@@ -82,7 +83,7 @@ void main() {
           },
         ),
       ),
-    ));
+    )));
     await tester.tap(find.byKey(const Key('option.sudden')));
     await tester.pump();
 
@@ -100,7 +101,7 @@ void main() {
 
   testWidgets('multi_choice records every chosen code', (tester) async {
     AnswerValue? value;
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
@@ -109,7 +110,7 @@ void main() {
           onAnswered: (v, _) => value = v,
         ),
       ),
-    ));
+    )));
     await tester.tap(find.byKey(const Key('option.rash')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('option.fainting')));
@@ -132,13 +133,13 @@ void main() {
 
   testWidgets('yes and no record booleans, not text', (tester) async {
     AnswerValue? value;
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: YesNoAnswer(question: q('yes_no_unknown'), onAnswered: (v, _) => value = v),
       ),
-    ));
+    )));
     await tester.tap(find.byKey(const Key('option.no')));
     await tester.pump();
     expect((value! as BoolValue).value, isFalse);
@@ -146,7 +147,7 @@ void main() {
 
   testWidgets('number carries its unit', (tester) async {
     AnswerValue? value;
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
@@ -155,7 +156,7 @@ void main() {
           onAnswered: (v, _) => value = v,
         ),
       ),
-    ));
+    )));
     await tester.enterText(find.byKey(const Key('answer.number')), '42');
     await tester.pump();
     await tester.tap(find.byKey(const Key('answer.confirm')));
@@ -188,7 +189,7 @@ void main() {
 
   testWidgets('scale records a bare number', (tester) async {
     AnswerValue? value;
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
@@ -197,7 +198,7 @@ void main() {
           onAnswered: (v, _) => value = v,
         ),
       ),
-    ));
+    )));
     await tester.tap(find.byKey(const Key('scale.6')));
     await tester.pump();
     expect(value!.toJson(), 6.0);
@@ -207,7 +208,7 @@ void main() {
     // `{"n": 3, "unit": "day"}`. A tagged union here would coerce to a Text of
     // the whole object on the backend.
     AnswerValue? value;
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
@@ -218,7 +219,7 @@ void main() {
           ),
         ),
       ),
-    ));
+    )));
     await tester.enterText(find.byKey(const Key('answer.duration_n')), '3');
     await tester.pump();
     await tester.tap(find.byKey(const Key('duration.week')));
@@ -241,13 +242,13 @@ void main() {
       (tester) async {
     // §1 rule 8: nothing in this app may invite dictation into a clinical field.
     AnswerValue? value;
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: FreeTextAnswer(question: q('free_text'), onAnswered: (v, _) => value = v),
       ),
-    ));
+    )));
     await tester.enterText(find.byKey(const Key('answer.free_text')), 'nothing else');
     await tester.pump();
     await tester.tap(find.byKey(const Key('answer.confirm')));
@@ -276,7 +277,7 @@ void main() {
 
   group('the two affordances', () {
     testWidgets('both appear when the content allows both', (tester) async {
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpWidget(ProviderScope(child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
@@ -287,14 +288,14 @@ void main() {
             onSkip: () {},
           ),
         ),
-      ));
+      )));
       expect(find.byKey(const Key('answer.dont_know')), findsOneWidget);
       expect(find.byKey(const Key('answer.skip')), findsOneWidget);
     });
 
     testWidgets('skip disappears where the content forbids it', (tester) async {
       // Consent and the chief complaint. Without them there is no intake.
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpWidget(ProviderScope(child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
@@ -305,7 +306,7 @@ void main() {
             onSkip: () {},
           ),
         ),
-      ));
+      )));
       expect(find.byKey(const Key('answer.dont_know')), findsOneWidget);
       expect(find.byKey(const Key('answer.skip')), findsNothing);
     });
@@ -314,7 +315,7 @@ void main() {
       // They record different statuses — `unresolved` and `not_asked` — so a
       // patient who cannot tell them apart produces the wrong one.
       for (final locale in ['en', 'hi', 'ta', 'bn']) {
-        await tester.pumpWidget(MaterialApp(
+        await tester.pumpWidget(ProviderScope(child: MaterialApp(
           locale: Locale(locale),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -326,7 +327,7 @@ void main() {
               onSkip: () {},
             ),
           ),
-        ));
+        )));
         await tester.pumpAndSettle();
         final dontKnow = tester.widget<Text>(
           find.descendant(
@@ -353,7 +354,7 @@ void main() {
     final question = q('number', unit: 'celsius', units: ['celsius', 'fahrenheit']);
     AnswerValue? value;
     String? text;
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       theme: buildTheme(),
@@ -368,7 +369,7 @@ void main() {
           )!,
         ),
       ),
-    ));
+    )));
     await tester.enterText(find.byKey(const Key('answer.number')), '101');
     await tester.tap(find.byKey(const Key('unit.fahrenheit')));
     await tester.pumpAndSettle();
@@ -393,7 +394,7 @@ void main() {
 
   testWidgets('a question with one unit offers no choice', (tester) async {
     // A toggle with a single option is a control that cannot do anything.
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       theme: buildTheme(),
@@ -403,7 +404,7 @@ void main() {
           onAnswered: (_, __) {},
         )!,
       ),
-    ));
+    )));
     expect(find.byKey(const Key('unit.years')), findsNothing);
   });
 
@@ -416,7 +417,7 @@ void main() {
     Question showing = q('free_text', questionId: 'medications');
     late StateSetter setOuter;
 
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       theme: buildTheme(),
@@ -431,7 +432,7 @@ void main() {
           },
         ),
       ),
-    ));
+    )));
 
     await tester.enterText(find.byKey(const Key('answer.free_text')), 'Metformin 500mg');
     await tester.pumpAndSettle();
@@ -454,7 +455,7 @@ void main() {
     Question showing = q('free_text', questionId: 'medications');
     late StateSetter setOuter;
 
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       theme: buildTheme(),
@@ -466,7 +467,7 @@ void main() {
           },
         ),
       ),
-    ));
+    )));
 
     await tester.enterText(find.byKey(const Key('answer.free_text')), 'Metformin');
     setOuter(() => showing = q('free_text', questionId: 'medications'));
@@ -485,7 +486,7 @@ Future<(AnswerValue?, String?)> pumpAnswerWith(
 ) async {
   AnswerValue? captured;
   String? capturedText;
-  await tester.pumpWidget(MaterialApp(
+  await tester.pumpWidget(ProviderScope(child: MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     theme: buildTheme(),
@@ -500,7 +501,7 @@ Future<(AnswerValue?, String?)> pumpAnswerWith(
         )!,
       ),
     ),
-  ));
+  )));
   await tester.enterText(find.byKey(const Key('answer.number')), entry);
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('answer.confirm')));

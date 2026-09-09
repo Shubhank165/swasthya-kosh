@@ -85,6 +85,26 @@
   "@stopListening": {
     "description": ""
   },
+  "voiceSpeak": "Speak the answer",
+  "@voiceSpeak": {
+    "description": "On-device voice input control"
+  },
+  "voiceListening": "Listening…",
+  "@voiceListening": {
+    "description": "On-device voice input control"
+  },
+  "voiceNotCaught": "Didn't catch that. Please say it again or tap an answer.",
+  "@voiceNotCaught": {
+    "description": "On-device voice input control"
+  },
+  "voiceDownload": "Use voice (one-time download)",
+  "@voiceDownload": {
+    "description": "On-device voice input control"
+  },
+  "voiceDownloading": "Getting voice ready…",
+  "@voiceDownloading": {
+    "description": "On-device voice input control"
+  },
   "whoIsThisFor": "Who is this for?",
   "@whoIsThisFor": {
     "description": ""

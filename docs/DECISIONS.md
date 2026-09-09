@@ -1091,3 +1091,60 @@ Separately, and more important than the date: **a response that fails validation
 is now a `REJECTED` verdict rather than an exception.** An unparseable response
 already behaved that way; a parseable-but-off-contract one did not. A rejected
 document is visible to a human. A stuck one is not.
+
+---
+
+## 68. The app has a microphone now, and the voice never leaves the phone
+
+**2026-09-09.** The app was touch-only, and `test/no_voice_test.dart` enforced
+it: no `RECORD_AUDIO`, no speech package, no `SpeechToText` reference anywhere.
+The reasoning (§7.2, decision recorded against §1 rule 1) was sound but aimed at
+the wrong thing. The danger was never a patient *speaking* — it was that the
+only speech input available was the **keyboard microphone**, which ships the
+audio to Google or Apple. A patient with low literacy in every script the
+bundle offers had no way through the interview.
+
+On-device recognition removes the danger the ban existed for. So:
+
+- **TTS first** (commit "Read every question aloud…"). `flutter_tts` was
+  already a dependency for the consent notice; reading every question aloud is
+  the same output-only path, and it changed no constraint.
+- **STT via `sherpa_onnx`.** An offline recogniser with its own bundled native
+  libraries. The Whisper model is downloaded once per language into app
+  storage; `record` streams 16 kHz PCM straight into it. The audio is held in
+  memory for the seconds someone is speaking and is gone when recognition
+  returns — never a file, never a request. The one network call in the whole
+  feature is the model GET.
+- **Option-matching only, not free text.** The offline bundle carries no
+  free-text interpreters (they run on the backend against the submitted
+  record). So a spoken answer can only pick from what is on screen: a choice
+  question's options, or yes / no / "not sure", matched against the label the
+  option is *displayed* with in the patient's language. A phrase that does not
+  clearly land on one of those is not an answer — it returns nothing and the
+  screen waits. `kMatchFloor` is deliberately not generous; a confident wrong
+  match is worse than asking again.
+
+`test/no_voice_test.dart` is replaced by `test/on_device_voice_test.dart`,
+which asserts the new, stronger, still-testable invariant: the mic feeds an
+offline recogniser, no cloud speech package sits beside it, nothing in
+`lib/voice/` touches the `dio` client or the API, and no captured audio is
+written anywhere.
+
+Consent gains `on_device_voice_input` (`applies_to: [app]`), distinct from the
+kiosk's `raw_audio_retention`: the kiosk keeps a recording for physician
+playback, the app keeps nothing. Consent is still asked, because processing a
+person's voice is processing their data even when nothing is retained. The
+purpose wording and the `consent_v2` version bump it implies are on the
+clinical review queue.
+
+**Still to do, and named rather than buried:**
+
+- The model archive checksum in `asr_models.dart` is a placeholder and the
+  verification is disabled (`checksumPinned = false`); a real release pins it.
+- Whisper `tiny` is one multilingual model for all nine languages — simplest
+  ops, modest accuracy on code-mixed Indian speech. A per-language AI4Bharat
+  IndicConformer model can replace it in the registry without a caller
+  changing.
+- Recognition quality per language, and the yes/no and "don't know" phrase
+  tables in `option_match.dart`, are engineer-authored and want a native
+  speaker's review — on the queue.

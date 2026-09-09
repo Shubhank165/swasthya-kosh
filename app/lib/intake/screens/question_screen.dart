@@ -107,6 +107,7 @@ class QuestionScreen extends StatelessWidget {
                     question: question,
                     language: language,
                     onAnswered: onAnswered,
+                    onDontKnow: onDontKnow,
                   ) ??
                   const SizedBox.shrink(),
               const SizedBox(height: Sizes.gutter),

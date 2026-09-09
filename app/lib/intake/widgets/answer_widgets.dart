@@ -10,10 +10,12 @@
 /// keyboard is genuinely painful, so free text appears only where the content
 /// says nothing else will do.
 ///
-/// **Never invite voice input** (§1 rule 8, §16). If a patient taps the
-/// microphone on their own keyboard, that audio goes to Google or Apple. We
-/// cannot prevent it — but no element in this app suggests it, no field is
-/// labelled "speak", and no free-text field is presented as the easy path.
+/// **Voice input is on-device only** (§16, and the DECISIONS entry that
+/// reversed the touch-only stance). The objection was never speaking — it was
+/// that the *keyboard* microphone ships the audio to Google or Apple. So no
+/// free-text field is presented as the easy path and none is labelled "speak";
+/// the only voice control here is [ListenButton] on a choice question, which
+/// runs an offline recogniser on the phone, keeps nothing, and sends nothing.
 library;
 
 import 'package:flutter/material.dart';
@@ -22,6 +24,8 @@ import '../../content/answer.dart';
 import '../../content/bundle.dart';
 import '../../core/theme.dart';
 import '../../l10n/strings.dart';
+import '../../voice/listen_button.dart';
+import '../../voice/option_match.dart';
 
 /// What a renderer hands back when the patient answers.
 typedef OnAnswered = void Function(AnswerValue value, String originalText);
@@ -35,6 +39,7 @@ Widget? buildAnswerWidget({
   required Question question,
   required OnAnswered onAnswered,
   String language = 'en',
+  VoidCallback? onDontKnow,
   Key? key,
 }) {
   // **Keyed by question, always.** Flutter keeps a `State` object when the same
@@ -56,14 +61,20 @@ Widget? buildAnswerWidget({
           key: resolved,
           question: question,
           language: language,
-          onAnswered: onAnswered),
+          onAnswered: onAnswered,
+          onDontKnow: onDontKnow),
       AnswerType.multiChoice => MultiChoiceAnswer(
           key: resolved,
           question: question,
           language: language,
-          onAnswered: onAnswered),
-      AnswerType.yesNoUnknown =>
-        YesNoAnswer(key: resolved, question: question, onAnswered: onAnswered),
+          onAnswered: onAnswered,
+          onDontKnow: onDontKnow),
+      AnswerType.yesNoUnknown => YesNoAnswer(
+          key: resolved,
+          question: question,
+          language: language,
+          onAnswered: onAnswered,
+          onDontKnow: onDontKnow),
       AnswerType.number =>
         NumberAnswer(key: resolved, question: question, onAnswered: onAnswered),
       AnswerType.scale =>
@@ -168,11 +179,13 @@ class SingleChoiceAnswer extends StatelessWidget {
     required this.question,
     required this.onAnswered,
     this.language = 'en',
+    this.onDontKnow,
   });
 
   final Question question;
   final String language;
   final OnAnswered onAnswered;
+  final VoidCallback? onDontKnow;
 
   @override
   Widget build(BuildContext context) {
@@ -180,6 +193,17 @@ class SingleChoiceAnswer extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _VoiceRow(
+          language: language,
+          matcher: (t) => matchOption(
+            transcript: t,
+            optionCodes: options,
+            labelFor: (c) => question.labelForOption(c, language),
+            language: language,
+          ),
+          onOption: (code, heard) => onAnswered(CodedValue(code), heard),
+          onDontKnow: onDontKnow,
+        ),
         for (final option in options)
           OptionTile(
             key: Key('option.$option'),
@@ -194,17 +218,52 @@ class SingleChoiceAnswer extends StatelessWidget {
   }
 }
 
+/// The [ListenButton] plus the glue that turns a [SpokenMatch] into the same
+/// callbacks a tap would fire. Renders nothing at all when voice is
+/// unavailable, so a choice question looks exactly as it did before.
+class _VoiceRow extends StatelessWidget {
+  const _VoiceRow({
+    required this.language,
+    required this.matcher,
+    required this.onOption,
+    this.onDontKnow,
+  });
+
+  final String language;
+  final SpokenMatch Function(String transcript) matcher;
+  final void Function(String code, String heardLabel) onOption;
+  final VoidCallback? onDontKnow;
+
+  @override
+  Widget build(BuildContext context) => ListenButton(
+        language: language,
+        matcher: matcher,
+        onResult: (match) {
+          switch (match.intent) {
+            case SpokenIntent.option:
+              onOption(match.optionCode!, match.heardLabel ?? match.optionCode!);
+            case SpokenIntent.dontKnow:
+              onDontKnow?.call();
+            case SpokenIntent.none:
+              break;
+          }
+        },
+      );
+}
+
 class MultiChoiceAnswer extends StatefulWidget {
   const MultiChoiceAnswer({
     super.key,
     required this.question,
     required this.onAnswered,
     this.language = 'en',
+    this.onDontKnow,
   });
 
   final Question question;
   final String language;
   final OnAnswered onAnswered;
+  final VoidCallback? onDontKnow;
 
   @override
   State<MultiChoiceAnswer> createState() => _MultiChoiceAnswerState();
@@ -220,6 +279,21 @@ class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _VoiceRow(
+          language: widget.language,
+          matcher: (t) => matchOption(
+            transcript: t,
+            optionCodes: options,
+            labelFor: (c) => widget.question.labelForOption(c, widget.language),
+            language: widget.language,
+          ),
+          // Voice toggles one option at a time, exactly like a tap. The patient
+          // still presses Continue when they have named everything.
+          onOption: (code, _) => setState(() {
+            if (!_chosen.remove(code)) _chosen.add(code);
+          }),
+          onDontKnow: widget.onDontKnow,
+        ),
         for (final option in options)
           OptionTile(
             key: Key('option.$option'),
@@ -256,10 +330,18 @@ class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
 }
 
 class YesNoAnswer extends StatelessWidget {
-  const YesNoAnswer({super.key, required this.question, required this.onAnswered});
+  const YesNoAnswer({
+    super.key,
+    required this.question,
+    required this.onAnswered,
+    this.language = 'en',
+    this.onDontKnow,
+  });
 
   final Question question;
+  final String language;
   final OnAnswered onAnswered;
+  final VoidCallback? onDontKnow;
 
   @override
   Widget build(BuildContext context) {
@@ -271,6 +353,15 @@ class YesNoAnswer extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _VoiceRow(
+          language: language,
+          matcher: (t) => matchYesNo(transcript: t, language: language),
+          onOption: (code, _) => onAnswered(
+            BoolValue(code == 'yes'),
+            code == 'yes' ? strings.optYes : strings.optNo,
+          ),
+          onDontKnow: onDontKnow,
+        ),
         OptionTile(
           key: const Key('option.yes'),
           label: strings.optYes,

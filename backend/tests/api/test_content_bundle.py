@@ -88,15 +88,18 @@ class TestServingTheConsentNotice:
     def test_it_is_reachable_without_a_credential(self, app_client: Any) -> None:
         assert app_client.get("/api/v1/content/consent").status_code == 200
 
-    def test_the_kiosk_is_offered_audio_retention_and_the_app_is_not(
+    def test_each_surface_gets_only_the_audio_purpose_that_applies_to_it(
         self, app_client: Any
     ) -> None:
-        """The app has no microphone (2/3 §1 rule 1).
+        """The kiosk retains audio for physician playback; the app processes
+        voice on-device and keeps nothing.
 
-        Asking a patient to consent to the retention of audio the app cannot
-        capture would produce a DPDP artefact describing something that never
-        happened — and it would produce one for every app intake, which is worse
-        than producing none.
+        These are different asks and belong on different surfaces:
+        `raw_audio_retention` on the kiosk, `on_device_voice_input` on the app.
+        Offering either where it does not apply would file a DPDP artefact
+        describing something that never happened. Everything outside those two
+        is one shared notice — a purpose that quietly applied to one surface and
+        not the other would be a second consent regime.
         """
         kiosk = app_client.get("/api/v1/content/consent?source=kiosk").json()
         app = app_client.get("/api/v1/content/consent?source=app").json()
@@ -105,9 +108,11 @@ class TestServingTheConsentNotice:
                  "app": {p["code"] for p in app["purposes"]}}
         assert "raw_audio_retention" in codes["kiosk"]
         assert "raw_audio_retention" not in codes["app"]
-        # Everything else is the same notice. A purpose that quietly applied to
-        # one surface and not the other would be a second consent regime.
-        assert codes["kiosk"] - {"raw_audio_retention"} == codes["app"]
+        assert "on_device_voice_input" in codes["app"]
+        assert "on_device_voice_input" not in codes["kiosk"]
+        assert codes["kiosk"] - {"raw_audio_retention"} == (
+            codes["app"] - {"on_device_voice_input"}
+        )
 
     def test_every_purpose_carries_a_label_in_every_bundle_language(
         self, app_client: Any

@@ -47,9 +47,26 @@ dependencies:
   image_picker: ^1.1.2
   image: ^4.2.0
 
-  # Consent text read aloud (§11). Output only. There is no speech *input*
-  # package in this file and there must never be one — see §1 and §16.
+  # Question and consent text read aloud (§11, §14). Output only.
   flutter_tts: ^4.0.2
+
+  # On-device voice input — 2/3 §16, and the DECISIONS entry that reversed the
+  # touch-only stance. Every piece here runs on the phone:
+  #   record       captures 16 kHz PCM from the mic and nothing else — no file,
+  #                no upload. It exposes its own permission check, so
+  #                permission_handler stays out (still forbidden below).
+  #   sherpa_onnx  the offline recogniser. Bundles its own native libs; the ASR
+  #                model is downloaded once per language and read from disk.
+  #   archive      unpacks the downloaded model tarball on device.
+  # `on_device_voice_test.dart` asserts there is no cloud speech package beside
+  # these and that nothing in lib/voice/ touches the network.
+  record: ^5.1.2
+  sherpa_onnx: ^1.13.7
+  archive: ^3.6.1
+  # Model download only — a plain GET of a public model URL, kept separate from
+  # the `dio` client that carries patient data so the one network call this
+  # feature makes is obvious in review.
+  http: ^1.2.0
 
   collection: ^1.18.0
   crypto: ^3.0.3

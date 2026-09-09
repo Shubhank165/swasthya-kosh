@@ -5,8 +5,10 @@
 # consent text is versioned content — not a string in a template — and the
 # artefact stored against an intake references this version immutably.
 #
-# Purpose codes are granted separately. `raw_audio_retention` is NOT part of the
-# base grant: recording a patient's voice and keeping it are different asks.
+# Purpose codes are granted separately. `raw_audio_retention` (kiosk) and
+# `on_device_voice_input` (app) are NOT part of the base grant: speaking an
+# answer, keeping the recording of it, and — for the app — processing the voice
+# on-device with nothing kept are three different asks.
 version: 1
 effective_from: "2026-01-01"
 clinical_source: "drafted against DPDP Act 2023 notice requirements; pending institutional legal review"
@@ -59,6 +61,34 @@ purposes:
         आप बोलकर उत्तर दे सकते हैं और हम रिकॉर्डिंग नहीं रखेंगे। अगर आप अलग से
         सहमति दें, तो हम आवाज़ रखेंगे ताकि डॉक्टर आपकी बात दोबारा सुन सकें। आप
         मना कर सकते हैं और फिर भी कियोस्क सामान्य रूप से उपयोग कर सकते हैं।
+
+  - code: on_device_voice_input
+    required: false
+    default_granted: false
+    # App only, and distinct from `raw_audio_retention` above. The kiosk keeps a
+    # recording so a physician can listen back; the phone app does not keep
+    # anything. The microphone feeds a recogniser that runs on the phone, the
+    # audio is held in memory for the few seconds someone is speaking, and it is
+    # never written to storage or sent anywhere — see the DECISIONS entry that
+    # reversed the touch-only stance. Consent is still asked because processing
+    # a person's voice is processing their data even when nothing is retained.
+    #
+    # clinical_source: engineer-drafted for the on-device voice feature; the
+    # wording and the version bump (this belongs in a consent_v2) are on the
+    # review queue for institutional legal review.
+    applies_to: [app]
+    label:
+      en: "Answering by voice on this phone"
+      hi: "इस फ़ोन पर आवाज़ से उत्तर देना"
+    description:
+      en: >
+        You can speak your answers instead of tapping. Your voice is understood
+        on this phone only — nothing is recorded, saved, or sent anywhere. You
+        can say no and answer by touch as usual.
+      hi: >
+        आप टैप करने के बजाय बोलकर उत्तर दे सकते हैं। आपकी आवाज़ केवल इसी फ़ोन पर
+        समझी जाती है — कुछ भी रिकॉर्ड, सहेजा या कहीं भेजा नहीं जाता। आप मना कर
+        सकते हैं और हमेशा की तरह छूकर उत्तर दे सकते हैं।
 
   - code: hospital_record_linkage
     required: false
