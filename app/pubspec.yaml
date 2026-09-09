@@ -60,7 +60,7 @@ dependencies:
   #   archive      unpacks the downloaded model tarball on device.
   # `on_device_voice_test.dart` asserts there is no cloud speech package beside
   # these and that nothing in lib/voice/ touches the network.
-  record: ^5.1.2
+  record: ^6.0.0
   sherpa_onnx: ^1.13.7
   archive: ^3.6.1
   # Model download only — a plain GET of a public model URL, kept separate from
