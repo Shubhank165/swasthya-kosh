@@ -263,6 +263,21 @@ final storedLanguageProvider = FutureProvider<String?>(
   (ref) => ref.watch(languageStoreProvider).read(),
 );
 
+/// Whether a question is read aloud the moment it opens (§14).
+///
+/// On by default: the patient who needs it should not have to ask for it on
+/// every screen. The speaker control toggles this, and [main] seeds it from
+/// [storedReadAloudProvider] before the first question.
+final readAloudEnabledProvider = StateProvider<bool>((ref) => true);
+
+final readAloudPrefStoreProvider =
+    Provider<ReadAloudPrefStore>((ref) => ReadAloudPrefStore());
+
+/// The remembered read-aloud choice, or `null` when it has never been changed.
+final storedReadAloudProvider = FutureProvider<bool?>(
+  (ref) => ref.watch(readAloudPrefStoreProvider).read(),
+);
+
 /// The hospital the patient picked (§5 screen 2).
 final selectedHospitalProvider = StateProvider<Hospital?>((ref) => null);
 

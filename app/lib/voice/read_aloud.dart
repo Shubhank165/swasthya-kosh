@@ -102,17 +102,17 @@ class ReadAloud {
     }
   }
 
-  /// Start speaking [text] in [language], or stop if [key] is already playing.
-  Future<void> toggle({
+  /// Speak [text] in [language], keyed by [key]. Any utterance already playing
+  /// is cut off first. Used both for the automatic read when a question opens
+  /// and for a tap to replay it. Fails soft — a device that cannot speak the
+  /// language simply stays quiet.
+  Future<void> speak({
     required String key,
     required String text,
     required String language,
   }) async {
     await _ready;
-    if (speakingKey.value == key) {
-      await stop();
-      return;
-    }
+    if (_unavailable || text.trim().isEmpty) return;
     if (!await canSpeak(language)) return;
     try {
       await _tts.stop();
@@ -124,6 +124,19 @@ class ReadAloud {
       // left stuck on "stop".
     }
     if (speakingKey.value == key) speakingKey.value = null;
+  }
+
+  /// Start speaking [text] in [language], or stop if [key] is already playing.
+  Future<void> toggle({
+    required String key,
+    required String text,
+    required String language,
+  }) async {
+    if (speakingKey.value == key) {
+      await stop();
+      return;
+    }
+    await speak(key: key, text: text, language: language);
   }
 
   Future<void> stop() async {

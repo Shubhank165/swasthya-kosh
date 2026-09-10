@@ -3,9 +3,8 @@
 /// `record` opens the microphone at 16 kHz and hands this class a stream of
 /// PCM. `sherpa_onnx` turns the samples into text. **Neither writes the audio
 /// anywhere and nothing sends it** — the bytes live in memory for the few
-/// seconds a patient is speaking and are gone when [stop] returns. The only
-/// network this feature touches is the one-time model download in
-/// `asr_models.dart`.
+/// seconds a patient is speaking and are gone when [stop] returns. The model
+/// ships in the APK, so this feature touches no network at all.
 ///
 /// Like the backend's Gemini adapter, this module is exercised by hand on a
 /// device rather than in CI: it needs a real microphone and a real model, and
@@ -49,36 +48,28 @@ class Transcriber {
   final List<int> _pcm = <int>[];
   StreamSubscription<Uint8List>? _sub;
 
-  /// True when [language]'s model is on disk and the mic is permitted, so the
-  /// button can show. Never prompts; [ensureModel] does the download. Fails
-  /// soft: no recorder plugin (or none in a test) reads as "not ready".
+  /// True when the device can capture PCM and [language]'s model is on disk, so
+  /// the mic button can show. **Never prompts for the microphone** — that
+  /// happens on the first tap, in [start] — and never copies the model;
+  /// [ensureModel] does that. Fails soft: no recorder plugin (or none in a
+  /// test) reads as "not ready".
   Future<bool> isReady(String language) async {
     try {
-      if (!await _recorder.hasPermission()) return false;
+      if (!await _recorder.isEncoderSupported(AudioEncoder.pcm16bits)) {
+        return false;
+      }
       return await _models.installed(language) != null;
     } on Object {
       return false;
     }
   }
 
-  /// Whether the mic permission is currently granted (asking if it must).
-  Future<bool> requestPermission() async {
+  /// Copy [language]'s model out of the bundled assets if it is not on disk
+  /// yet. Returns whether it is now present. No network, no prompt; cheap and
+  /// idempotent after the first call. Safe to call at launch to warm it.
+  Future<bool> ensureModel(String language) async {
     try {
-      return await _recorder.hasPermission();
-    } on Object {
-      return false;
-    }
-  }
-
-  /// Download [language]'s model if it is missing. Returns whether it is now
-  /// present. Safe to call repeatedly; a failure leaves nothing partial.
-  Future<bool> ensureModel(
-    String language, {
-    void Function(double fraction)? onProgress,
-  }) async {
-    try {
-      if (await _models.installed(language) != null) return true;
-      return await _models.download(language, onProgress: onProgress) != null;
+      return await _models.ensureInstalled(language) != null;
     } on Object catch (e) {
       debugPrint('ensureModel failed: $e');
       return false;
@@ -115,12 +106,16 @@ class Transcriber {
     _loadedFor = language;
   }
 
-  /// Start listening. Call [stop] to end and get the transcript.
-  Future<void> start(String language) async {
+  /// Start listening. Prompts for the microphone the first time. Returns
+  /// whether recording actually began — false means no permission or no engine,
+  /// and the caller should leave the screen on touch. Call [stop] to end and
+  /// get the transcript.
+  Future<bool> start(String language) async {
     try {
       await _loadRecognizer(language);
-      if (_recognizer == null) return;
-      if (!await _recorder.hasPermission()) return;
+      if (_recognizer == null) return false;
+      // `hasPermission` asks the OS if the answer is not yet determined.
+      if (!await _recorder.hasPermission()) return false;
       _pcm.clear();
       final stream = await _recorder.startStream(
         const RecordConfig(
@@ -130,8 +125,10 @@ class Transcriber {
         ),
       );
       _sub = stream.listen((chunk) => _pcm.addAll(chunk));
+      return true;
     } on Object catch (e) {
       debugPrint('transcriber start failed: $e');
+      return false;
     }
   }
 

@@ -114,7 +114,7 @@ void main() {
     });
   });
 
-  group('the voice code never touches the patient-data network', () {
+  group('the voice code never touches the network at all', () {
     test('lib/voice does not use the dio client or the API', () {
       final offenders = <String>[];
       for (final file in dartFiles(voiceDir)) {
@@ -129,17 +129,49 @@ void main() {
           if (src.contains(needle)) offenders.add('${file.path}: $needle');
         }
       }
-      expect(offenders, isEmpty,
-          reason: 'the only network call in lib/voice is the model download');
+      expect(offenders, isEmpty);
     });
 
-    test('the one network call is a GET for a model, not a POST of anything', () {
-      final models = File('lib/voice/asr_models.dart').readAsStringSync();
-      expect(models.contains("http.Request('GET'"), isTrue);
+    test('nothing in lib/voice opens a socket, an HTTP client, or a URL', () {
+      final offenders = <String>[];
       for (final file in dartFiles(voiceDir)) {
         final src = file.readAsStringSync();
-        expect(RegExp(r'\.post\(|http\.post|Request\(.POST').hasMatch(src), isFalse,
-            reason: '${file.path} sends a POST');
+        for (final needle in [
+          'package:http',
+          'HttpClient',
+          'Socket',
+          'WebSocket',
+          'Uri.parse',
+          'http://',
+          'https://',
+          '.get(',
+          '.post(',
+        ]) {
+          if (src.contains(needle)) offenders.add('${file.path}: $needle');
+        }
+      }
+      expect(offenders, isEmpty,
+          reason: 'the ASR model ships in the APK — there is no download');
+    });
+
+    test('the model is a bundled asset, copied to storage, not fetched', () {
+      final models = File('lib/voice/asr_models.dart').readAsStringSync();
+      expect(models.contains('rootBundle') || models.contains('AssetBundle'),
+          isTrue,
+          reason: 'the model is loaded from the app bundle');
+      expect(models.contains('getApplicationSupportDirectory'), isTrue,
+          reason: "sherpa reads real paths, so assets are copied to the app's "
+              'storage');
+
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      expect(pubspec.contains('assets/asr/'), isTrue,
+          reason: 'the model must be declared as a bundled asset');
+      for (final f in [
+        'assets/asr/whisper-tiny/tiny-encoder.int8.onnx',
+        'assets/asr/whisper-tiny/tiny-decoder.int8.onnx',
+        'assets/asr/whisper-tiny/tiny-tokens.txt',
+      ]) {
+        expect(File(f).existsSync(), isTrue, reason: '$f is missing from the repo');
       }
     });
   });

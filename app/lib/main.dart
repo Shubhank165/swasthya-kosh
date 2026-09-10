@@ -1,10 +1,10 @@
 /// MediKiosk patient app — 2/3.
 ///
-/// Touch-only pre-consultation intake. **There is no voice capture anywhere in
-/// this app** (§1 rule 1): no microphone permission, no speech package, and no
-/// UI element that invites dictation into a clinical field. That is not a
-/// feature decision — it is what preserves the project's privacy claim, which
-/// is that at the kiosk the patient's voice never leaves the device.
+/// Touch-first pre-consultation intake, now with optional voice that never
+/// leaves the phone: read-aloud (`flutter_tts`) and speech input
+/// (`sherpa_onnx`, model bundled in the APK) both run on the device, and
+/// nothing spoken or heard is stored or sent — see DECISIONS §68 and
+/// `test/on_device_voice_test.dart`.
 library;
 
 import 'package:flutter/material.dart';
@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/providers.dart';
 import 'core/theme.dart';
 import 'home/root.dart';
+import 'voice/transcribe.dart';
 
 void main() {
   runApp(const ProviderScope(child: MediKioskApp()));
@@ -37,6 +38,20 @@ class _MediKioskAppState extends ConsumerState<MediKioskApp> {
       final stored = next.valueOrNull;
       if (stored != null) ref.read(languageProvider.notifier).state = stored;
     }, fireImmediately: true);
+    // Same join for the read-aloud choice: on by default, but if the patient
+    // turned it off on a previous run it stays off.
+    ref.listenManual(storedReadAloudProvider, (_, next) {
+      final stored = next.valueOrNull;
+      if (stored != null) {
+        ref.read(readAloudEnabledProvider.notifier).state = stored;
+      }
+    }, fireImmediately: true);
+    // Copy the bundled speech model into app storage now, off the first frame,
+    // so the microphone on the first question is ready without a pause. No
+    // network, no prompt; a failure just means voice input is unavailable.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(transcriberProvider).ensureModel(ref.read(languageProvider));
+    });
     // Drain the submission queue on launch — §9, §15 item 8.
     //
     // Unawaited and unannounced: an intake finished on a train goes out the

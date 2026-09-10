@@ -188,3 +188,42 @@ class HospitalStore {
     } on Object {/* nothing to clear */}
   }
 }
+
+/// Whether questions are read aloud automatically, remembered between launches.
+///
+/// Read-aloud starts on its own when a question opens (§14) so a patient who
+/// chose a script they cannot read is not asked to reach for a button on every
+/// screen. The speaker control then becomes a mute toggle, and this is where
+/// that choice is kept so it survives a restart. It is an accessibility
+/// preference, not patient data, so unlike the language and hospital it is
+/// **not** cleared on sign-out — the next patient on a shared phone keeps the
+/// same accommodation until they turn it off themselves.
+class ReadAloudPrefStore {
+  ReadAloudPrefStore({FlutterSecureStorage? storage})
+      : _storage = storage ??
+            const FlutterSecureStorage(
+              aOptions: AndroidOptions(encryptedSharedPreferences: true),
+            );
+
+  static const _key = 'medikiosk.ui.read_aloud';
+
+  final FlutterSecureStorage _storage;
+
+  /// `null` when the patient has never changed it — the caller then keeps the
+  /// on-by-default behaviour.
+  Future<bool?> read() async {
+    try {
+      final raw = await _storage.read(key: _key);
+      if (raw == null) return null;
+      return raw == 'true';
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> write(bool enabled) async {
+    try {
+      await _storage.write(key: _key, value: enabled ? 'true' : 'false');
+    } on Object {/* best effort */}
+  }
+}

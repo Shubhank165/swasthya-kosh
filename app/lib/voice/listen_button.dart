@@ -4,8 +4,8 @@
 /// one: the option tiles are still there and still the primary path. This
 /// button is absent entirely when the device cannot do on-device recognition
 /// for the chosen language — the same graceful absence as a missing read-aloud
-/// voice. When a language's model has not been fetched yet it offers the
-/// one-time download rather than silently doing nothing.
+/// voice. The model ships in the APK, so there is nothing to download and no
+/// prompt until the patient actually taps to speak.
 ///
 /// What it hands back is a [SpokenMatch]: a specific option, "I'm not sure", or
 /// nothing caught. It never guesses — a phrase that does not clearly land on an
@@ -19,7 +19,7 @@ import '../l10n/strings.dart';
 import 'option_match.dart';
 import 'transcribe.dart';
 
-enum _Phase { checking, unsupported, needsModel, downloading, ready, listening }
+enum _Phase { checking, unsupported, ready, listening }
 
 class ListenButton extends ConsumerStatefulWidget {
   const ListenButton({
@@ -43,7 +43,6 @@ class ListenButton extends ConsumerStatefulWidget {
 
 class _ListenButtonState extends ConsumerState<ListenButton> {
   _Phase _phase = _Phase.checking;
-  double _progress = 0;
 
   @override
   void initState() {
@@ -53,32 +52,12 @@ class _ListenButtonState extends ConsumerState<ListenButton> {
 
   Future<void> _check() async {
     final t = ref.read(transcriberProvider);
+    // Copy the bundled model to storage if this is the first run, then see
+    // whether the device can record at all. Neither step prompts.
+    await t.ensureModel(widget.language);
     final ready = await t.isReady(widget.language);
     if (!mounted) return;
-    if (ready) {
-      setState(() => _phase = _Phase.ready);
-      return;
-    }
-    // Not ready: either the device cannot record at all, or the model is
-    // missing. `requestPermission` tells the two apart.
-    final canRecord = await t.requestPermission();
-    if (!mounted) return;
-    setState(() => _phase = canRecord ? _Phase.needsModel : _Phase.unsupported);
-  }
-
-  Future<void> _download() async {
-    setState(() {
-      _phase = _Phase.downloading;
-      _progress = 0;
-    });
-    final ok = await ref.read(transcriberProvider).ensureModel(
-          widget.language,
-          onProgress: (f) {
-            if (mounted) setState(() => _progress = f);
-          },
-        );
-    if (!mounted) return;
-    setState(() => _phase = ok ? _Phase.ready : _Phase.unsupported);
+    setState(() => _phase = ready ? _Phase.ready : _Phase.unsupported);
   }
 
   Future<void> _toggleListening() async {
@@ -98,8 +77,18 @@ class _ListenButtonState extends ConsumerState<ListenButton> {
       }
       return;
     }
+    // First tap asks for the microphone. A refusal leaves the button in place
+    // — the patient can still tap the options — and says why once.
     setState(() => _phase = _Phase.listening);
-    await t.start(widget.language);
+    final started = await t.start(widget.language);
+    if (!mounted) return;
+    if (!started) {
+      setState(() => _phase = _Phase.ready);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+            SnackBar(content: Text(Strings.of(context).voiceNoMic)));
+    }
   }
 
   @override
@@ -109,34 +98,6 @@ class _ListenButtonState extends ConsumerState<ListenButton> {
       case _Phase.checking:
       case _Phase.unsupported:
         return const SizedBox.shrink();
-      case _Phase.needsModel:
-        return Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: TextButton.icon(
-            key: const Key('question.voiceDownload'),
-            onPressed: _download,
-            icon: const Icon(Icons.download),
-            label: Text(strings.voiceDownload),
-          ),
-        );
-      case _Phase.downloading:
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  value: _progress == 0 ? null : _progress,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(strings.voiceDownloading),
-            ],
-          ),
-        );
       case _Phase.ready:
       case _Phase.listening:
         final listening = _phase == _Phase.listening;

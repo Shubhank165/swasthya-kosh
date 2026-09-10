@@ -25,13 +25,27 @@ class _FakeReadAloud implements ReadAloud {
   Future<bool> canSpeak(String language) async => available;
 
   @override
+  Future<void> speak({
+    required String key,
+    required String text,
+    required String language,
+  }) async {
+    if (!available) return;
+    spoken.add((key: key, text: text, language: language));
+    speakingKey.value = key;
+  }
+
+  @override
   Future<void> toggle({
     required String key,
     required String text,
     required String language,
   }) async {
-    spoken.add((key: key, text: text, language: language));
-    speakingKey.value = speakingKey.value == key ? null : key;
+    if (speakingKey.value == key) {
+      speakingKey.value = null;
+      return;
+    }
+    await speak(key: key, text: text, language: language);
   }
 
   @override
@@ -96,9 +110,10 @@ void main() {
       ));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('question.readAloud')), findsNothing);
+      expect(fake.spoken, isEmpty);
     });
 
-    testWidgets('speaks in the question language and toggles to a stop control',
+    testWidgets('reads the question on its own, in the chosen language',
         (tester) async {
       final fake = _FakeReadAloud();
       await tester.pumpWidget(_host(
@@ -108,12 +123,45 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('question.readAloud')));
-      await tester.pumpAndSettle();
-
+      // No tap: the question speaks the moment it appears.
       expect(fake.spoken.single.language, 'hi');
       expect(fake.spoken.single.text, 'Kaisa lag raha hai?');
       expect(find.byIcon(Icons.stop), findsOneWidget);
+    });
+
+    testWidgets('a new question reads itself once', (tester) async {
+      final fake = _FakeReadAloud();
+      await tester.pumpWidget(_host(
+        const ReadAloudButton(
+          utteranceKey: 'q1', text: 'First?', language: 'en'),
+        fake,
+      ));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(_host(
+        const ReadAloudButton(
+          utteranceKey: 'q2', text: 'Second?', language: 'en'),
+        fake,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(fake.spoken.map((s) => s.text), ['First?', 'Second?']);
+    });
+
+    testWidgets('tapping while it speaks silences it', (tester) async {
+      final fake = _FakeReadAloud();
+      await tester.pumpWidget(_host(
+        const ReadAloudButton(
+          utteranceKey: 'q1', text: 'Kaisa lag raha hai?', language: 'hi'),
+        fake,
+      ));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.stop), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('question.readAloud')));
+      await tester.pumpAndSettle();
+
+      expect(fake.speakingKey.value, isNull);
+      expect(find.byIcon(Icons.volume_off), findsOneWidget);
     });
 
     testWidgets('renders nothing for an empty utterance', (tester) async {
@@ -124,6 +172,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('question.readAloud')), findsNothing);
+      expect(fake.spoken, isEmpty);
     });
   });
 }

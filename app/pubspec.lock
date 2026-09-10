@@ -26,7 +26,7 @@ packages:
     source: hosted
     version: "0.11.3"
   archive:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: archive
       sha256: cb6a278ef2dbb298455e1a713bda08524a175630ec643a242c399c932a0a1f7d
@@ -440,7 +440,7 @@ packages:
     source: hosted
     version: "2.3.2"
   http:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: http
       sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"

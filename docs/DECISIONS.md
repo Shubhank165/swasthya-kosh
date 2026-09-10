@@ -1110,11 +1110,20 @@ On-device recognition removes the danger the ban existed for. So:
   already a dependency for the consent notice; reading every question aloud is
   the same output-only path, and it changed no constraint.
 - **STT via `sherpa_onnx`.** An offline recogniser with its own bundled native
-  libraries. The Whisper model is downloaded once per language into app
-  storage; `record` streams 16 kHz PCM straight into it. The audio is held in
-  memory for the seconds someone is speaking and is gone when recognition
-  returns — never a file, never a request. The one network call in the whole
-  feature is the model GET.
+  libraries. The Whisper model **ships in the APK** (`assets/asr/`, ~103 MB)
+  and is copied into app storage on first launch — there is no download and
+  nothing for the patient to opt into. `record` streams 16 kHz PCM straight
+  into it. The audio is held in memory for the seconds someone is speaking and
+  is gone when recognition returns — never a file, never a request. **The
+  feature makes no network call at all**; `on_device_voice_test.dart` fails the
+  build if anything in `lib/voice/` opens an HTTP client, a socket, or a URL.
+- **Read-aloud is automatic.** A question speaks itself the moment it opens, in
+  the chosen language, without the patient reaching for a control on every
+  screen (2026-09-10, after the first cut shipped it as a per-question button).
+  The speaker control is now a mute toggle: tap to silence and stop the next
+  question reading itself, tap again to resume and replay. The choice is
+  remembered across launches (`ReadAloudPrefStore`) and, being an accessibility
+  preference rather than patient data, is **not** cleared on sign-out.
 - **Option-matching only, not free text.** The offline bundle carries no
   free-text interpreters (they run on the backend against the submitted
   record). So a spoken answer can only pick from what is on screen: a choice
@@ -1126,9 +1135,10 @@ On-device recognition removes the danger the ban existed for. So:
 
 `test/no_voice_test.dart` is replaced by `test/on_device_voice_test.dart`,
 which asserts the new, stronger, still-testable invariant: the mic feeds an
-offline recogniser, no cloud speech package sits beside it, nothing in
-`lib/voice/` touches the `dio` client or the API, and no captured audio is
-written anywhere.
+offline recogniser, no cloud speech package sits beside it, the model is a
+bundled asset copied to storage rather than fetched, nothing in `lib/voice/`
+opens a network connection of any kind, and no captured audio is written
+anywhere.
 
 Consent gains `on_device_voice_input` (`applies_to: [app]`), distinct from the
 kiosk's `raw_audio_retention`: the kiosk keeps a recording for physician
@@ -1139,8 +1149,11 @@ clinical review queue.
 
 **Still to do, and named rather than buried:**
 
-- The model archive checksum in `asr_models.dart` is a placeholder and the
-  verification is disabled (`checksumPinned = false`); a real release pins it.
+- Bundling the model pushes the release APK past ~280 MB. Fine for
+  side-loading a demo; for real distribution, either `--split-per-abi` (the
+  native libs, not the model, are the per-ABI cost) or a Play asset-delivery
+  pack. The model itself is checked into the repo under `assets/asr/`, which
+  bloats it — a follow-up moves it to Git LFS.
 - Whisper `tiny` is one multilingual model for all nine languages — simplest
   ops, modest accuracy on code-mixed Indian speech. A per-language AI4Bharat
   IndicConformer model can replace it in the registry without a caller

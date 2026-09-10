@@ -97,13 +97,9 @@
   "@voiceNotCaught": {
     "description": "On-device voice input control"
   },
-  "voiceDownload": "Use voice (one-time download)",
-  "@voiceDownload": {
-    "description": "On-device voice input control"
-  },
-  "voiceDownloading": "Getting voice ready…",
-  "@voiceDownloading": {
-    "description": "On-device voice input control"
+  "voiceNoMic": "Microphone access is off. You can still tap an answer.",
+  "@voiceNoMic": {
+    "description": "Shown when the patient declines the microphone permission"
   },
   "whoIsThisFor": "Who is this for?",
   "@whoIsThisFor": {
