@@ -19,6 +19,7 @@ class PatientDocument {
     required this.status,
     this.uploadedAt,
     this.rejectionReason,
+    this.url,
   });
 
   factory PatientDocument.fromJson(Map<String, dynamic> json) => PatientDocument(
@@ -27,6 +28,7 @@ class PatientDocument {
         status: json['status'] as String? ?? 'unknown',
         uploadedAt: DateTime.tryParse(json['uploaded_at']?.toString() ?? ''),
         rejectionReason: json['rejection_reason'] as String?,
+        url: json['url'] as String?,
       );
 
   final String documentId;
@@ -41,7 +43,15 @@ class PatientDocument {
   /// photograph, never about its contents.
   final String? rejectionReason;
 
+  /// A short-lived signed link to the patient's **own uploaded scan** — the
+  /// photo they took, nothing read off it (§8). Null for a row the device
+  /// produced with no image behind it, or when signing failed.
+  final String? url;
+
   bool get rejected => status == 'rejected';
+
+  /// Whether tapping the row can show something.
+  bool get viewable => url != null && url!.isNotEmpty;
 }
 
 class PatientDocumentsRepository {

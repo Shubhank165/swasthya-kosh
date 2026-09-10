@@ -40,6 +40,11 @@ class ReadAloudButton extends ConsumerStatefulWidget {
 class _ReadAloudButtonState extends ConsumerState<ReadAloudButton> {
   late Future<bool> _available;
 
+  /// Captured in [initState] because `ref` cannot be used from [dispose].
+  /// `readAloudProvider` is a plain Provider and never rebuilds, so this stays
+  /// valid for the life of the widget.
+  late final ReadAloud _service;
+
   /// The question this button has already started reading, so a rebuild does
   /// not restart it and a mute is not immediately undone.
   String? _handled;
@@ -47,8 +52,21 @@ class _ReadAloudButtonState extends ConsumerState<ReadAloudButton> {
   @override
   void initState() {
     super.initState();
-    _available = ref.read(readAloudProvider).canSpeak(widget.language);
+    _service = ref.read(readAloudProvider);
+    _available = _service.canSpeak(widget.language);
     _scheduleAutoRead();
+  }
+
+  @override
+  void dispose() {
+    // Leaving the question flow — to the review screen, urgent care, or the
+    // done screen. Whatever this button set talking must not carry on over the
+    // next screen; the last question is the one where nothing else cuts it off.
+    // Walking question-to-question keeps the same State and never reaches here.
+    if (_service.speakingKey.value == widget.utteranceKey) {
+      _service.stop();
+    }
+    super.dispose();
   }
 
   @override

@@ -78,6 +78,20 @@ class _DocumentTile extends StatelessWidget {
               ? (document.rejectionReason ?? '')
               : _date(document.uploadedAt),
         ),
+        // Tapping opens the patient's own scan — the image they photographed,
+        // not a reading of it. A row with no stored image (a device-produced
+        // reading) is not tappable.
+        trailing: document.viewable ? const Icon(Icons.visibility_outlined) : null,
+        onTap: document.viewable
+            ? () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => _DocumentView(
+                      title: _kind(document.kind),
+                      url: document.url!,
+                    ),
+                  ),
+                )
+            : null,
       ),
     );
   }
@@ -95,6 +109,52 @@ class _DocumentTile extends StatelessWidget {
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     return '${when.day} ${months[when.month - 1]} ${when.year}';
+  }
+}
+
+/// The patient's own uploaded scan, full screen and zoomable.
+///
+/// `Image.network` straight off the signed URL — the upload path already
+/// downscaled and stripped it to a JPEG (§8), so there is nothing else to
+/// render and no PDF case to handle. A dead or expired link shows a plain
+/// message and a way back, never a stack trace.
+class _DocumentView extends StatelessWidget {
+  const _DocumentView({required this.title, required this.url});
+
+  final String title;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      backgroundColor: Colors.black,
+      body: Center(
+        child: InteractiveViewer(
+          maxScale: 5,
+          child: Image.network(
+            url,
+            fit: BoxFit.contain,
+            loadingBuilder: (context, child, progress) => progress == null
+                ? child
+                : const Center(child: CircularProgressIndicator()),
+            errorBuilder: (context, _, __) => Padding(
+              padding: const EdgeInsets.all(Sizes.gutter * 2),
+              child: Text(
+                strings.documentUnavailable,
+                key: const Key('document.unavailable'),
+                textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyLarge
+                    ?.copyWith(color: Colors.white70),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

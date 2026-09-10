@@ -1,13 +1,16 @@
-/// Turn a spoken phrase into one of a question's options — 2/3 §16.
+/// Turn a spoken phrase into an answer — 2/3 §16.
 ///
-/// **This does not parse free text.** The offline bundle carries no free-text
-/// interpreters (they run on the backend against the submitted record), so on
-/// the phone a voice answer can only ever pick from what is already on screen:
-/// the options of a choice question, or yes / no / "I'm not sure". Anything the
-/// patient says that does not clearly land on one of those is *not an answer* —
-/// it returns null, the screen stays put, and they are asked to say it again or
-/// tap. A confident wrong match is the failure mode worth preventing, so the
+/// **Two modes.** On a choice or yes/no question the phrase can only ever pick
+/// from what is already on screen — the options, or yes / no / "I'm not sure" —
+/// and anything that does not clearly land on one of those is *not an answer*:
+/// it returns none, the screen stays put, and the patient says it again or
+/// taps. A confident wrong match is the failure mode worth preventing, so the
 /// threshold is deliberately not generous.
+///
+/// On a **descriptive** question there is nothing to match against: the words
+/// *are* the answer. [matchDictation] hands them back verbatim for the text box,
+/// where the patient reads and corrects them before Continue — the edit step is
+/// what makes an imperfect transcript safe there.
 ///
 /// Matching is on the label the option is *displayed with*, in the language the
 /// patient chose — the same string §9 requires be recorded — never on the
@@ -153,6 +156,22 @@ SpokenMatch matchOption({
         optionCode: bestCode, heardLabel: bestLabel);
   }
   return SpokenMatch.none;
+}
+
+/// A descriptive question takes the words as spoken. There is nothing to match
+/// against — the transcript is handed back as [SpokenMatch.heardLabel] for the
+/// text box, and the patient corrects it before it is recorded. "I don't know"
+/// is still honoured so a question can be dismissed by voice.
+SpokenMatch matchDictation({
+  required String transcript,
+  required String language,
+}) {
+  final text = transcript.trim();
+  if (text.isEmpty) return SpokenMatch.none;
+  if (_containsPhrase(transcript, _dontKnowPhrases[language] ?? const [])) {
+    return const SpokenMatch(SpokenIntent.dontKnow);
+  }
+  return SpokenMatch(SpokenIntent.option, heardLabel: text);
 }
 
 /// Resolve [transcript] for a yes / no / unknown question. Returns the option

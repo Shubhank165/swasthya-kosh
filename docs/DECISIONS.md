@@ -1124,14 +1124,26 @@ On-device recognition removes the danger the ban existed for. So:
   question reading itself, tap again to resume and replay. The choice is
   remembered across launches (`ReadAloudPrefStore`) and, being an accessibility
   preference rather than patient data, is **not** cleared on sign-out.
-- **Option-matching only, not free text.** The offline bundle carries no
-  free-text interpreters (they run on the backend against the submitted
-  record). So a spoken answer can only pick from what is on screen: a choice
-  question's options, or yes / no / "not sure", matched against the label the
-  option is *displayed* with in the patient's language. A phrase that does not
-  clearly land on one of those is not an answer — it returns nothing and the
-  screen waits. `kMatchFloor` is deliberately not generous; a confident wrong
-  match is worse than asking again.
+- **Option-matching on choice questions; dictation on descriptive ones.** On a
+  choice or yes/no question a spoken answer can only pick from what is on
+  screen, matched against the *displayed* label in the patient's language; a
+  phrase that does not clearly land on an option returns nothing and the screen
+  waits (`kMatchFloor` is deliberately not generous — a confident wrong match
+  is worse than asking again). On a **descriptive** question, where free text is
+  the answer rather than a fallback and typing Devanagari or Tamil on a phone
+  is the real barrier, the transcript is dictated straight into the text box.
+  It is **not recorded until the patient presses Continue**, so they read and
+  fix it first — that edit step is what makes an imperfect transcript
+  acceptable there, and it is the safeguard a silent option-match does not
+  have. (2026-09-11: the first cut of STT withheld voice from free text on §1
+  rule 8 grounds; on a phone with no cloud keyboard in the loop and a
+  mandatory review step, that reasoning no longer holds and it was the case
+  that needed voice most.)
+- **Recognition runs in a background isolate.** Whisper-tiny on the target
+  hardware (a Snapdragon 695, `SM6375`) is a 2–4 s CPU-bound job; on the UI
+  isolate that is a frozen screen. The isolate is spawned once on first use,
+  keeps the recogniser warm, and the button shows "getting ready" / "working
+  out what you said" around it. `numThreads: 4` (2 big + 2 little cores).
 
 `test/no_voice_test.dart` is replaced by `test/on_device_voice_test.dart`,
 which asserts the new, stronger, still-testable invariant: the mic feeds an
@@ -1155,9 +1167,14 @@ clinical review queue.
   pack. The model itself is checked into the repo under `assets/asr/`, which
   bloats it — a follow-up moves it to Git LFS.
 - Whisper `tiny` is one multilingual model for all nine languages — simplest
-  ops, modest accuracy on code-mixed Indian speech. A per-language AI4Bharat
-  IndicConformer model can replace it in the registry without a caller
-  changing.
+  ops, modest accuracy on code-mixed Indian speech, and even in an isolate the
+  30 s-padded encoder pass is the floor on latency. The registry is addressed
+  by language, so the real fix is a faster non-autoregressive model:
+  **SenseVoice** (CTC, multilingual incl. Hindi, ~sub-second) as a single
+  drop-in, or **AI4Bharat IndicConformer** per language. Either is a bigger
+  asset; both are a `_modelFor` change and nothing else.
 - Recognition quality per language, and the yes/no and "don't know" phrase
   tables in `option_match.dart`, are engineer-authored and want a native
-  speaker's review — on the queue.
+  speaker's review — on the queue. The dictation-into-free-text reversal wants
+  a line in the DPDP notice too (`on_device_voice_input` already covers the
+  processing; the wording should say the words land in an editable field).

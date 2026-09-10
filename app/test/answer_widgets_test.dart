@@ -238,9 +238,11 @@ void main() {
     }
   });
 
-  testWidgets('free_text records what was typed and offers no voice affordance',
-      (tester) async {
-    // §1 rule 8: nothing in this app may invite dictation into a clinical field.
+  testWidgets('free_text records what was typed, and voice is absent with no '
+      'recogniser', (tester) async {
+    // On-device dictation is offered here (DECISIONS §68) but only ever fills
+    // the box for the patient to edit — it never records on its own. With no
+    // recogniser plugin (this test) the affordance is simply not shown.
     AnswerValue? value;
     await tester.pumpWidget(ProviderScope(child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -249,15 +251,14 @@ void main() {
         body: FreeTextAnswer(question: q('free_text'), onAnswered: (v, _) => value = v),
       ),
     )));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('answer.free_text')), 'nothing else');
     await tester.pump();
     await tester.tap(find.byKey(const Key('answer.confirm')));
     await tester.pump();
 
     expect((value! as TextValue).text, 'nothing else');
-    expect(find.byIcon(Icons.mic), findsNothing);
-    expect(find.byIcon(Icons.mic_none), findsNothing);
-    expect(find.byIcon(Icons.keyboard_voice), findsNothing);
+    expect(find.byKey(const Key('question.listen')), findsNothing);
   });
 
   testWidgets('date records an ISO date', (tester) async {

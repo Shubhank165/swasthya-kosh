@@ -101,6 +101,18 @@
   "@voiceNoMic": {
     "description": "Shown when the patient declines the microphone permission"
   },
+  "voicePreparing": "Getting ready…",
+  "@voicePreparing": {
+    "description": "Shown while the speech recogniser loads on first use"
+  },
+  "voiceRecognising": "Working out what you said…",
+  "@voiceRecognising": {
+    "description": "Shown while the recorded audio is being transcribed"
+  },
+  "documentUnavailable": "This document couldn't be opened. Pull down to refresh and try again.",
+  "@documentUnavailable": {
+    "description": "Shown when a document's signed image link fails to load"
+  },
   "whoIsThisFor": "Who is this for?",
   "@whoIsThisFor": {
     "description": ""

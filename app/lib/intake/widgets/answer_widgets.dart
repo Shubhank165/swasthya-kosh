@@ -10,12 +10,12 @@
 /// keyboard is genuinely painful, so free text appears only where the content
 /// says nothing else will do.
 ///
-/// **Voice input is on-device only** (§16, and the DECISIONS entry that
-/// reversed the touch-only stance). The objection was never speaking — it was
-/// that the *keyboard* microphone ships the audio to Google or Apple. So no
-/// free-text field is presented as the easy path and none is labelled "speak";
-/// the only voice control here is [ListenButton] on a choice question, which
-/// runs an offline recogniser on the phone, keeps nothing, and sends nothing.
+/// **Voice input is on-device only** (§16, DECISIONS §68). The objection was
+/// never speaking — it was that the *keyboard* microphone ships the audio to
+/// Google or Apple. [ListenButton] runs an offline recogniser on the phone,
+/// keeps nothing and sends nothing: on a choice question it matches the spoken
+/// phrase to an option, and on a descriptive question it dictates into the text
+/// box, where the patient edits it before it is recorded.
 library;
 
 import 'package:flutter/material.dart';
@@ -83,8 +83,12 @@ Widget? buildAnswerWidget({
         DurationAnswer(key: resolved, question: question, onAnswered: onAnswered),
       AnswerType.date =>
         DateAnswer(key: resolved, question: question, onAnswered: onAnswered),
-      AnswerType.freeText =>
-        FreeTextAnswer(key: resolved, question: question, onAnswered: onAnswered),
+      AnswerType.freeText => FreeTextAnswer(
+          key: resolved,
+          question: question,
+          language: language,
+          onAnswered: onAnswered,
+          onDontKnow: onDontKnow),
       AnswerType.unknown => null,
   };
 }
@@ -241,7 +245,9 @@ class _VoiceRow extends StatelessWidget {
         onResult: (match) {
           switch (match.intent) {
             case SpokenIntent.option:
-              onOption(match.optionCode!, match.heardLabel ?? match.optionCode!);
+              // `optionCode` is null for dictation (there is no option, just
+              // the words); a choice question always sets it.
+              onOption(match.optionCode ?? '', match.heardLabel ?? '');
             case SpokenIntent.dontKnow:
               onDontKnow?.call();
             case SpokenIntent.none:
@@ -621,10 +627,18 @@ class _DateAnswerState extends State<DateAnswer> {
 }
 
 class FreeTextAnswer extends StatefulWidget {
-  const FreeTextAnswer({super.key, required this.question, required this.onAnswered});
+  const FreeTextAnswer({
+    super.key,
+    required this.question,
+    required this.onAnswered,
+    this.language = 'en',
+    this.onDontKnow,
+  });
 
   final Question question;
+  final String language;
   final OnAnswered onAnswered;
+  final VoidCallback? onDontKnow;
 
   @override
   State<FreeTextAnswer> createState() => _FreeTextAnswerState();
@@ -639,21 +653,41 @@ class _FreeTextAnswerState extends State<FreeTextAnswer> {
     super.dispose();
   }
 
+  /// Dictated words land in the box, appended to whatever is already there, for
+  /// the patient to read and fix. They are not recorded until Continue — the
+  /// edit is the safety step that a spoken option match does not have.
+  void _dictated(String text) {
+    if (text.trim().isEmpty) return;
+    final existing = _controller.text.trimRight();
+    final joined = existing.isEmpty ? text.trim() : '$existing ${text.trim()}';
+    setState(() {
+      _controller.text = joined;
+      _controller.selection =
+          TextSelection.collapsed(offset: _controller.text.length);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = Strings.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // On-device dictation — the recogniser runs on the phone and keeps
+        // nothing (§16). This is the one place free text is the answer rather
+        // than a fallback, so it is also the one place voice helps most; the
+        // patient still edits what comes back before it counts.
+        _VoiceRow(
+          language: widget.language,
+          matcher: (t) => matchDictation(transcript: t, language: widget.language),
+          onOption: (_, heard) => _dictated(heard),
+          onDontKnow: widget.onDontKnow,
+        ),
         TextField(
           key: const Key('answer.free_text'),
           controller: _controller,
           maxLines: 4,
           style: Theme.of(context).textTheme.bodyLarge,
-          // No hint text suggesting dictation, and no voice affordance of any
-          // kind. §1 rule 8: if the patient taps their keyboard's microphone
-          // that audio goes to Google or Apple, and while we cannot stop it,
-          // nothing here invites it.
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: Sizes.gap),
