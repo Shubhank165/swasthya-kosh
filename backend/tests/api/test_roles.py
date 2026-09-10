@@ -40,6 +40,10 @@ EXPECTED: dict[tuple[str, str], set[Role]] = {
     # nothing else.
     # Submitting an intake: a kiosk in the corridor, a staff member at a
     # counter, or a patient on their own phone before they travel (2/3 §9).
+    # A provisioning check: confirm the bearer token is a real kiosk token and
+    # see which hospital it is bound to. Kiosk only — a patient session has no
+    # reason to call it.
+    ("GET", "/api/v1/kiosk/whoami"): {Role.KIOSK},
     ("POST", "/api/v1/intakes/ingest"): {Role.KIOSK, Role.STAFF, Role.PATIENT},
     ("POST", "/api/v1/intakes/{intake_id}/documents"): {
         Role.KIOSK, Role.STAFF, Role.PATIENT

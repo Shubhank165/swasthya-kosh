@@ -24,6 +24,7 @@ from app.api.v1 import (
     fhir,
     hospitals,
     intakes,
+    kiosk,
     patient_auth,
     patients,
     realtime,
@@ -176,6 +177,7 @@ def create_app() -> FastAPI:
     app.include_router(hospitals.router, prefix=prefix)
     app.include_router(patient_auth.router, prefix=prefix)
 
+    app.include_router(kiosk.router, prefix=prefix)
     app.include_router(intakes.router, prefix=prefix)
     app.include_router(documents.router, prefix=prefix)
     app.include_router(documents.content_router, prefix=prefix)

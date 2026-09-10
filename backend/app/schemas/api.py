@@ -175,6 +175,15 @@ class DocumentUploadResponse(ApiModel):
     demo: bool = False
 
 
+class KioskIdentityOut(ApiModel):
+    """The principal behind a kiosk bearer token — the payload of
+    `GET /kiosk/whoami`. No patient data; a provisioning check only."""
+
+    role: str
+    hospital_id: str
+    user_id: str
+
+
 class DocumentResultsRequest(ApiModel):
     """An extraction the Jetson produced on-device.
 
