@@ -210,6 +210,45 @@ class TestUnrepairableInputIsKept:
         assert pending[0].reason == "repair_failed"
         assert pending[0].payload["fields"] == "not a mapping at all"
 
+        # No intake exists, so there is no id to hand back. This used to be the
+        # payload fingerprint, which is id-shaped and addresses nothing: a
+        # device took it at face value, posted a photographed prescription to
+        # it, and got "no intake at this hospital" — after being told the
+        # submission succeeded.
+        assert result.intake_id is None
+
+        # And the device is told what was actually wrong, so the payload can be
+        # fixed instead of retried unchanged. `needs_manual_review` with an
+        # empty `unresolved_fields` and nothing else reads as "your record was
+        # fine and we filed it for review anyway".
+        assert result.reason == "repair_failed"
+        assert result.errors
+        assert {"loc", "type", "msg"} >= set(result.errors[0])
+
+    async def test_an_unusable_payload_never_claims_the_id_it_was_sent(
+        self, ingest_service: Any
+    ) -> None:
+        """A claimed `intake_id` on an unusable payload is still not an intake.
+
+        Echoing it back is the same trap as the fingerprint was: the device
+        recognises its own id, believes the record landed under it, and
+        addresses documents to something that was never created.
+        """
+        claimed = "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e99"
+        result = await ingest_service.ingest(
+            {
+                "schema_version": "0.1",
+                "hospital_id": HOSPITAL_ID,
+                "intake_id": claimed,
+                "status": "complete",
+                "fields": "not a mapping at all",
+            },
+            hospital_id=HOSPITAL_ID,
+            actor_id="kiosk-1",
+        )
+        assert result.needs_manual_review is True
+        assert result.intake_id is None, "the claimed id addresses no intake either"
+
     async def test_the_stored_errors_carry_no_clinical_text(
         self, session: Any, ingest_service: Any
     ) -> None:

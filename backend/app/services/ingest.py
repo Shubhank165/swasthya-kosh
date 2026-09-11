@@ -67,7 +67,16 @@ class IngestResult:
     is a better outcome than the doctor discovering them.
     """
 
-    intake_id: str
+    #: Where the intake lives, and `None` when it does not live anywhere.
+    #:
+    #: An unusable payload is kept in `ingest_raw` for a human to recover, and
+    #: `ingest_raw` is not an intake: nothing addressed by intake id — the
+    #: report, a document upload, the worklist — can find it. This field used
+    #: to carry the payload fingerprint in that case, which looked exactly like
+    #: an identifier and 404'd on every route that took one, so a device would
+    #: photograph a prescription, post it, and be told the intake did not
+    #: exist. Saying `None` is the same fact without the wild goose chase.
+    intake_id: str | None
     status: str
     unresolved_fields: tuple[str, ...]
     needs_review: bool
@@ -76,6 +85,12 @@ class IngestResult:
     red_flags: tuple[str, ...] = ()
     contradictions: int = 0
     demo: bool = False
+    #: Why the payload could not be used, and what failed its contract. Empty
+    #: on the happy path. Structural only — `safe_errors` strips the offending
+    #: values, because those are the patient's own words and they belong in
+    #: `ingest_raw`, which is access-controlled, not in an API response.
+    reason: str | None = None
+    errors: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -88,6 +103,8 @@ class IngestResult:
             "red_flags": list(self.red_flags),
             "contradictions": self.contradictions,
             "demo": self.demo,
+            "reason": self.reason,
+            "errors": [dict(e) for e in self.errors],
         }
 
 
@@ -372,13 +389,23 @@ class IngestService:
         )
 
         return IngestResult(
-            intake_id=str(claimed_intake_id) if claimed_intake_id else fingerprint[:16],
+            # Not the claimed id and not the fingerprint. Neither addresses an
+            # intake, because this payload did not become one — it became an
+            # `ingest_raw` row for a human to recover. A device that is handed
+            # something id-shaped here will use it, and every route that takes
+            # an intake id will tell it the intake does not exist.
+            intake_id=None,
             status="needs_manual_review",
             unresolved_fields=(),
             needs_review=True,
             repaired=False,
             needs_manual_review=True,
             demo=self._demo,
+            # What was wrong, so the device can be fixed. Without this the only
+            # signal is `needs_manual_review` with nothing unresolved, which
+            # reads as "the record was fine and we filed it for review anyway".
+            reason=outcome.reason,
+            errors=outcome.errors,
         )
 
 

@@ -299,6 +299,13 @@ async def seed(
             result = await service.ingest(
                 payload, hospital_id=HOSPITAL_ID, actor_id="seed"
             )
+            if result.intake_id is None:
+                # Our own fixtures failing their own contract is a broken
+                # build, not a seeded demo. Surfacing it here beats a demo that
+                # comes up with fewer intakes than it should and no reason why.
+                raise RuntimeError(
+                    f"seed payload was not usable ({result.reason}): {result.errors}"
+                )
             created.append(result.intake_id)
 
     logger.info("seed_complete", count=len(created), concepts=concepts)

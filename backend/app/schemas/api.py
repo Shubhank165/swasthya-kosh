@@ -29,7 +29,13 @@ class ErrorResponse(ApiModel):
 class IngestResponse(ApiModel):
     """What the kiosk gets back from `POST /intakes/ingest`."""
 
-    intake_id: str
+    #: Where the intake lives — and `null` when it does not live anywhere.
+    #:
+    #: `null` accompanies `needs_manual_review: true`: the payload was kept in
+    #: `ingest_raw` for a human to recover, which is not an intake and cannot be
+    #: addressed by intake id. **Do not post documents, consent or anything else
+    #: against a null id** — read `errors`, fix the payload, submit again.
+    intake_id: str | None = None
     status: str
     #: Fields the device asked but could not settle. The useful half of the
     #: response: staff can fill these before the consultation.
@@ -40,6 +46,13 @@ class IngestResponse(ApiModel):
     red_flags: list[str] = Field(default_factory=list)
     contradictions: int = 0
     demo: bool = False
+    #: `repair_failed` | `repair_disabled` | `unsupported_version` |
+    #: `repair_changed_identity`, and null when the payload was usable.
+    reason: str | None = None
+    #: What failed the contract: `loc`, `type` and `msg` per error. The
+    #: offending values are deliberately absent — they are the patient's own
+    #: words, and they stay in the access-controlled raw store.
+    errors: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class FactOut(ApiModel):

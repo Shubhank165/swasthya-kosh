@@ -51,6 +51,11 @@ async def ingest(
     back with `needs_manual_review: true` and a 200, because a device that keeps
     retrying an unparseable payload eventually drops it, and the answers are
     worth more than the status code.
+
+    **In that case `intake_id` is null**, and the device must not post anything
+    against it. A raw row is not an intake: it has no report, no worklist entry
+    and nowhere to attach a document. `reason` and `errors` say what failed the
+    contract, so the payload can be fixed rather than retried unchanged.
     """
 
     async def _produce() -> IngestResponse:
