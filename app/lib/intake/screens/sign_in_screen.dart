@@ -12,7 +12,6 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../identity/auth_repository.dart';
 import '../../l10n/strings.dart';
-import 'hospital_screen.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
@@ -65,10 +64,17 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         );
     if (!mounted) return;
     if (result.ok) {
+      // Invalidating is the whole navigation. `Root` renders this screen
+      // because nobody is signed in; once that is no longer true it renders
+      // the home shell instead.
+      //
+      // This used to push the hospital picker, which dropped a patient who
+      // had just signed in straight into the first step of a new visit — past
+      // their own visits, documents and profile, with the only way back being
+      // the system back gesture. Signing in is not the same act as starting a
+      // visit, and the home screen is where a patient decides which one they
+      // came for.
       ref.invalidate(signedInProvider);
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const HospitalScreen()),
-      );
       return;
     }
     setState(() {
