@@ -189,6 +189,19 @@
   "@photoLooksCropped": {
     "description": ""
   },
+  "reviewAddDocuments": "Add prescriptions or reports",
+  "@reviewAddDocuments": {
+    "description": ""
+  },
+  "reviewAddMoreDocuments": "{count} added — add another",
+  "@reviewAddMoreDocuments": {
+    "description": "",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "removeDocument": "Remove",
   "@removeDocument": {
     "description": ""

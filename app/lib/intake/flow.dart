@@ -333,6 +333,18 @@ class IntakeFlow extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Back to the documents screen from the review — §5 screen 10.
+  ///
+  /// A patient who reaches the review and realises the prescription in their
+  /// bag never got photographed should not have to abandon the intake to add
+  /// it. [continueToReview] brings them straight back, so this is a detour
+  /// rather than a step backwards through the interview.
+  void addMoreDocuments() {
+    if (_stage != FlowStage.review) return;
+    _stage = FlowStage.documents;
+    notifyListeners();
+  }
+
   /// §4: log a content-version mismatch when the bundle names something this
   /// build cannot render. Question ids only — they are content identifiers, not
   /// anything a patient said.

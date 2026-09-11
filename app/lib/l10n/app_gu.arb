@@ -45,6 +45,19 @@
   "photoTooBlurry": "આ ફોટો ધૂંધળો છે. કૃપા કરી ફરીથી લો.",
   "photoTooSmall": "આ ફોટો વાંચવા માટે ખૂબ નાનો છે. કૃપા કરી ફરીથી લો.",
   "photoLooksCropped": "પાનાનો કેટલોક ભાગ કપાઈ ગયો હોઈ શકે. કૃપા કરી તપાસો.",
+  "reviewAddDocuments": "પ્રિસ્ક્રિપ્શન અથવા રિપોર્ટ ઉમેરો",
+  "@reviewAddDocuments": {
+    "description": ""
+  },
+  "reviewAddMoreDocuments": "{count} ઉમેર્યા — વધુ ઉમેરો",
+  "@reviewAddMoreDocuments": {
+    "description": "",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "removeDocument": "દૂર કરો",
   "statusUploading": "મોકલાઈ રહ્યું છે",
   "statusProcessing": "વંચાઈ રહ્યું છે",

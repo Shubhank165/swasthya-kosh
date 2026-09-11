@@ -176,6 +176,40 @@ void main() {
     });
   });
 
+  group('voice is offered only where the model earns it', () {
+    // Whisper-tiny romanises Hindi rather than writing Devanagari: on clean
+    // synthesised speech "तीन दिनों से" came back as "Team denose", which is
+    // not a rougher transcript but a different sentence, in a record a
+    // physician acts on. whisper-base is no better. So the served set is a
+    // deliberate, measured list and shrinking the mic to match is the feature,
+    // not a regression — see the doc comment on WhisperModel.servedLanguages.
+    final models = File('lib/voice/asr_models.dart').readAsStringSync();
+
+    test('a language the model cannot write is not offered a microphone', () {
+      final served = RegExp(r'servedLanguages\s*=\s*\{([^}]*)\}')
+          .firstMatch(models)
+          ?.group(1);
+      expect(served, isNotNull,
+          reason: 'the served-language set must stay declared in one place');
+      expect(served, contains("'en'"));
+      for (final unserved in ['hi', 'bn', 'ta', 'te', 'mr', 'gu', 'kn', 'pa']) {
+        expect(served, isNot(contains("'$unserved'")),
+            reason: 'no bundled model transcribes $unserved usably yet; adding '
+                'it here without adding a model that can ships romanised '
+                'answers into a clinical record');
+      }
+    });
+
+    test('an unserved language resolves to no model at all', () {
+      // The gate is in the model lookup, so every caller above it — isReady,
+      // ensureModel, prepare — reports "not available" without a special case,
+      // and ListenButton renders the absent microphone it already had.
+      expect(models.contains('WhisperModel? _modelFor'), isTrue,
+          reason: 'the lookup must be able to answer "nothing serves this"');
+      expect(models.contains('servedLanguages.contains(language)'), isTrue);
+    });
+  });
+
   test('read-aloud is still output-only', () {
     // TTS gained no input path when STT arrived.
     final src = File('lib/voice/read_aloud.dart').readAsStringSync();

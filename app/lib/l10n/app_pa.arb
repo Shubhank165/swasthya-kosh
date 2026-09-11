@@ -45,6 +45,19 @@
   "photoTooBlurry": "ਇਹ ਫ਼ੋਟੋ ਧੁੰਦਲੀ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਲਓ।",
   "photoTooSmall": "ਇਹ ਫ਼ੋਟੋ ਪੜ੍ਹਨ ਲਈ ਬਹੁਤ ਛੋਟੀ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਲਓ।",
   "photoLooksCropped": "ਸਫ਼ੇ ਦਾ ਕੁਝ ਹਿੱਸਾ ਕੱਟਿਆ ਜਾ ਸਕਦਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਜਾਂਚ ਲਓ।",
+  "reviewAddDocuments": "ਨੁਸਖ਼ੇ ਜਾਂ ਰਿਪੋਰਟਾਂ ਸ਼ਾਮਲ ਕਰੋ",
+  "@reviewAddDocuments": {
+    "description": ""
+  },
+  "reviewAddMoreDocuments": "{count} ਸ਼ਾਮਲ ਕੀਤੇ — ਹੋਰ ਸ਼ਾਮਲ ਕਰੋ",
+  "@reviewAddMoreDocuments": {
+    "description": "",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "removeDocument": "ਹਟਾਓ",
   "statusUploading": "ਭੇਜਿਆ ਜਾ ਰਿਹਾ ਹੈ",
   "statusProcessing": "ਪੜ੍ਹਿਆ ਜਾ ਰਿਹਾ ਹੈ",

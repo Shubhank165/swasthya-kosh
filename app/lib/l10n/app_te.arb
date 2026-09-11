@@ -45,6 +45,19 @@
   "photoTooBlurry": "ఈ ఫోటో మసకగా ఉంది. దయచేసి మళ్లీ తీయండి.",
   "photoTooSmall": "ఈ ఫోటో చదవడానికి చాలా చిన్నది. దయచేసి మళ్లీ తీయండి.",
   "photoLooksCropped": "పేజీలో కొంత భాగం కత్తిరించబడి ఉండవచ్చు. దయచేసి తనిఖీ చేయండి.",
+  "reviewAddDocuments": "ప్రిస్క్రిప్షన్లు లేదా రిపోర్టులు జోడించండి",
+  "@reviewAddDocuments": {
+    "description": ""
+  },
+  "reviewAddMoreDocuments": "{count} జోడించబడ్డాయి — మరొకటి జోడించండి",
+  "@reviewAddMoreDocuments": {
+    "description": "",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "removeDocument": "తొలగించండి",
   "statusUploading": "పంపబడుతోంది",
   "statusProcessing": "చదవబడుతోంది",

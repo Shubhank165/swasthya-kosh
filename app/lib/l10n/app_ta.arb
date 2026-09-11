@@ -45,6 +45,19 @@
   "photoTooBlurry": "இந்தப் படம் மங்கலாக உள்ளது. மீண்டும் எடுக்கவும்.",
   "photoTooSmall": "இந்தப் படம் படிக்க முடியாத அளவு சிறியது. மீண்டும் எடுக்கவும்.",
   "photoLooksCropped": "பக்கத்தின் ஒரு பகுதி வெட்டப்பட்டிருக்கலாம். சரிபார்க்கவும்.",
+  "reviewAddDocuments": "மருந்துச் சீட்டு அல்லது அறிக்கை சேர்க்கவும்",
+  "@reviewAddDocuments": {
+    "description": ""
+  },
+  "reviewAddMoreDocuments": "{count} சேர்க்கப்பட்டது — மேலும் சேர்க்கவும்",
+  "@reviewAddMoreDocuments": {
+    "description": "",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "removeDocument": "நீக்கு",
   "statusUploading": "அனுப்பப்படுகிறது",
   "statusProcessing": "படிக்கப்படுகிறது",

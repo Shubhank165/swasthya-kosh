@@ -45,6 +45,19 @@
   "photoTooBlurry": "हा फोटो अस्पष्ट आहे. कृपया पुन्हा काढा.",
   "photoTooSmall": "हा फोटो वाचण्यासाठी खूप लहान आहे. कृपया पुन्हा काढा.",
   "photoLooksCropped": "पानाचा काही भाग कापला गेला असू शकतो. कृपया तपासा.",
+  "reviewAddDocuments": "प्रिस्क्रिप्शन किंवा अहवाल जोडा",
+  "@reviewAddDocuments": {
+    "description": ""
+  },
+  "reviewAddMoreDocuments": "{count} जोडले — आणखी जोडा",
+  "@reviewAddMoreDocuments": {
+    "description": "",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "removeDocument": "काढा",
   "statusUploading": "पाठवत आहे",
   "statusProcessing": "वाचले जात आहे",

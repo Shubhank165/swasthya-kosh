@@ -45,6 +45,19 @@
   "photoTooBlurry": "यह फ़ोटो धुंधली है। कृपया फिर से लें।",
   "photoTooSmall": "यह फ़ोटो पढ़ने के लिए बहुत छोटी है। कृपया फिर से लें।",
   "photoLooksCropped": "पृष्ठ का कुछ हिस्सा कट सकता है। कृपया जाँच लें।",
+  "reviewAddDocuments": "पर्चे या रिपोर्ट जोड़ें",
+  "@reviewAddDocuments": {
+    "description": ""
+  },
+  "reviewAddMoreDocuments": "{count} जोड़े गए — और जोड़ें",
+  "@reviewAddMoreDocuments": {
+    "description": "",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "removeDocument": "हटाएँ",
   "statusUploading": "भेजा जा रहा है",
   "statusProcessing": "पढ़ा जा रहा है",

@@ -44,7 +44,9 @@ class _IntakeHostState extends ConsumerState<IntakeHost> {
             bundle: flow.bundle,
             answers: flow.answers,
             language: flow.language,
+            documentCount: flow.pages.length,
             onEdit: flow.edit,
+            onAddDocuments: flow.addMoreDocuments,
             onSubmit: flow.sending ? () {} : flow.submit,
           ),
         FlowStage.urgent => UrgentCareScreen(

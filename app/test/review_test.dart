@@ -88,7 +88,9 @@ void main() {
         bundle: bundle(),
         answers: answers(),
         language: 'en',
+        documentCount: 0,
         onEdit: (_) {},
+        onAddDocuments: () {},
         onSubmit: () {},
       )));
       expect(find.text('Metformin 500'), findsOneWidget);
@@ -103,7 +105,9 @@ void main() {
         bundle: bundle(),
         answers: answers(),
         language: 'en',
+        documentCount: 0,
         onEdit: (_) {},
+        onAddDocuments: () {},
         onSubmit: () {},
       )));
       final meds = tester.getTopLeft(find.byKey(const Key('review.q.meds')));
@@ -117,7 +121,9 @@ void main() {
         bundle: bundle(),
         answers: answers(),
         language: 'en',
+        documentCount: 0,
         onEdit: (_) {},
+        onAddDocuments: () {},
         onSubmit: () {},
       )));
       expect(find.byKey(const Key('review.q.skipped')), findsNothing);
@@ -129,7 +135,9 @@ void main() {
         bundle: bundle(),
         answers: answers(),
         language: 'en',
+        documentCount: 0,
         onEdit: (id) => edited = id,
+        onAddDocuments: () {},
         onSubmit: () {},
       )));
       await tester.tap(find.descendant(
@@ -144,10 +152,66 @@ void main() {
         bundle: bundle(),
         answers: answers(),
         language: 'hi',
+        documentCount: 0,
         onEdit: (_) {},
+        onAddDocuments: () {},
         onSubmit: () {},
       )));
       expect(find.text('कौन सी दवाएँ?'), findsOneWidget);
+    });
+
+    testWidgets('submit is on screen before anything is scrolled', (tester) async {
+      // It used to sit at the end of the answer list, so a patient with a long
+      // interview had to scroll past every answer to discover the screen had a
+      // way forward at all.
+      await tester.pumpWidget(wrap(ReviewScreen(
+        bundle: bundle(),
+        answers: answers(),
+        language: 'en',
+        documentCount: 0,
+        onEdit: (_) {},
+        onAddDocuments: () {},
+        onSubmit: () {},
+      )));
+
+      final submit = find.byKey(const Key('review.submit'));
+      expect(submit, findsOneWidget);
+      final box = tester.getRect(submit);
+      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+      expect(box.bottom, lessThanOrEqualTo(screen.height),
+          reason: 'submit must be visible without scrolling');
+    });
+
+    testWidgets('documents can still be added from the review', (tester) async {
+      // A patient who reaches the review and finds the prescription still in
+      // their bag should not have to abandon the intake to photograph it.
+      var asked = false;
+      await tester.pumpWidget(wrap(ReviewScreen(
+        bundle: bundle(),
+        answers: answers(),
+        language: 'en',
+        documentCount: 0,
+        onEdit: (_) {},
+        onAddDocuments: () => asked = true,
+        onSubmit: () {},
+      )));
+      await tester.tap(find.byKey(const Key('review.addDocuments')));
+      expect(asked, isTrue);
+    });
+
+    testWidgets('the footer says how many pages were added', (tester) async {
+      // A count, so "did I add it?" is answerable without leaving the screen.
+      // A count only: §8 keeps what was read off the page away from patients.
+      await tester.pumpWidget(wrap(ReviewScreen(
+        bundle: bundle(),
+        answers: answers(),
+        language: 'en',
+        documentCount: 2,
+        onEdit: (_) {},
+        onAddDocuments: () {},
+        onSubmit: () {},
+      )));
+      expect(find.textContaining('2'), findsWidgets);
     });
   });
 

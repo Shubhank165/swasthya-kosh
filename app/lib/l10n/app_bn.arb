@@ -45,6 +45,19 @@
   "photoTooBlurry": "ছবিটি ঝাপসা। অনুগ্রহ করে আবার তুলুন।",
   "photoTooSmall": "ছবিটি পড়ার জন্য খুব ছোট। অনুগ্রহ করে আবার তুলুন।",
   "photoLooksCropped": "পাতার কিছু অংশ কাটা পড়তে পারে। অনুগ্রহ করে দেখে নিন।",
+  "reviewAddDocuments": "প্রেসক্রিপশন বা রিপোর্ট যোগ করুন",
+  "@reviewAddDocuments": {
+    "description": ""
+  },
+  "reviewAddMoreDocuments": "{count}টি যোগ হয়েছে — আরও যোগ করুন",
+  "@reviewAddMoreDocuments": {
+    "description": "",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "removeDocument": "সরান",
   "statusUploading": "পাঠানো হচ্ছে",
   "statusProcessing": "পড়া হচ্ছে",

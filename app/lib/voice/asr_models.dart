@@ -24,10 +24,11 @@ import 'package:path_provider/path_provider.dart';
 
 /// One offline Whisper model, bundled as assets.
 ///
-/// Whisper is multilingual, so one model serves every language the bundle
-/// offers; [WhisperModel.multilingual] is the only entry today. A per-language
-/// Indic model (AI4Bharat IndicConformer) can be added here later without any
-/// caller changing — the registry is addressed by language.
+/// [WhisperModel.multilingual] is the only entry today, and it does not serve
+/// every language the app offers — see [WhisperModel.servedLanguages] for
+/// which, and for the measurements behind that list. A per-language Indic
+/// model can be added here later without any caller changing: the registry is
+/// addressed by language and answers null where it has nothing.
 @immutable
 class WhisperModel {
   const WhisperModel({
@@ -57,6 +58,31 @@ class WhisperModel {
     decoder: 'tiny-decoder.int8.onnx',
     tokens: 'tiny-tokens.txt',
   );
+
+  /// The languages this checkpoint transcribes well enough to put in a record.
+  ///
+  /// Whisper is nominally multilingual and the language token does reach the
+  /// decoder — forcing `ta` changes the output script, so the plumbing works.
+  /// What tiny will not do is write Devanagari. Measured against clean
+  /// synthesised speech, which is the friendliest input an ASR model ever gets
+  /// and an optimistic bound on a patient speaking into a phone in an OPD:
+  ///
+  ///     तीन दिनों से        -> "Team denose"
+  ///     मुझे बुखार है         -> "持jebhukhar"
+  ///     दो दिन से खांसी है    -> "Do dense kasi hale"
+  ///
+  /// whisper-base, three times the size, is no better: the same phrases come
+  /// back as "10 de noze" and "m ch he b khar", and one answer came back in
+  /// Urdu script. An answer romanised like that is not a rougher transcript,
+  /// it is a different sentence, and it would land in a document a physician
+  /// acts on. So voice is offered only where the model earns it; everywhere
+  /// else the microphone is absent and the patient taps or types, which is
+  /// §16's graceful absence and the same rule read-aloud already follows.
+  ///
+  /// This is a property of the checkpoint, not of this code. A per-language
+  /// Indic model — AI4Bharat IndicConformer, once a sherpa-onnx export of it
+  /// exists — slots in beside [multilingual] and this set grows with it.
+  static const servedLanguages = {'en'};
 }
 
 /// Where a language's model lives on disk once it is ready.
@@ -88,7 +114,14 @@ class AsrModelStore {
     return dir;
   }
 
-  WhisperModel _modelFor(String language) => WhisperModel.multilingual;
+  /// The model that serves [language], or null when none does.
+  ///
+  /// Null is not a failure to report — it is "this language has no on-device
+  /// voice", and every caller above turns it into an absent microphone.
+  WhisperModel? _modelFor(String language) =>
+      WhisperModel.servedLanguages.contains(language)
+          ? WhisperModel.multilingual
+          : null;
 
   ModelFiles _pathsUnder(String dir, WhisperModel model) => ModelFiles(
         encoder: p.join(dir, model.encoder),
@@ -97,10 +130,12 @@ class AsrModelStore {
       );
 
   /// The model for [language] if its files are already on disk and non-empty,
-  /// else null. A disk check only — never copies, never throws.
+  /// else null. A disk check only — never copies, never throws. Null also when
+  /// no model serves [language] at all.
   Future<ModelFiles?> installed(String language) async {
     try {
       final model = _modelFor(language);
+      if (model == null) return null;
       final dir = p.join((await _root()).path, model.id);
       final files = _pathsUnder(dir, model);
       for (final path in [files.encoder, files.decoder, files.tokens]) {
@@ -115,14 +150,14 @@ class AsrModelStore {
 
   /// Make sure [language]'s model is on disk, copying it out of the bundled
   /// assets if it is not there yet. Returns the file paths, or null if the copy
-  /// failed (no space, assets missing in a test). Cheap and idempotent after
-  /// the first call. Because the model is multilingual, provisioning it for one
-  /// language provisions it for all.
+  /// failed (no space, assets missing in a test), or if no model serves
+  /// [language]. Cheap and idempotent after the first call.
   Future<ModelFiles?> ensureInstalled(String language) async {
     final ready = await installed(language);
     if (ready != null) return ready;
 
     final model = _modelFor(language);
+    if (model == null) return null;
     final dir = Directory(p.join((await _root()).path, model.id));
     try {
       await dir.create(recursive: true);

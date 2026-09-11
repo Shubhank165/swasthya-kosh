@@ -24,14 +24,23 @@ class ReviewScreen extends StatelessWidget {
     required this.bundle,
     required this.answers,
     required this.language,
+    required this.documentCount,
     required this.onEdit,
+    required this.onAddDocuments,
     required this.onSubmit,
   });
 
   final ContentBundle bundle;
   final Map<String, Answer> answers;
   final String language;
+
+  /// How many pages the patient photographed, so the footer can say whether
+  /// anything was added at all. A count, never a thumbnail or a reading: §8
+  /// keeps unverified OCR off every patient-facing screen.
+  final int documentCount;
+
   final void Function(String questionId) onEdit;
+  final VoidCallback onAddDocuments;
   final VoidCallback onSubmit;
 
   /// Sections whose answers are shown first and in full.
@@ -61,6 +70,14 @@ class ReviewScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(strings.reviewTitle)),
+      // Submit is pinned, not parked at the end of the list. A patient with
+      // thirty answers had to scroll past all of them to find out the button
+      // existed, which reads as a screen with no way forward.
+      bottomNavigationBar: _Footer(
+        documentCount: documentCount,
+        onAddDocuments: onAddDocuments,
+        onSubmit: onSubmit,
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(Sizes.gutter),
@@ -108,12 +125,61 @@ class ReviewScreen extends StatelessWidget {
                 ),
             ],
             const SizedBox(height: Sizes.gutter),
-            FilledButton(
-              key: const Key('review.submit'),
-              onPressed: onSubmit,
-              child: Text(strings.submitIntake),
-            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The pinned footer: add what was missed, then submit.
+///
+/// Both controls sit above the fold at all times. The documents route is
+/// secondary and stays a text button — it is a detour a few patients need, not
+/// a second thing every patient must decide about before they can finish.
+class _Footer extends StatelessWidget {
+  const _Footer({
+    required this.documentCount,
+    required this.onAddDocuments,
+    required this.onSubmit,
+  });
+
+  final int documentCount;
+  final VoidCallback onAddDocuments;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    return Material(
+      elevation: 8,
+      color: Theme.of(context).colorScheme.surface,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(Sizes.gutter),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextButton.icon(
+                key: const Key('review.addDocuments'),
+                onPressed: onAddDocuments,
+                icon: const Icon(Icons.add_a_photo_outlined),
+                label: Text(
+                  documentCount == 0
+                      ? strings.reviewAddDocuments
+                      : strings.reviewAddMoreDocuments(documentCount),
+                ),
+              ),
+              const SizedBox(height: Sizes.gap),
+              FilledButton(
+                key: const Key('review.submit'),
+                onPressed: onSubmit,
+                child: Text(strings.submitIntake),
+              ),
+            ],
+          ),
         ),
       ),
     );

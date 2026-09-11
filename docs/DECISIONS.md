@@ -1178,3 +1178,50 @@ clinical review queue.
   speaker's review — on the queue. The dictation-into-free-text reversal wants
   a line in the DPDP notice too (`on_device_voice_input` already covers the
   processing; the wording should say the words land in an editable field).
+
+## 69. Voice is offered only in the language the model can actually write
+
+§68 shipped one multilingual Whisper for all nine languages and named accuracy
+on Indian speech as a known weakness. Device testing turned that abstraction
+into a number: a patient answering "तीन दिनों से" got **"team dinose"** in the
+text box.
+
+The first suspicion was a wiring bug — the wrong language code reaching the
+recogniser. It was not. Replaying the shipped model files outside the app, on
+clean synthesised speech (the friendliest input an ASR model ever gets, and so
+an optimistic bound on an OPD patient speaking into a phone):
+
+| said | whisper-tiny, `language=hi` | whisper-base, `language=hi` |
+|---|---|---|
+| तीन दिनों से | `Team denose` | `10 de noze` |
+| मुझे बुखार है | `持jebhukhar` | `m ch he b khar` |
+| सिर में दर्द हो रहा है | `Sirmhe Darda hurahahi` | `Sirmedardh Hura Ha` |
+| दो दिन से खांसी है | `Do dense kasi hale` | `2-Den se khasi hai` |
+| मुझे शुगर की बीमारी है | `majhe sugar ke bimari hai` | `مجھے شگر کی ب` |
+
+The language token *is* applied — forcing `ta` changes the output script, so
+sherpa-onnx and the app are both doing their jobs. Whisper at a size that fits
+a mid-range phone simply will not write Devanagari; it romanises. whisper-base
+is three times the asset for the same failure, and one answer came back in
+Urdu script.
+
+A romanised answer is not a rougher transcript. It is a different sentence, and
+it lands in a document a physician acts on — the same objection this project
+already makes to machine-translating a clinical term nobody reviewed (§16) and
+to letting "not established" render as a denial.
+
+So `WhisperModel.servedLanguages` is `{'en'}`, `_modelFor` answers null for
+everything else, and every caller above it already turns null into an absent
+microphone. In the other eight languages the patient taps and types, exactly as
+they did before voice existed, and read-aloud — which works fine in Hindi —
+is untouched. The gate is one set in one file, and the measurements are in the
+doc comment beside it so the next person to widen it knows what to re-measure.
+
+**The real fix is a model, not a config.** AI4Bharat IndicConformer (CTC,
+~120M, built for the 22 scheduled languages) is the right family; as of this
+writing there is no sherpa-onnx-format export of it, so it is an export job
+rather than a download. SenseVoice, §68's other candidate, covers zh/en/ja/ko/yue
+and no Indian language at all — it is off the list. Until one of those lands,
+offering a Hindi microphone would be claiming a capability this build does not
+have, which is the thing the sign-in stand-in notice and the OCR "read but not
+placed" line both exist to avoid.

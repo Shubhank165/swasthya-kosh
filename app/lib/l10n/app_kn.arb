@@ -45,6 +45,19 @@
   "photoTooBlurry": "ಈ ಫೋಟೋ ಮಸುಕಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ತೆಗೆಯಿರಿ.",
   "photoTooSmall": "ಈ ಫೋಟೋ ಓದಲು ತುಂಬಾ ಚಿಕ್ಕದಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ತೆಗೆಯಿರಿ.",
   "photoLooksCropped": "ಪುಟದ ಕೆಲವು ಭಾಗ ಕತ್ತರಿಸಿರಬಹುದು. ದಯವಿಟ್ಟು ಪರಿಶೀಲಿಸಿ.",
+  "reviewAddDocuments": "ಔಷಧಿ ಚೀಟಿ ಅಥವಾ ವರದಿ ಸೇರಿಸಿ",
+  "@reviewAddDocuments": {
+    "description": ""
+  },
+  "reviewAddMoreDocuments": "{count} ಸೇರಿಸಲಾಗಿದೆ — ಇನ್ನಷ್ಟು ಸೇರಿಸಿ",
+  "@reviewAddMoreDocuments": {
+    "description": "",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "removeDocument": "ತೆಗೆದುಹಾಕಿ",
   "statusUploading": "ಕಳುಹಿಸಲಾಗುತ್ತಿದೆ",
   "statusProcessing": "ಓದಲಾಗುತ್ತಿದೆ",
