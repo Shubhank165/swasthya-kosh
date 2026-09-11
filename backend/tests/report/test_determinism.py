@@ -21,9 +21,12 @@ from typing import Any
 
 import pytest
 
+from app.domain.clinical.enums import Section
+from app.domain.documents.extraction import DocumentExtraction, DocumentItem, ItemKind
+from app.domain.record import Fact, FieldStatus, TurnSource
 from app.domain.report import builder
 from app.domain.report.safety import find_unsupported_assertions
-from tests.conftest import HOSPITAL_ID
+from tests.conftest import FROZEN_NOW, HOSPITAL_ID
 
 GOLDEN = Path(__file__).parent / "golden"
 LANGUAGES = ("en", "hi")
@@ -289,3 +292,147 @@ class TestTheDocumentTimeline:
         rows = self._section(rendered["hi"], "दस्तावेज़ समयरेखा")
         assert rows
         assert any("पठनीय तिथि नहीं" in r for r in rows)
+
+
+class TestChiefComplaintPromotion:
+    """A `chief_complaint` field renders under CHIEF COMPLAINT regardless of
+    which section its own content carries it in — 2026-09-11.
+
+    The kiosk's core `chief_complaint` field already sets `Section
+    .CHIEF_COMPLAINT` itself; this is for content built on a different question
+    set, where the field is namespaced (`routing.chief_complaint`) and its
+    section is whatever the routing questions carry, which is HPI on the
+    deployed app bundle. A physician opening the report to an empty header
+    while the actual complaint sits a section down reads as "no complaint was
+    taken", not as a content quirk.
+    """
+
+    def _fact(self, field_id: str, section: Section) -> Fact:
+        return Fact(
+            fact_id="f1",
+            field_id=field_id,
+            status=FieldStatus.ANSWERED,
+            source=TurnSource(turn_id=1),
+            section=section,
+            recorded_at=FROZEN_NOW,
+        )
+
+    def test_a_namespaced_chief_complaint_field_is_promoted(self) -> None:
+        fact = self._fact("routing.chief_complaint", Section.HPI)
+        assert builder._effective_section(fact) is Section.CHIEF_COMPLAINT
+
+    def test_the_bare_field_needs_no_promotion(self) -> None:
+        fact = self._fact("chief_complaint", Section.CHIEF_COMPLAINT)
+        assert builder._effective_section(fact) is Section.CHIEF_COMPLAINT
+
+    def test_a_field_that_merely_contains_the_word_is_not_promoted(self) -> None:
+        """`routing.complaints` (plural) is the multi-select of complaint
+        areas used for triage, not the chief complaint itself. A substring
+        match would have promoted it too."""
+        fact = self._fact("routing.complaints", Section.HPI)
+        assert builder._effective_section(fact) is Section.HPI
+
+
+class TestUnclassifiedDocumentText:
+    """`OTHER` items — text the OCR pass read but did not classify — are shown
+    plainly as unclassified, never filed as a prior investigation.
+
+    2026-09-11: a bed-rest certificate's own boilerplate (doctor's name,
+    signature date, the patient's father's name) came back as `other` items
+    and were dumped into PRIOR INVESTIGATIONS by the old catch-all, which read
+    as ten fabricated investigations. They now land in the document-notes area
+    that already carries "this document did not come through cleanly", plainly
+    marked as unclassified.
+    """
+
+    def _extraction(self, *items: DocumentItem) -> DocumentExtraction:
+        return DocumentExtraction(document_id="doc_1", items=list(items))
+
+    def _other(self, item_id: str, raw_text: str) -> DocumentItem:
+        return DocumentItem(
+            item_id=item_id,
+            kind=ItemKind.OTHER,
+            raw_text=raw_text,
+            page=1,
+            confidence=0.9,
+        )
+
+    async def test_an_other_item_does_not_appear_in_investigations(
+        self, content: Any
+    ) -> None:
+        templates = content.templates.require("en")
+        extraction = self._extraction(self._other("i1", "Father's Name"))
+        grouped = builder._document_lines([extraction], templates)
+        assert Section.INVESTIGATIONS not in grouped
+
+    async def test_an_other_item_is_shown_as_unclassified_instead(
+        self, content: Any
+    ) -> None:
+        templates = content.templates.require("en")
+        extraction = self._extraction(self._other("i1", "Father's Name"))
+        lines = builder._unclassified_lines([extraction], templates)
+        assert len(lines) == 1
+        assert "Father's Name" in lines[0].text
+        assert "doc_1" in lines[0].text
+
+    async def test_a_real_lab_result_still_lands_in_investigations(
+        self, content: Any
+    ) -> None:
+        """The fix removes the OTHER catch-all, not the mapping every other
+        kind still has."""
+        from app.domain.documents.extraction import LabResult
+
+        templates = content.templates.require("en")
+        lab_item = DocumentItem(
+            item_id="i1",
+            kind=ItemKind.LAB_RESULT,
+            raw_text="Hb 9.8",
+            page=1,
+            confidence=0.9,
+            lab_result=LabResult(analyte="Haemoglobin", value=9.8, unit="g/dL"),
+        )
+        grouped = builder._document_lines([self._extraction(lab_item)], templates)
+        assert Section.INVESTIGATIONS in grouped
+
+    async def test_the_aadhaar_fixture_reads_redacted_and_unclassified(
+        self,
+        ingest_service: Any,
+        document_service: Any,
+        report_service: Any,
+        kiosk_payload: dict[str, Any],
+        ocr_images: dict[str, bytes],
+    ) -> None:
+        """End to end: the document that used to leak an Aadhaar-shaped number
+        into the report now reads redacted, and lands as unclassified text
+        rather than a phantom investigation."""
+        result = await ingest_service.ingest(
+            kiosk_payload, hospital_id=HOSPITAL_ID, actor_id="kiosk-1"
+        )
+        upload = await document_service.upload(
+            hospital_id=HOSPITAL_ID,
+            intake_id=result.intake_id,
+            content=ocr_images["contains_aadhaar"],
+            content_type="image/jpeg",
+        )
+        await document_service.process(
+            hospital_id=HOSPITAL_ID, document_id=upload.document_id
+        )
+        bundle = await report_service.build(
+            hospital_id=HOSPITAL_ID, intake_id=result.intake_id, language="en"
+        )
+        text = bundle.text
+        assert "4321 8765 2108" not in text
+        assert "9876543210" not in text
+
+        investigations = self._section_of(text, "PRIOR INVESTIGATIONS")
+        assert not any("Aadhaar" in row or "Mobile" in row for row in investigations)
+
+    @staticmethod
+    def _section_of(text: str, title: str) -> list[str]:
+        lines = text.splitlines()
+        start = lines.index(title)
+        end = next(
+            (i for i in range(start + 1, len(lines)) if lines[i] and lines[i].isupper()),
+            len(lines),
+        )
+        return lines[start + 1 : end]

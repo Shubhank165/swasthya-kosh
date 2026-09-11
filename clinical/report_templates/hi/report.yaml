@@ -64,6 +64,7 @@ strings:
   document_unprocessed: "{document} अपलोड हुआ, अभी संसाधित नहीं"
   document_low_confidence: "{document} कम विश्वसनीयता से पढ़ा गया — मूल से मिलाएँ"
   document_rejected: "{document} पढ़ा नहीं जा सका ({reason}) — नई तस्वीर आवश्यक है"
+  document_other_text: "{document}: \"{text}\" — पन्ने पर पढ़ा गया पर किसी नैदानिक खंड में नहीं रखा गया; स्कैन जाँचें"
 
   interaction_prompt: "इन दोनों में पारस्परिक क्रिया संभव है — कृपया समीक्षा करें।"
 

@@ -62,6 +62,7 @@ REQUIRED_KEYS: tuple[str, ...] = (
     "document_unprocessed",
     "document_low_confidence",
     "document_rejected",
+    "document_other_text",
     "interaction_prompt",
     "range_below",
     "range_above",

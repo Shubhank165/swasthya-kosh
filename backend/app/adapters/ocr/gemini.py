@@ -59,6 +59,17 @@ Rules, all of them absolute:
 - document_date: ISO 8601 only, YYYY-MM-DD. A date printed 04/09/2026 on an
   Indian document is 4 September 2026; write it 2026-09-04. If the printed date
   is ambiguous, undated or unclear, omit the field entirely. Never guess a date.
+- Create an item only for content that matters clinically: a medicine, a
+  diagnosis, a procedure, an investigation or lab result, or free text that
+  carries clinical meaning (a symptom, an examination finding, an instruction
+  or advice from the practitioner). Do not create an item for a form's own
+  furniture: letterhead, clinic name or address, the doctor's name,
+  registration or licence number, a signature or stamp line, a printed field
+  label with no clinical content, a patient demographic line (name, age, sex,
+  father's or guardian's name, home address, an ID number), a date that is only
+  the form's own issue, print or signature date, or a serial or reference
+  number. If genuinely unsure whether a line is clinical, keep it — but do not
+  manufacture an item out of a form's own boilerplate.
 """
 
 

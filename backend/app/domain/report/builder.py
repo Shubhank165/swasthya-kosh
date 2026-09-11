@@ -29,7 +29,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from app.domain.clinical.enums import SECTION_ORDER, Certainty, ReporterRole, Section
-from app.domain.documents.extraction import DocumentExtraction, ItemKind, RangeStatus
+from app.domain.documents.extraction import (
+    DocumentExtraction,
+    DocumentItem,
+    ItemKind,
+    RangeStatus,
+)
 from app.domain.documents.interactions import InteractionFinding
 from app.domain.record import (
     CanonicalRecord,
@@ -124,6 +129,25 @@ def _markers_for(fact: Fact, templates: TemplateSet) -> tuple[LineMarker, ...]:
     return tuple(markers)
 
 
+def _effective_section(fact: Fact) -> Section:
+    """`fact.section`, except a chief-complaint field always renders as one.
+
+    The kiosk's core `chief_complaint` field already carries
+    `Section.CHIEF_COMPLAINT`. Content built on a different question set can
+    file the same clinical fact under a routing or triage field — the deployed
+    app bundle's `routing.chief_complaint` lands in HPI (2026-09-11) — and a
+    physician opening the report to a header that says "Nothing recorded" while
+    the actual complaint sits a section down is worse than a content bug: it
+    reads as no complaint was ever taken. Matched on field id suffix rather than
+    an exact string so any `<namespace>.chief_complaint` field is covered
+    without a content change.
+    """
+    field_id = fact.field_id
+    if field_id == "chief_complaint" or field_id.endswith(".chief_complaint"):
+        return Section.CHIEF_COMPLAINT
+    return fact.section
+
+
 def _line_for(fact: Fact, templates: TemplateSet, labels: FieldLabels) -> ReportLine:
     """One answered fact as one line."""
     label = labels(fact.field_id)
@@ -186,23 +210,54 @@ def _sort_facts(facts: Sequence[Fact]) -> tuple[Fact, ...]:
 # --- documents ---------------------------------------------------------------
 
 
-#: Which report section a document item lands in. Mirrors `_fact_shape` in
-#: `app.services.documents`, because an item and the fact derived from it should
-#: appear in the same place — a medicine read off a prescription is drug
-#: history, not an investigation.
+#: Which report section a *classified* document item lands in. Mirrors
+#: `_fact_shape` in `app.services.documents`, because an item and the fact
+#: derived from it should appear in the same place — a medicine read off a
+#: prescription is drug history, not an investigation.
+#:
+#: `ItemKind.OTHER` has no entry on purpose. It means "read, understood as
+#: text, but not classified" (`app.domain.documents.extraction`) — a form's
+#: letterhead, a doctor's signature line and a patient's date of birth are all
+#: `OTHER` alongside anything genuinely clinical the model could not place, and
+#: none of the three is a prior investigation. Filing it there anyway is what
+#: produced a PRIOR INVESTIGATIONS section made of "Doctor Name" and "Father's
+#: Name" from a bed-rest certificate (2026-09-11). `_unclassified_lines` below
+#: gives it a home that does not claim to be a clinical section.
 _ITEM_SECTIONS: Mapping[ItemKind, Section] = {
     ItemKind.MEDICINE: Section.MEDICATIONS,
     ItemKind.DIAGNOSIS: Section.PAST_MEDICAL,
     ItemKind.PROCEDURE: Section.PAST_SURGICAL,
     ItemKind.LAB_RESULT: Section.INVESTIGATIONS,
-    ItemKind.OTHER: Section.INVESTIGATIONS,
 }
+
+
+def _rendered_item_text(
+    item: DocumentItem, extraction: DocumentExtraction, templates: TemplateSet
+) -> str:
+    """The line for one classified item: its value, any range flag, the raw
+    text beside a low-confidence read, and the document it came from."""
+    text = item.render()
+    if item.range_status is RangeStatus.BELOW_RANGE:
+        text += f" — {templates.text('range_below')}"
+    elif item.range_status is RangeStatus.ABOVE_RANGE:
+        text += f" — {templates.text('range_above')}"
+    elif item.lab_result is not None and item.range_status is RangeStatus.RANGE_UNAVAILABLE:
+        text += f" — {templates.text('range_unavailable')}"
+    if item.needs_verification and item.raw_text:
+        text += " (" + templates.format("patient_said", text=item.raw_text) + ")"
+    # The source label goes on the line so a physician reading "Metformin
+    # 500 mg BD" in the drug history can tell it came off a scan rather than
+    # out of the patient's mouth.
+    text += f" [{extraction.document_id} p{item.page}]"
+    return text
 
 
 def _document_lines(
     extractions: Sequence[DocumentExtraction], templates: TemplateSet
 ) -> dict[Section, list[ReportLine]]:
-    """Everything read off the patient's documents, grouped by report section.
+    """Every *classified* item read off the patient's documents, grouped by
+    report section. Unclassified (`OTHER`) items are handled separately by
+    `_unclassified_lines` — see the note on `_ITEM_SECTIONS`.
 
     Lab results carry the reference range printed on their own document and,
     where one existed, a statement of where the value sits against it. A result
@@ -212,31 +267,17 @@ def _document_lines(
     grouped: dict[Section, list[ReportLine]] = {}
     for extraction in sorted(extractions, key=lambda e: e.document_id):
         for item in extraction.items:
+            section = _ITEM_SECTIONS.get(item.kind)
+            if section is None:
+                continue
             markers: list[LineMarker] = []
             if item.needs_verification:
                 markers.append(
                     LineMarker(code="verify", text=templates.text("verify_marker"))
                 )
-            text = item.render()
-            if item.range_status is RangeStatus.BELOW_RANGE:
-                text += f" — {templates.text('range_below')}"
-            elif item.range_status is RangeStatus.ABOVE_RANGE:
-                text += f" — {templates.text('range_above')}"
-            elif (
-                item.lab_result is not None
-                and item.range_status is RangeStatus.RANGE_UNAVAILABLE
-            ):
-                text += f" — {templates.text('range_unavailable')}"
-            if item.needs_verification and item.raw_text:
-                text += " (" + templates.format("patient_said", text=item.raw_text) + ")"
-            # The source label goes on the line so a physician reading "Metformin
-            # 500 mg BD" in the drug history can tell it came off a scan rather
-            # than out of the patient's mouth.
-            text += f" [{extraction.document_id} p{item.page}]"
-            section = _ITEM_SECTIONS.get(item.kind, Section.INVESTIGATIONS)
             grouped.setdefault(section, []).append(
                 ReportLine(
-                    text=text,
+                    text=_rendered_item_text(item, extraction, templates),
                     field_ids=(f"document_item:{item.kind}",),
                     fact_ids=(item.item_id,),
                     sources=(
@@ -250,6 +291,41 @@ def _document_lines(
                 )
             )
     return grouped
+
+
+def _unclassified_lines(
+    extractions: Sequence[DocumentExtraction], templates: TemplateSet
+) -> tuple[ReportLine, ...]:
+    """`OTHER` items: text the OCR pass read but could not — or should not —
+    place in a clinical section. Shown plainly as unclassified rather than
+    silently dropped (§6.3) or, worse, dressed up as a finding."""
+    lines: list[ReportLine] = []
+    for extraction in sorted(extractions, key=lambda e: e.document_id):
+        for item in extraction.items:
+            if item.kind is not ItemKind.OTHER:
+                continue
+            shown = item.raw_text or item.label or ""
+            if not shown.strip():
+                continue
+            lines.append(
+                ReportLine(
+                    text=templates.format(
+                        "document_other_text",
+                        document=f"{extraction.document_id} p{item.page}",
+                        text=shown,
+                    ),
+                    field_ids=(f"document_item:{item.kind}",),
+                    fact_ids=(item.item_id,),
+                    sources=(
+                        DocumentSource(
+                            document_id=extraction.document_id,
+                            page=item.page,
+                            bbox=item.bbox,
+                        ),
+                    ),
+                )
+            )
+    return tuple(lines)
 
 
 def _document_notes(record: CanonicalRecord, templates: TemplateSet) -> tuple[ReportLine, ...]:
@@ -375,7 +451,9 @@ def build(
     sections: list[ReportSection] = []
     for section in BODY_SECTIONS:
         answered = [
-            f for f in voice if f.section is section and f.status is FieldStatus.ANSWERED
+            f
+            for f in voice
+            if _effective_section(f) is section and f.status is FieldStatus.ANSWERED
         ]
         lines = [_line_for(f, templates, labels) for f in _sort_facts(answered)]
         lines.extend(document_lines.get(section, ()))
@@ -414,7 +492,8 @@ def build(
         alerts=tuple(record.red_flags),
         interactions=interaction_lines,
         document_timeline=_document_timeline(record, extractions, templates),
-        document_notes=_document_notes(record, templates),
+        document_notes=_document_notes(record, templates)
+        + _unclassified_lines(extractions, templates),
         contains_repaired=any(f.repaired for f in live),
         needs_verification=any(f.needs_verification for f in live)
         or any(e.low_confidence for e in extractions),

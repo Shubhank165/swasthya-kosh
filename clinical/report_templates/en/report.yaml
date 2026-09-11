@@ -61,6 +61,7 @@ strings:
   document_unprocessed: "{document} uploaded, not yet processed"
   document_low_confidence: "{document} read with low confidence — verify against the original"
   document_rejected: "{document} could not be read ({reason}) — a fresh photograph is needed"
+  document_other_text: "{document}: \"{text}\" — read off the page but not placed in any clinical section; check the scan"
 
   interaction_prompt: "These two may interact — please review."
 
