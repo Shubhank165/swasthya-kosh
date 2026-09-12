@@ -53,9 +53,10 @@ from app.domain.report.model import (
     TimelineEntry,
 )
 from app.domain.report.templates import TemplateSet
+from app.domain.timeline.model import TimelineSnapshot, TimelineStatus
 
-#: 1.1 adds the DOCUMENT TIMELINE section.
-TEMPLATE_VERSION = "1.1"
+#: 1.1 adds the DOCUMENT TIMELINE section; 1.2 adds HISTORY TIMELINE.
+TEMPLATE_VERSION = "1.2"
 
 #: Sections that appear in the report body, in render order. Fixed by the
 #: problem statement: chief complaint, HPI, past medical and surgical, drug and
@@ -445,10 +446,18 @@ def build(
     templates: TemplateSet,
     extractions: Sequence[DocumentExtraction] = (),
     interactions: Sequence[InteractionFinding] = (),
+    timeline: TimelineSnapshot | None = None,
     labels: FieldLabels = DEFAULT_LABELS,
     demo: bool = False,
 ) -> PhysicianReport:
-    """Assemble the report. Pure."""
+    """Assemble the report. Pure.
+
+    `timeline` arrives as a finished value, exactly as `extractions` do. The
+    builder never fetches it and never calls anything to produce it — that is
+    what keeps this module model-free while the timeline's *contents* may have
+    been selected by one upstream. Each event renders through `templates.format`
+    like every other line: the model extracts, the templates render.
+    """
     labels = labels.overlaid(templates.labels)
     live = record.live_facts()
     voice = [f for f in live if f.is_from_today]
@@ -506,12 +515,49 @@ def build(
         document_timeline=_document_timeline(record, extractions, templates),
         document_notes=_document_notes(record, templates)
         + _unclassified_lines(extractions, templates),
+        history=timeline,
         contains_repaired=any(f.repaired for f in live),
         needs_verification=any(f.needs_verification for f in live)
         or any(e.low_confidence for e in extractions),
         demo=demo,
         generated_at=record.updated_at,
     )
+
+
+def _history_lines(report: PhysicianReport, templates: TemplateSet) -> list[str]:
+    """The history timeline, with the state it is in stated on every path.
+
+    Three states and three different sentences, because a reader cannot tell
+    them apart from the list alone: *not built yet* is not *nothing on record*,
+    and *everything on record* is not *what we judged relevant*. A filtered
+    timeline that does not announce it is filtered reads as a complete history
+    and is not — which is the whole reason `history_filtered_note` exists and
+    is not optional decoration.
+    """
+    timeline = report.history
+    if timeline is None or timeline.status is TimelineStatus.PENDING:
+        # Never a silently empty section. "Not ready" and "nothing there" look
+        # identical on screen and mean opposite things.
+        return [templates.text("history_pending")]
+
+    if not timeline.events:
+        return [templates.text("history_none")]
+
+    lines = [
+        templates.format(
+            "history_event",
+            date=event.event_date.isoformat(),
+            label=event.label,
+        )
+        for event in timeline.events
+    ]
+    if timeline.status is TimelineStatus.FILTERED:
+        lines.append(
+            templates.format("history_filtered_note", omitted=timeline.omitted_count)
+        )
+    else:
+        lines.append(templates.text("history_unfiltered"))
+    return lines
 
 
 # --- rendering ---------------------------------------------------------------
@@ -544,6 +590,14 @@ def render_text(report: PhysicianReport, templates: TemplateSet) -> str:
         out.append(f"  {templates.text('nothing_outstanding')}")
     if report.document_notes:
         out.extend(f"  - {line.rendered()}" for line in report.document_notes)
+    out.append("")
+
+    # Immediately before the document timeline, and deliberately *not* merged
+    # into it: that section answers how stale each uploaded scan is, and
+    # "this scan is 40 days old" beside "3 Aug 2026 — Metformin started" makes
+    # both harder to read than either alone.
+    out.append(templates.text("history_title").upper())
+    out.extend(f"  {line}" for line in _history_lines(report, templates))
     out.append("")
 
     out.append(templates.text("timeline_title").upper())

@@ -11,6 +11,20 @@ no `RedFlagClassifier`, no `ReportWriter`. Question selection and red-flag
 evaluation live on the Jetson, permanently; the report is a template,
 permanently. A protocol here would be an invitation to wire a model into a path
 that must not have one.
+
+`TimelineProvider` is the one addition to that list, and the distinction has to
+be written down rather than assumed. It **selects and dates events that already
+exist in stored records**. It authors no prose: `validate.py` takes each event's
+label from the candidate it claims to be and throws the model's wording away. It
+states no diagnosis, its output renders through the same templates as every
+other line, and the same `safety.py` scan reads it — which matters, because
+those are the only report lines whose contents a model had any say in, and that
+scan is exactly what it exists for.
+
+The difference from a `ReportWriter` is not one of degree. A writer would decide
+what the document *says*; this decides which of the things already on the record
+are worth a physician's attention today, and pure code then checks every one of
+its answers against the record it claimed to read.
 """
 
 from __future__ import annotations
@@ -19,6 +33,7 @@ from typing import Any, Protocol
 
 from app.domain.documents.extraction import DocumentExtraction
 from app.domain.record import DocumentKind
+from app.domain.timeline.model import TimelineDraft, TimelineRequest
 
 
 class OCRProvider(Protocol):
@@ -48,6 +63,21 @@ class RepairProvider(Protocol):
     async def repair(
         self, payload: dict[str, Any], *, schema: dict[str, Any], errors: list[dict[str, Any]]
     ) -> dict[str, Any] | None: ...
+
+
+class TimelineProvider(Protocol):
+    """Selects which prior events relate to today's complaint.
+
+    Returns `None` as a normal outcome — unavailable, unconfigured, or nothing
+    worth selecting — mirroring `RepairProvider`. The caller falls back to the
+    deterministic timeline, which is a complete dated history rather than a
+    degraded one, so a provider being down costs relevance filtering and not the
+    feature.
+    """
+
+    name: str
+
+    async def summarise(self, request: TimelineRequest) -> TimelineDraft | None: ...
 
 
 class ABHAProvider(Protocol):

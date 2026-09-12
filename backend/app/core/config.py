@@ -72,6 +72,36 @@ class Settings(BaseSettings):
     ocr_quality_floor: float = 0.35
     ocr_fixtures_dir: Path = BACKEND_ROOT / "tests" / "fixtures" / "ocr"
 
+    # --- timeline ------------------------------------------------------------
+    #: `none`, `mock` or `vertex`. **`none` is the default and is not a
+    #: placeholder.** With no provider the report still carries a dated,
+    #: ordered history built by pure code; a provider only ever narrows that set
+    #: to what relates to today's complaint. Turning one on is a decision about
+    #: sending prior consultation content to a model — see
+    #: `timeline_share_prior_records` below — not a performance tuning knob.
+    timeline_provider: str = "none"
+    timeline_model_id: str | None = None
+    #: How many prior intakes are walked. Bounds both the cost of a model call
+    #: and the amount of history that could leave the building.
+    timeline_max_prior_intakes: int = 5
+    #: Hard cap on rendered events, applied after validation, so a chatty model
+    #: cannot lengthen a physician's report.
+    timeline_max_events: int = 12
+    #: Below this, a model-selected event is dropped.
+    timeline_min_relevance: float = 0.3
+    #: Scenario-keyed fixtures for the mock provider. Keyed by name rather than
+    #: by a digest of the request: a digest-keyed fixture invalidates on any
+    #: serialisation change, and the failure reads as "the mock broke".
+    timeline_fixtures_dir: Path = BACKEND_ROOT / "tests" / "fixtures" / "timeline"
+    #: **Defaults false, deliberately.** True is what lets prior consultation
+    #: content — coded values, the patient's own words, prior medicine names —
+    #: reach the model. That is a materially larger category of egress than the
+    #: document images already sent, and it should not start happening because
+    #: nobody set a variable. With it false the provider still runs, seeing only
+    #: this intake's own documents and today's answers, which is strictly less
+    #: than the OCR path already sends.
+    timeline_share_prior_records: bool = False
+
     # --- repair (the one place a language model touches clinical input) ------
     #: `mock`, `vertex`, or `none` to disable repair entirely.
     repair_provider: str = "mock"

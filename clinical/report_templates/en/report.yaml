@@ -20,6 +20,7 @@ strings:
     Every line requires physician verification before use.
 
   unresolved_title: "Unresolved"
+  history_title: "History timeline"
   timeline_title: "Document timeline"
   conflicts_title: "Information conflicts"
   safety_title: "Safety"
@@ -29,6 +30,26 @@ strings:
   nothing_outstanding: "Nothing outstanding."
   no_conflicts: "No conflicts detected between today's answers and prior records."
   timeline_none: "No documents to place in time."
+
+  # The medical history timeline — the problem statement's dated-history
+  # requirement. Separate from the document timeline above, which answers a
+  # different question: how stale each uploaded scan is. Mixing "this scan is 40
+  # days old" with "3 Aug 2026 — Metformin started" makes both unreadable.
+  history_event: "{date} — {label}"
+  history_none: "No dated history on record at this hospital."
+  history_pending: >-
+    The history timeline has not been built for this intake yet. It is not
+    empty — it is not ready. Reload in a moment.
+  history_unfiltered: >-
+    Every dated entry on record at this hospital, newest first. Nothing has been
+    judged for relevance to today's complaint.
+  # A filtered timeline that does not say it is filtered looks like a complete
+  # history and is not. This line is not optional decoration.
+  history_filtered_note: >-
+    Selected as related to today's complaint. {omitted} earlier event(s) were
+    judged unrelated and are not shown; the full record remains available.
+  history_source_visit: "visit"
+  history_source_document: "document"
   timeline_dated: "{document} is dated {date} — {days} day(s) before this intake. Anything read from it describes the patient on that date, not necessarily today; confirm current status with the patient."
   timeline_future: "{document} is dated {date}, which is {days} day(s) after this intake. Check the date on the document — one of the two is wrong."
   timeline_undated: "{document} carries no legible date. It cannot be placed on the timeline; treat every value read from it as historical until the patient confirms it still holds."

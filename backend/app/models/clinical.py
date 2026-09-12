@@ -153,6 +153,54 @@ class PatientIdentifierLink(Base, TimestampMixin):
     )
 
 
+class ClinicalTimeline(Base, TimestampMixin):
+    """A built history timeline, cached per intake and language.
+
+    **Not a column on `reports`.** `reports.body` is regenerated and overwritten
+    on every GET, so anything living there is derived rather than source — and
+    this is source: with a provider configured it is the output of a model call
+    that cost money and must not be repeated every time a physician reloads the
+    page. Two readers opening the same report must also see the same timeline,
+    which they would not if it were rebuilt per request.
+
+    `input_digest` is what makes the cache safe. It is a hash of the candidates
+    the timeline was built from, so a new document or a newly linked prior visit
+    invalidates it automatically — nothing has to remember to expire a row.
+    """
+
+    __tablename__ = "clinical_timelines"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    hospital_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("hospitals.id"), nullable=False, index=True
+    )
+    intake_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("intakes.id"), nullable=False, index=True
+    )
+    #: The report language this was rendered for. A Hindi and an English report
+    #: are two rows: the labels differ even when the selection does not.
+    language: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: A `TimelineStatus` value — `unfiltered`, `filtered`, `pending`.
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: `None` when pure code built it. The name of the provider otherwise.
+    provider: Mapped[str | None] = mapped_column(String(32))
+    model_id: Mapped[str | None] = mapped_column(String(128))
+    prompt_version: Mapped[str | None] = mapped_column(String(32))
+    #: sha256 over the candidate set. A change to the record changes this and
+    #: the cached row stops matching.
+    input_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    events: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    omitted_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    generated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "intake_id", "language", name="uq_clinical_timelines_intake_language"
+        ),
+        Index("ix_clinical_timelines_hospital_intake", "hospital_id", "intake_id"),
+    )
+
+
 class IntakeRecord(Base, TimestampMixin):
     """One intake received from a kiosk."""
 

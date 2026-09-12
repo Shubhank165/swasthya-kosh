@@ -116,6 +116,65 @@ describe('sections the backend decided and the screen must show', () => {
   });
 });
 
+describe('the history timeline says which of three states it is in', () => {
+  it('a filtered timeline names how many events it left out', () => {
+    // A filtered timeline that does not say it is filtered reads as a complete
+    // history and is not.
+    show({
+      history: {
+        status: 'filtered',
+        omitted_count: 3,
+        events: [
+          {
+            event_date: '2026-06-02',
+            kind: 'visit',
+            label: 'Fever, five days',
+            relevance_reason: 'same complaint',
+          },
+        ],
+      },
+    });
+    const status = screen.getByTestId('history-status');
+    expect(status).toHaveAttribute('data-status', 'filtered');
+    expect(status.textContent).toMatch(/3 earlier event/);
+    expect(screen.getByText('Fever, five days')).toBeInTheDocument();
+    // Why it was kept, named rather than scored — "0.9" tells a physician
+    // nothing they can check.
+    expect(screen.getByText('same complaint')).toBeInTheDocument();
+  });
+
+  it('an unfiltered timeline says nothing was judged for relevance', () => {
+    show({
+      history: {
+        status: 'unfiltered',
+        events: [{ event_date: '2026-06-02', kind: 'visit', label: 'Joint pain' }],
+      },
+    });
+    expect(screen.getByTestId('history-status')).toHaveAttribute(
+      'data-status',
+      'unfiltered',
+    );
+    expect(screen.getByTestId('history-status').textContent).toMatch(
+      /Nothing has been judged/,
+    );
+  });
+
+  it('a pending timeline says so rather than looking empty', () => {
+    // "Not ready" and "nothing on record" look identical and mean opposite
+    // things.
+    show({ history: { status: 'pending', events: [] } });
+    const status = screen.getByTestId('history-status');
+    expect(status).toHaveAttribute('data-status', 'pending');
+    expect(status.textContent).toMatch(/Not built/);
+  });
+
+  it('an older report body with no history field shows no section at all', () => {
+    // Nothing is coming for it, so there is nothing to say.
+    show({});
+    expect(screen.queryByTestId('history-timeline')).toBeNull();
+  });
+});
+
 describe('a line is a label and a value, not a key-value string', () => {
   it('renders the halves the builder stated', () => {
     show({

@@ -238,13 +238,16 @@ def report_service(
     bus: InProcessBus,
     still_clock: FrozenClock,
     ids: SequentialIdFactory,
+    providers: Any,
     content: ClinicalContent,
 ) -> Any:
     from app.domain.report.builder import FieldLabels
     from app.repositories.consent import AuditRepository, ReportRepository
     from app.repositories.documents import DocumentRepository
     from app.repositories.intakes import IntakeRepository
+    from app.repositories.patients import PatientLinkRepository
     from app.services.reports import ReportService
+    from app.services.timeline import TimelineService
 
     return ReportService(
         intakes=IntakeRepository(session),
@@ -258,6 +261,10 @@ def report_service(
         bus=bus,
         clock=still_clock,
         ids=ids,
+        links=PatientLinkRepository(session),
+        timeline=TimelineService(
+            provider=providers.timeline, clock=still_clock
+        ),
     )
 
 

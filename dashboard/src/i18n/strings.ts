@@ -174,6 +174,13 @@ const en = {
   'report.interactions': 'Medicines to look at together',
   'report.interactionsNone': 'No pairs flagged.',
   'report.interactionSource': 'Source: {source}',
+  'report.history': 'Medical history, in time',
+  'report.historyPending': 'Not built for this intake yet — reload in a moment.',
+  'report.historyNone': 'No dated history on record at this hospital.',
+  'report.historyUnfiltered':
+    'Every dated entry on record here, newest first. Nothing has been judged for relevance to today.',
+  'report.historyFiltered':
+    'Selected as related to today’s complaint. {omitted} earlier event(s) were judged unrelated and are not shown; the full record remains available.',
   'report.documentTimeline': 'Uploaded documents, in time',
   'report.documentTimelineNone': 'No documents were uploaded.',
   'report.documentUndated': 'No legible date',
@@ -422,6 +429,13 @@ const hi: Record<StringKey, string> = {
   'report.interactions': 'साथ में देखने योग्य दवाएँ',
   'report.interactionsNone': 'कोई युग्म चिह्नित नहीं।',
   'report.interactionSource': 'स्रोत: {source}',
+  'report.history': 'चिकित्सा इतिहास, समय-क्रम में',
+  'report.historyPending': 'इस इंटेक के लिए अभी तैयार नहीं — थोड़ी देर बाद पुनः लोड करें।',
+  'report.historyNone': 'इस अस्पताल में कोई तिथि-सहित पूर्व अभिलेख नहीं।',
+  'report.historyUnfiltered':
+    'यहाँ के सभी तिथि-सहित अभिलेख, नवीनतम पहले। आज की शिकायत से प्रासंगिकता के आधार पर कोई चयन नहीं।',
+  'report.historyFiltered':
+    'आज की शिकायत से संबंधित मानकर चुने गए। {omitted} पूर्व प्रविष्टि(याँ) असंबंधित मानी गईं और यहाँ नहीं दिखाई गईं; पूरा अभिलेख उपलब्ध है।',
   'report.documentTimeline': 'अपलोड किए गए दस्तावेज़, समय-क्रम में',
   'report.documentTimelineNone': 'कोई दस्तावेज़ अपलोड नहीं हुआ।',
   'report.documentUndated': 'कोई पठनीय तिथि नहीं',

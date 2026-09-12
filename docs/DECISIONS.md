@@ -1298,3 +1298,97 @@ it is `HMAC(pepper, number)`, so a literal would be wrong on every deployment
 with a different pepper and would produce a patient whose history nobody can
 reach, silently. With no pepper set the phone half is skipped, the result says
 so, and `scripts/seed.py` prints it.
+
+## 72. A timeline model selects; it never writes
+
+`adapters/protocols.py` says there is no `ReportWriter` protocol because one
+"would be an invitation to wire a model into a path that must not have one".
+`TimelineProvider` is an addition to that module and the distinction has to be
+written down rather than assumed.
+
+A writer would decide what the document *says*. This decides which of the things
+**already on the record** are worth a physician's attention today. The difference
+is not one of degree, and it is enforced in three places:
+
+- `validate.py` takes each event's label **from the candidate**, not from the
+  model's echo of it. A model that rewrites "Fever, five days" into "Pyrexia of
+  unknown origin" has its rewrite discarded. That single line is what makes
+  "selects, never authors" a property rather than an instruction.
+- An event whose `candidate_id` is not in the list offered is dropped; so is one
+  whose date disagrees with its candidate's. A real event moved to a wrong date
+  is worse than a missing one — a physician reads the order as causation.
+- Output renders through the same templates as every other line and is scanned
+  by the same `find_unsupported_assertions`. Those are the only report lines
+  whose contents a model had any say in, which is exactly what that scan is for.
+
+**The ordering is the safety argument.** `fallback.deterministic_timeline` builds
+a complete dated history with no model at all, and a provider can only ever
+*narrow* it. So the worst case for the whole feature is a physician seeing more
+history than they needed, never one seeing something that did not happen. A
+provider that is down, unparseable, or whose answers are all dropped by the gate
+falls back to the full history — not to an empty one, because "nothing relevant"
+and "the model's answers did not survive" are different states and only one of
+them is a finding.
+
+`domain/timeline/` is its own package rather than living under `domain/report/`,
+so the report builder stays model-free. The builder receives a finished
+`TimelineSnapshot` as a plain value, exactly as document extractions already
+arrive, and does no I/O to get it.
+
+## 73. A filtered timeline that does not say so is a lie about the record
+
+`TimelineStatus` has three values and the report prints a different sentence for
+each, because a reader cannot tell them apart from the list alone:
+
+- `PENDING` — not built yet. `history_pending` says so. **Never a silently empty
+  section**: "not ready" and "nothing on record" look identical on screen and
+  mean opposite things.
+- `UNFILTERED` — every dated entry on record, newest first, nothing judged for
+  relevance. Said out loud, so absence of filtering is not mistaken for a
+  judgement that everything shown matters.
+- `FILTERED` — a selection. `history_filtered_note` names the number left out:
+  *"{omitted} earlier event(s) were judged unrelated and are not shown; the full
+  record remains available."*
+
+That count is computed after validation rather than taken from the model's own
+`omitted_count`. A model that drops an event without saying so would otherwise
+make the report understate the gap.
+
+`HISTORY TIMELINE` is a new section and deliberately **not** an extension of
+`DOCUMENT TIMELINE`, which answers a different question: how stale each uploaded
+scan is. Mixing "this scan is 40 days old" with "3 Aug 2026 — Metformin started"
+makes both harder to read than either alone.
+
+## 74. Prior consultation content is a bigger decision than a prescription photo
+
+Vertex already sees an uploaded document. The timeline provider would
+additionally see coded values from earlier visits and the names of medicines the
+patient was on — a longitudinal picture rather than a single page. That is a
+materially larger category of egress and belongs in the same DPIA conversation
+as the Jetson handwriting path.
+
+So there are two switches, and neither is a performance knob:
+
+- `TIMELINE_PROVIDER` defaults to `none`. With no provider the report still
+  carries a full dated history built by pure code, so the problem statement's
+  requirement is met with no model involved. **Off is not a degraded mode.**
+- `TIMELINE_SHARE_PRIOR_RECORDS` defaults to `false`, and it guards the
+  *candidates* rather than the provider. With it false the provider still runs,
+  seeing only this intake's own documents and today's answers — strictly less
+  than the OCR path already sends. That is a shippable middle setting rather
+  than all-or-nothing. Offered prior-intake candidates while it is false, the
+  Vertex provider **raises**: a deployment that thinks it is filtering over five
+  visits and is quietly filtering over one has been misled about what the
+  physician is reading.
+
+Everything in a request is coded values and opaque `c1..cN` ids — no name, no
+phone, no ABHA address, no MRN, and not the patient's own words, which are
+theirs and are already on the report verbatim. `tests/safety/test_timeline_egress.py`
+asserts the serialised request contains none of the PHI markers
+`test_logging_phi.py` enumerates: **the test is the control, the flag is the
+policy**, and a flag nobody tests is a comment.
+
+The Vertex provider refuses to construct outside an Indian region or without ZDR
+asserted. Those guards are copied from `adapters/ocr/gemini.py` rather than
+shared, because a guard that lives in one place and is imported is a guard
+somebody can forget to import.

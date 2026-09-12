@@ -150,6 +150,37 @@ export interface TimelineEntry {
   fact_ids?: readonly string[];
 }
 
+/**
+ * The medical history timeline — `app/domain/timeline/model.py`.
+ *
+ * `status` is not decoration. A reader cannot tell "not built yet" from
+ * "nothing on record" from "a selection" by looking at the list, and the three
+ * mean very different things.
+ */
+export type TimelineStatus = 'unfiltered' | 'filtered' | 'pending';
+
+export interface ClinicalEvent {
+  event_date: string;
+  kind: 'visit' | 'document' | 'medication' | 'investigation' | string;
+  label: string;
+  source?: 'deterministic' | 'model_selected' | string;
+  intake_id?: string | null;
+  document_id?: string | null;
+  candidate_id?: string | null;
+  relevance?: number;
+  relevance_reason?: string | null;
+}
+
+export interface TimelineSnapshot {
+  status: TimelineStatus;
+  events?: readonly ClinicalEvent[];
+  /** How many earlier events were judged unrelated and left out. */
+  omitted_count?: number;
+  provider?: string | null;
+  model_id?: string | null;
+  generated_at?: string | null;
+}
+
 export interface PhysicianReport {
   intake_id: string;
   hospital_id: string;
@@ -161,6 +192,9 @@ export interface PhysicianReport {
   alerts?: readonly RedFlagLine[];
   interactions?: readonly InteractionLine[];
   document_timeline?: readonly TimelineEntry[];
+  /** `null` means not built yet — which the screen says, rather than showing
+   *  an empty section. */
+  history?: TimelineSnapshot | null;
   document_notes?: readonly ReportLine[];
   /** Display label for every field id the report mentions. */
   field_labels?: Readonly<Record<string, string>>;

@@ -151,6 +151,13 @@ class TestItIsActuallyDeterministic:
         second_payload = {
             **shuffled,
             "intake_id": "8d1d8b0e-3d6f-4a52-9b1a-2f0a0c0d0e02",
+            # A different patient, and that is load-bearing now that the report
+            # carries a history timeline. Filed under the same reference, the
+            # second intake would correctly see the first as a prior visit and
+            # the two reports would differ for a real reason — which would make
+            # this test fail while saying nothing about field ordering, the one
+            # thing it exists to check.
+            "patient_ref": {"type": "hospital_id", "value": "UHID-ORDER-TEST"},
         }
         second = await ingest_service.ingest(
             second_payload, hospital_id=HOSPITAL_ID, actor_id="kiosk-1"

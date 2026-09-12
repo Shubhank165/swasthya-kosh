@@ -27,16 +27,26 @@ from app.domain.documents.extraction import (
 )
 from app.domain.documents.ingredients import IngredientIndex
 from app.domain.documents.interactions import InteractionFinding, InteractionTable
-from app.domain.record import CanonicalRecord, Fact, FactValue, PhysicianAction
+from app.domain.record import (
+    CanonicalRecord,
+    Fact,
+    FactValue,
+    PatientRefType,
+    PhysicianAction,
+)
 from app.domain.report import builder
 from app.domain.report.builder import FieldLabels
 from app.domain.report.model import PhysicianReport, ReportBundle
 from app.domain.report.templates import TemplateRegistry
+from app.domain.timeline.fallback import deterministic_timeline
+from app.domain.timeline.model import TimelineSnapshot
 from app.events.bus import EventBus
 from app.events.schemas import Event, EventName
 from app.repositories.consent import AuditRepository, ReportRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.intakes import IntakeRepository
+from app.repositories.patients import PatientLinkRepository
+from app.services.timeline import TimelineService
 
 logger = get_logger(__name__)
 
@@ -58,6 +68,9 @@ class ReportService:
         bus: EventBus,
         clock: Clock,
         ids: IdFactory,
+        links: PatientLinkRepository | None = None,
+        timeline: TimelineService | None = None,
+        max_prior_intakes: int = 5,
         facility_timezone: str = "Asia/Kolkata",
         demo: bool = False,
     ) -> None:
@@ -72,6 +85,9 @@ class ReportService:
         self._bus = bus
         self._clock = clock
         self._ids = ids
+        self._links = links
+        self._timeline = timeline
+        self._max_prior_intakes = max_prior_intakes
         self._timezone = facility_timezone
         self._demo = demo
 
@@ -95,6 +111,60 @@ class ReportService:
     def _labels_map(self) -> dict[str, str]:
         return self._labels.as_mapping()
 
+    async def _timeline_for(
+        self,
+        record: CanonicalRecord,
+        extractions: Sequence[DocumentExtraction],
+        language: str,
+    ) -> TimelineSnapshot:
+        """The dated history for this intake.
+
+        With no provider configured — the default — this is the **deterministic**
+        timeline: pure code over the patient's prior records at this hospital,
+        plus whatever their uploaded documents were dated. No model, no
+        configuration, and it already meets the problem statement's
+        dated-history requirement. A provider only ever narrows it.
+
+        Prior visits are found through the patient's whole alias set, so the
+        history a timeline is built from is the same history `/patients/history`
+        returns: an ABHA address and a phone number do not produce two different
+        timelines for one person.
+
+        A patient with no reference — a guest — has no prior records to walk,
+        and gets an empty timeline rather than a pending one. Nothing is coming
+        later for them, and `history_pending` would be a promise.
+        """
+        prior = await self._prior_records(record)
+        if self._timeline is None:
+            return deterministic_timeline(prior, extractions)
+        return await self._timeline.build(
+            record, prior=prior, extractions=extractions, language=language
+        )
+
+    async def _prior_records(self, record: CanonicalRecord) -> list[CanonicalRecord]:
+        ref = record.patient_ref
+        if self._links is None or ref.value is None or ref.type is PatientRefType.GUEST:
+            return []
+        refs = await self._links.aliases_for(
+            hospital_id=record.hospital_id,
+            ref_type=ref.type.value,
+            ref_value=ref.value,
+        )
+        rows = await self._intakes.history_for(
+            hospital_id=record.hospital_id, refs=refs, limit=self._max_prior_intakes
+        )
+        prior: list[CanonicalRecord] = []
+        for row in rows:
+            # This intake is not its own history.
+            if row.id == str(record.intake_id):
+                continue
+            prior.append(
+                await self._intakes.load(
+                    hospital_id=record.hospital_id, intake_id=row.id
+                )
+            )
+        return prior
+
     async def build(
         self, *, hospital_id: str, intake_id: str, language: str | None = None
     ) -> ReportBundle:
@@ -106,12 +176,14 @@ class ReportService:
             hospital_id=hospital_id, intake_id=intake_id
         )
         interactions = self._interactions_for(record, extractions)
+        timeline = await self._timeline_for(record, extractions, templates.language)
 
         report = builder.build(
             record,
             templates=templates,
             extractions=extractions,
             interactions=interactions,
+            timeline=timeline,
             labels=self._labels,
             demo=self._demo,
         )

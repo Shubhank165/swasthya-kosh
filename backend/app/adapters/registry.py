@@ -20,6 +20,7 @@ from app.adapters.protocols import (
     OCRProvider,
     OTPSender,
     RepairProvider,
+    TimelineProvider,
 )
 from app.adapters.storage.stores import GCSObjectStore, LocalObjectStore, build_store
 from app.core.config import Settings
@@ -37,6 +38,10 @@ class Providers:
     abha: ABHAProvider
     storage: ObjectStore
     otp: OTPSender
+    #: `None` when `TIMELINE_PROVIDER=none`, which is the default. The report
+    #: still carries a full dated history — pure code builds it — so "disabled"
+    #: here means no relevance filtering, not no timeline.
+    timeline: TimelineProvider | None = None
 
     def describe(self) -> dict[str, str]:
         """What is live. Safe to serve from `/readyz`."""
@@ -46,6 +51,7 @@ class Providers:
             "abha": self.abha.name,
             "storage": self.storage.name,
             "otp": self.otp.name,
+            "timeline": self.timeline.name if self.timeline is not None else "disabled",
         }
 
 
@@ -78,6 +84,27 @@ def build_repair(settings: Settings) -> RepairProvider | None:
     return MockRepairProvider()
 
 
+def build_timeline(settings: Settings) -> TimelineProvider | None:
+    """The timeline provider, or `None` — and `None` is the default.
+
+    Unlike every other provider here, "off" is not a degraded mode. With no
+    provider the report carries the deterministic timeline: every dated entry on
+    record, newest first, labelled as unfiltered. A provider only ever narrows
+    that to what relates to today's complaint. So the decision to turn one on is
+    a decision about sending records to a model, not about whether the feature
+    works.
+    """
+    if settings.timeline_provider == "vertex":
+        from app.adapters.timeline.vertex import VertexTimelineProvider
+
+        return VertexTimelineProvider(settings)
+    if settings.timeline_provider == "mock":
+        from app.adapters.timeline.mock import MockTimelineProvider
+
+        return MockTimelineProvider(settings.timeline_fixtures_dir)
+    return None
+
+
 def build_abha(settings: Settings) -> MockABHAProvider | SandboxABHAProvider:
     return build_provider(settings)
 
@@ -98,6 +125,7 @@ def build_providers(settings: Settings) -> Providers:
         abha=build_abha(settings),
         storage=build_storage(settings),
         otp=build_otp(settings),
+        timeline=build_timeline(settings),
     )
     logger.info("providers_selected", **providers.describe())
     return providers

@@ -45,12 +45,14 @@ from app.repositories.patients import (
     PatientRepository,
 )
 from app.repositories.terminology import TerminologyRepository
+from app.repositories.timelines import TimelineRepository
 from app.services.documents import DocumentService
 from app.services.identity import IdentityService
 from app.services.ingest import IngestService
 from app.services.patient_auth import PatientAuthService
 from app.services.reports import ReportService
 from app.services.terminology import TerminologyService
+from app.services.timeline import TimelineService
 from app.services.worklist import WorklistService
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -211,6 +213,7 @@ async def get_report_service(
     settings: SettingsDep,
     content: ContentDep,
     labels: LabelsDep,
+    providers: ProvidersDep,
     bus: BusDep,
     clock: ClockDep,
     ids: IdsDep,
@@ -228,6 +231,17 @@ async def get_report_service(
         bus=bus,
         clock=clock,
         ids=ids,
+        links=PatientLinkRepository(session),
+        timeline=TimelineService(
+            provider=providers.timeline,
+            clock=clock,
+            repository=TimelineRepository(session),
+            ids=ids,
+            model_id=settings.timeline_model_id,
+            max_events=settings.timeline_max_events,
+            min_relevance=settings.timeline_min_relevance,
+        ),
+        max_prior_intakes=settings.timeline_max_prior_intakes,
         facility_timezone=settings.facility_timezone,
         demo=settings.demo_mode,
     )

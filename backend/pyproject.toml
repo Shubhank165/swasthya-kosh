@@ -78,6 +78,7 @@ ignore = [
 "app/repositories/documents.py" = ["N818"]
 "app/adapters/ocr/gemini.py" = ["N818"]
 "app/adapters/abha/providers.py" = ["N818"]
+"app/adapters/timeline/vertex.py" = ["N818"]
 
 [tool.mypy]
 python_version = "3.12"

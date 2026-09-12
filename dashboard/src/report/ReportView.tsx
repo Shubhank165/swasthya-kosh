@@ -25,6 +25,7 @@ import type {
   ReportLine,
   ReportSection,
   TimelineEntry,
+  TimelineSnapshot,
 } from '../api/types';
 import { isoDate } from '../lib/format';
 import { statesFor, type FactLike, type FactState } from './factState';
@@ -79,6 +80,7 @@ export function ReportView({
 
       {/* Computed by the backend and, until now, discarded by this screen. */}
       <InteractionsBlock interactions={report.interactions ?? []} t={t} />
+      <HistoryBlock history={report.history ?? null} t={t} />
       <TimelineBlock entries={report.document_timeline ?? []} t={t} />
       <DocumentNotesBlock
         lines={report.document_notes ?? []}
@@ -338,6 +340,71 @@ function InteractionsBlock({
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+function HistoryBlock({
+  history,
+  t,
+}: {
+  history: TimelineSnapshot | null;
+  t: Translate;
+}) {
+  // A missing `history` field is an older report body, built before this
+  // section existed. Nothing is coming for it, so there is nothing to say.
+  if (history === null) return null;
+
+  const events = history.events ?? [];
+  // Three states, three different sentences. A reader cannot tell them apart
+  // from the list alone, and "not built yet" is not "nothing on record".
+  const note =
+    history.status === 'pending'
+      ? t('report.historyPending')
+      : events.length === 0
+        ? t('report.historyNone')
+        : history.status === 'filtered'
+          ? t('report.historyFiltered', { omitted: history.omitted_count ?? 0 })
+          : t('report.historyUnfiltered');
+
+  return (
+    <section aria-labelledby="section-history" data-testid="history-timeline">
+      <SectionHeading id="section-history">{t('report.history')}</SectionHeading>
+      {events.length > 0 && (
+        <ol className="space-y-1">
+          {events.map((event) => (
+            <li
+              key={`${event.event_date}-${event.candidate_id ?? event.label}`}
+              data-event-kind={event.kind}
+              className="flex items-baseline gap-3 px-2 py-1"
+            >
+              <span className="w-28 shrink-0 text-sm tabular-nums text-ink-muted">
+                {isoDate(event.event_date)}
+              </span>
+              <span className="text-ink">{event.label}</span>
+              {/* Why it was kept, when a model made that call. Named rather
+                  than scored: "0.9" tells a physician nothing they can check. */}
+              {event.relevance_reason && (
+                <span className="text-xs text-ink-faint">
+                  {event.relevance_reason}
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+      {/* Always printed, never conditional on the list being short. A filtered
+          timeline that does not say it is filtered reads as a complete
+          history and is not. */}
+      <p
+        data-testid="history-status"
+        data-status={history.status}
+        className={`mt-1.5 px-2 text-xs ${
+          history.status === 'pending' ? 'text-uncertain' : 'text-ink-faint'
+        }`}
+      >
+        {note}
+      </p>
     </section>
   );
 }

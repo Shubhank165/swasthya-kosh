@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.clinical.enums import Section
 from app.domain.record import Contradiction, RedFlagEvent, SourceRef
+from app.domain.timeline.model import TimelineSnapshot
 
 
 class LineMarker(BaseModel):
@@ -146,6 +147,11 @@ class PhysicianReport(BaseModel):
     #: section.
     document_timeline: tuple[TimelineEntry, ...] = ()
     document_notes: tuple[ReportLine, ...] = ()
+    #: The medical history timeline — the problem statement's dated-history
+    #: requirement. `None` means it has not been built for this intake yet, and
+    #: the renderer says so rather than printing an empty section: "not ready"
+    #: and "nothing on record" look identical and mean opposite things.
+    history: TimelineSnapshot | None = None
     #: Display label for every field id this report mentions.
     #:
     #: Conflicts and timeline entries carry field ids and no labels, and a
