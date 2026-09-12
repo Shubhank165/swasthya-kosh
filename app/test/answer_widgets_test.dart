@@ -14,6 +14,40 @@ import 'package:medikiosk_app/content/bundle.dart';
 import 'package:medikiosk_app/core/theme.dart';
 import 'package:medikiosk_app/intake/widgets/answer_actions.dart';
 import 'package:medikiosk_app/intake/widgets/answer_widgets.dart';
+import 'package:medikiosk_app/voice/transcribe.dart';
+
+/// A transcriber that says the device is ready and hands back one fixed
+/// utterance. It never opens a microphone, so it runs in CI; what it exercises
+/// is the wiring from a transcript to a recorded value, which is the half that
+/// was missing on the numeric widgets.
+class FakeTranscriber extends Transcriber {
+  FakeTranscriber(this.transcript);
+
+  final String transcript;
+
+  @override
+  Future<bool> ensureModel(String language) async => true;
+
+  @override
+  Future<bool> isReady(String language) async => true;
+
+  @override
+  Future<bool> start(String language) async => true;
+
+  @override
+  Future<String> stop() async => transcript;
+
+  @override
+  Future<void> dispose() async {}
+}
+
+/// Tap the mic twice — start, then stop — and let the result land.
+Future<void> speak(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('question.listen')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('question.listen')));
+  await tester.pumpAndSettle();
+}
 
 Question q(
   String type, {
@@ -477,6 +511,99 @@ void main() {
     expect(find.text('Metformin'), findsOneWidget);
   });
 
+    group('the numeric widgets have a mic', () {
+    AnswerValue? captured;
+    String? capturedText;
+
+    setUp(() {
+      captured = null;
+      capturedText = null;
+    });
+
+    Future<void> pumpWithVoice(
+      WidgetTester tester,
+      Question question,
+      String transcript,
+    ) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          transcriberProvider.overrideWithValue(FakeTranscriber(transcript)),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildTheme(),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: buildAnswerWidget(
+                question: question,
+                language: 'en',
+                onAnswered: (value, text) {
+                  captured = value;
+                  capturedText = text;
+                },
+              )!,
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('temperature offers one, and a spoken reading fills the box',
+        (tester) async {
+      // The question either side of this one has a mic; this screen looked
+      // stripped because `number` was one of four widgets that could not host
+      // one at all.
+      await pumpWithVoice(
+        tester,
+        q('number', unit: 'fahrenheit', units: ['celsius', 'fahrenheit'],
+            min: 30, max: 110),
+        'a hundred and one fahrenheit',
+      );
+      expect(find.byKey(const Key('question.listen')), findsOneWidget);
+      await speak(tester);
+
+      // Filled, not submitted: the patient reads it back and presses Continue.
+      final field = tester.widget<TextField>(find.byKey(const Key('answer.number')));
+      expect(field.controller!.text, '101');
+      expect(find.text('fahrenheit'), findsWidgets);
+    });
+
+    testWidgets('a spoken score answers a scale outright', (tester) async {
+      await pumpWithVoice(tester, q('scale', min: 0, max: 10), 'about six');
+      expect(find.byKey(const Key('question.listen')), findsOneWidget);
+      expect(captured, isNull, reason: 'nothing recorded before the mic ran');
+      await speak(tester);
+      // A bounded whole-number scale is the one numeric question where a
+      // spoken value either lands on a button that is on screen or is not a
+      // match — so it answers, rather than filling a box to confirm.
+      expect((captured! as ScaleValue).value, 6);
+      expect(capturedText, '6');
+    });
+
+    testWidgets('a spoken duration sets both the figure and the unit',
+        (tester) async {
+      await pumpWithVoice(tester, q('duration'), 'three days');
+      expect(find.byKey(const Key('question.listen')), findsOneWidget);
+      await speak(tester);
+      final field =
+          tester.widget<TextField>(find.byKey(const Key('answer.duration_n')));
+      expect(field.controller!.text, '3');
+      await tester.tap(find.byKey(const Key('answer.confirm')));
+      await tester.pump();
+      final recorded = captured! as DurationValue;
+      expect(recorded.n, 3);
+      expect(recorded.unit, 'day');
+    });
+
+    testWidgets('date takes the language but still offers only the picker',
+        (tester) async {
+      await pumpWithVoice(tester, q('date'), '2 January 2024');
+      expect(find.byKey(const Key('answer.date_picker')), findsOneWidget);
+      expect(find.byKey(const Key('question.listen')), findsNothing);
+    });
+  });
 }
 
 /// Type [entry] into the number box and confirm, returning what was recorded.

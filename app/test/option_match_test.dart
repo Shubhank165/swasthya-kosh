@@ -122,4 +122,152 @@ void main() {
           SpokenIntent.dontKnow);
     });
   });
+
+  group('matchNumber', () {
+    test('digits, number words and a mix all reach the same reading', () {
+      for (final said in ['101', 'one oh one', 'a hundred and one']) {
+        final m = matchNumber(
+            transcript: said, language: 'en', minimum: 30, maximum: 110);
+        expect(m.number, 101, reason: said);
+      }
+    });
+
+    test('a decimal survives the transcript', () {
+      expect(
+          matchNumber(transcript: '38.5', language: 'en', minimum: 30, maximum: 45)
+              .number,
+          38.5);
+      expect(
+          matchNumber(
+                  transcript: 'thirty eight point five',
+                  language: 'en',
+                  minimum: 30,
+                  maximum: 45)
+              .number,
+          38.5);
+    });
+
+    test('tens and units are added, not concatenated', () {
+      expect(matchNumber(transcript: 'twenty five', language: 'en').number, 25);
+      expect(matchNumber(transcript: 'ninety nine', language: 'en').number, 99);
+    });
+
+    test('a reading outside the content bounds is not a match', () {
+      // An impossible vital sign is worse than asking again.
+      final m = matchNumber(
+          transcript: 'one', language: 'en', minimum: 30, maximum: 110);
+      expect(m.intent, SpokenIntent.none);
+    });
+
+    test('a stray number before the real one is skipped, not taken', () {
+      final m = matchNumber(
+          transcript: 'for 2 days it was one oh one',
+          language: 'en',
+          minimum: 30,
+          maximum: 110);
+      expect(m.number, 101);
+    });
+
+    test('a spoken unit selects it, and silence about units leaves it alone', () {
+      final withUnit = matchNumber(
+        transcript: 'a hundred and one fahrenheit',
+        language: 'en',
+        minimum: 30,
+        maximum: 110,
+        units: const ['celsius', 'fahrenheit'],
+      );
+      expect(withUnit.unit, 'fahrenheit');
+      final bare = matchNumber(
+        transcript: 'a hundred and one',
+        language: 'en',
+        minimum: 30,
+        maximum: 110,
+        units: const ['celsius', 'fahrenheit'],
+      );
+      expect(bare.number, 101);
+      expect(bare.unit, isNull);
+    });
+
+    test('"centigrade" is celsius', () {
+      expect(
+          matchNumber(
+            transcript: 'thirty eight point five centigrade',
+            language: 'en',
+            units: const ['celsius', 'fahrenheit'],
+          ).unit,
+          'celsius');
+    });
+
+    test('"don\'t know" is honoured', () {
+      expect(matchNumber(transcript: 'no idea', language: 'en').intent,
+          SpokenIntent.dontKnow);
+    });
+  });
+
+  group('matchDuration', () {
+    test('a number and a unit together', () {
+      final m = matchDuration(transcript: 'three days', language: 'en');
+      expect(m.number, 3);
+      expect(m.unit, 'day');
+      expect(matchDuration(transcript: '2 weeks', language: 'en').unit, 'week');
+    });
+
+    test('an article counts as one', () {
+      final m = matchDuration(transcript: 'since a week', language: 'en');
+      expect(m.number, 1);
+      expect(m.unit, 'week');
+    });
+
+    test('a number with no unit is not a duration', () {
+      // Three of what? Filling the figure and leaving whichever unit was
+      // selected standing beside it would record a guess.
+      expect(matchDuration(transcript: 'three', language: 'en').intent,
+          SpokenIntent.none);
+    });
+
+    test('a unit with no number is not a duration either', () {
+      expect(matchDuration(transcript: 'days', language: 'en').intent,
+          SpokenIntent.none);
+    });
+  });
+
+  group('a label spoken inside a sentence', () {
+    test('a verbose answer still lands on its option', () {
+      final m = matchOption(
+        transcript: "it's a burning kind of pain, doctor",
+        optionCodes: const ['burning', 'stabbing', 'dull'],
+        labelFor: labels({
+          'burning': 'Burning pain',
+          'stabbing': 'Stabbing pain',
+          'dull': 'Dull ache',
+        }),
+        language: 'en',
+      );
+      expect(m.optionCode, 'burning');
+    });
+
+    test('and an unrelated sentence still matches nothing', () {
+      final m = matchOption(
+        transcript: 'can you repeat the question please doctor',
+        optionCodes: const ['burning', 'stabbing', 'dull'],
+        labelFor: labels({
+          'burning': 'Burning pain',
+          'stabbing': 'Stabbing pain',
+          'dull': 'Dull ache',
+        }),
+        language: 'en',
+      );
+      expect(m.intent, SpokenIntent.none);
+    });
+
+    test('a long sentence does not drift onto the wrong option', () {
+      final m = matchOption(
+        transcript: 'well it comes and goes through the day mostly in the evening',
+        optionCodes: const ['burning', 'stabbing'],
+        labelFor: labels({'burning': 'Burning pain', 'stabbing': 'Stabbing pain'}),
+        language: 'en',
+      );
+      expect(m.intent, SpokenIntent.none);
+    });
+  });
 }

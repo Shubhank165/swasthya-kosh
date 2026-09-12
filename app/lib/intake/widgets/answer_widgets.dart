@@ -75,14 +75,30 @@ Widget? buildAnswerWidget({
           language: language,
           onAnswered: onAnswered,
           onDontKnow: onDontKnow),
-      AnswerType.number =>
-        NumberAnswer(key: resolved, question: question, onAnswered: onAnswered),
-      AnswerType.scale =>
-        ScaleAnswer(key: resolved, question: question, onAnswered: onAnswered),
-      AnswerType.duration =>
-        DurationAnswer(key: resolved, question: question, onAnswered: onAnswered),
-      AnswerType.date =>
-        DateAnswer(key: resolved, question: question, onAnswered: onAnswered),
+      AnswerType.number => NumberAnswer(
+          key: resolved,
+          question: question,
+          language: language,
+          onAnswered: onAnswered,
+          onDontKnow: onDontKnow),
+      AnswerType.scale => ScaleAnswer(
+          key: resolved,
+          question: question,
+          language: language,
+          onAnswered: onAnswered,
+          onDontKnow: onDontKnow),
+      AnswerType.duration => DurationAnswer(
+          key: resolved,
+          question: question,
+          language: language,
+          onAnswered: onAnswered,
+          onDontKnow: onDontKnow),
+      AnswerType.date => DateAnswer(
+          key: resolved,
+          question: question,
+          language: language,
+          onAnswered: onAnswered,
+          onDontKnow: onDontKnow),
       AnswerType.freeText => FreeTextAnswer(
           key: resolved,
           question: question,
@@ -205,7 +221,8 @@ class SingleChoiceAnswer extends StatelessWidget {
             labelFor: (c) => question.labelForOption(c, language),
             language: language,
           ),
-          onOption: (code, heard) => onAnswered(CodedValue(code), heard),
+          onMatch: (m) =>
+              onAnswered(CodedValue(m.optionCode ?? ''), m.heardLabel ?? ''),
           onDontKnow: onDontKnow,
         ),
         for (final option in options)
@@ -229,13 +246,16 @@ class _VoiceRow extends StatelessWidget {
   const _VoiceRow({
     required this.language,
     required this.matcher,
-    required this.onOption,
+    required this.onMatch,
     this.onDontKnow,
   });
 
   final String language;
   final SpokenMatch Function(String transcript) matcher;
-  final void Function(String code, String heardLabel) onOption;
+
+  /// Called with the whole match rather than a code and a label: a numeric
+  /// question needs the number and the unit, which no pair of strings carries.
+  final void Function(SpokenMatch match) onMatch;
   final VoidCallback? onDontKnow;
 
   @override
@@ -245,9 +265,7 @@ class _VoiceRow extends StatelessWidget {
         onResult: (match) {
           switch (match.intent) {
             case SpokenIntent.option:
-              // `optionCode` is null for dictation (there is no option, just
-              // the words); a choice question always sets it.
-              onOption(match.optionCode ?? '', match.heardLabel ?? '');
+              onMatch(match);
             case SpokenIntent.dontKnow:
               onDontKnow?.call();
             case SpokenIntent.none:
@@ -295,7 +313,8 @@ class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
           ),
           // Voice toggles one option at a time, exactly like a tap. The patient
           // still presses Continue when they have named everything.
-          onOption: (code, _) => setState(() {
+          onMatch: (m) => setState(() {
+            final code = m.optionCode ?? '';
             if (!_chosen.remove(code)) _chosen.add(code);
           }),
           onDontKnow: widget.onDontKnow,
@@ -362,9 +381,9 @@ class YesNoAnswer extends StatelessWidget {
         _VoiceRow(
           language: language,
           matcher: (t) => matchYesNo(transcript: t, language: language),
-          onOption: (code, _) => onAnswered(
-            BoolValue(code == 'yes'),
-            code == 'yes' ? strings.optYes : strings.optNo,
+          onMatch: (m) => onAnswered(
+            BoolValue(m.optionCode == 'yes'),
+            m.optionCode == 'yes' ? strings.optYes : strings.optNo,
           ),
           onDontKnow: onDontKnow,
         ),
@@ -384,10 +403,18 @@ class YesNoAnswer extends StatelessWidget {
 }
 
 class NumberAnswer extends StatefulWidget {
-  const NumberAnswer({super.key, required this.question, required this.onAnswered});
+  const NumberAnswer({
+    super.key,
+    required this.question,
+    required this.onAnswered,
+    this.language = 'en',
+    this.onDontKnow,
+  });
 
   final Question question;
   final OnAnswered onAnswered;
+  final String language;
+  final VoidCallback? onDontKnow;
 
   @override
   State<NumberAnswer> createState() => _NumberAnswerState();
@@ -422,6 +449,27 @@ class _NumberAnswerState extends State<NumberAnswer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Voice fills the box; it does not answer the question. The patient
+        // reads the figure back and presses Continue, which is what makes a
+        // misheard vital sign recoverable — the same bargain free text makes.
+        _VoiceRow(
+          language: widget.language,
+          matcher: (t) => matchNumber(
+            transcript: t,
+            language: widget.language,
+            minimum: widget.question.minimum,
+            maximum: widget.question.maximum,
+            units: widget.question.units ?? const [],
+          ),
+          onMatch: (m) => setState(() {
+            final n = m.number!;
+            _controller.text = n == n.roundToDouble()
+                ? n.round().toString()
+                : n.toString();
+            if (m.unit != null) _unit = m.unit;
+          }),
+          onDontKnow: widget.onDontKnow,
+        ),
         TextField(
           key: const Key('answer.number'),
           controller: _controller,
@@ -470,10 +518,18 @@ class _NumberAnswerState extends State<NumberAnswer> {
 }
 
 class ScaleAnswer extends StatefulWidget {
-  const ScaleAnswer({super.key, required this.question, required this.onAnswered});
+  const ScaleAnswer({
+    super.key,
+    required this.question,
+    required this.onAnswered,
+    this.language = 'en',
+    this.onDontKnow,
+  });
 
   final Question question;
   final OnAnswered onAnswered;
+  final String language;
+  final VoidCallback? onDontKnow;
 
   @override
   State<ScaleAnswer> createState() => _ScaleAnswerState();
@@ -487,37 +543,69 @@ class _ScaleAnswerState extends State<ScaleAnswer> {
     // Numbered buttons rather than a slider. A slider requires a drag, reports
     // a value the patient did not deliberately choose if they nudge it, and is
     // near-unusable with a screen reader or a tremor.
-    return Wrap(
-      spacing: Sizes.gap,
-      runSpacing: Sizes.gap,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var value = min; value <= max; value++)
-          SizedBox(
-            width: 56,
-            height: 56,
-            child: OutlinedButton(
-              key: Key('scale.$value'),
-              onPressed: () => widget.onAnswered(
-                ScaleValue(value.toDouble()),
-                '$value',
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(Sizes.minTouchTarget, Sizes.minTouchTarget),
-              ),
-              child: Text('$value'),
-            ),
+        // A spoken score answers outright, unlike the free-figure questions:
+        // the scale is bounded and whole, so "six" either lands on a button
+        // that is on screen or is not a match at all.
+        _VoiceRow(
+          language: widget.language,
+          matcher: (t) => matchNumber(
+            transcript: t,
+            language: widget.language,
+            minimum: min.toDouble(),
+            maximum: max.toDouble(),
           ),
+          onMatch: (m) {
+            final value = m.number!.roundToDouble();
+            widget.onAnswered(ScaleValue(value), '${value.round()}');
+          },
+          onDontKnow: widget.onDontKnow,
+        ),
+        const SizedBox(height: Sizes.gap),
+        Wrap(
+          spacing: Sizes.gap,
+          runSpacing: Sizes.gap,
+          children: [
+            for (var value = min; value <= max; value++)
+              SizedBox(
+                width: 56,
+                height: 56,
+                child: OutlinedButton(
+                  key: Key('scale.$value'),
+                  onPressed: () => widget.onAnswered(
+                    ScaleValue(value.toDouble()),
+                    '$value',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize:
+                        const Size(Sizes.minTouchTarget, Sizes.minTouchTarget),
+                  ),
+                  child: Text('$value'),
+                ),
+              ),
+          ],
+        ),
       ],
     );
   }
 }
 
 class DurationAnswer extends StatefulWidget {
-  const DurationAnswer({super.key, required this.question, required this.onAnswered});
+  const DurationAnswer({
+    super.key,
+    required this.question,
+    required this.onAnswered,
+    this.language = 'en',
+    this.onDontKnow,
+  });
 
   final Question question;
   final OnAnswered onAnswered;
+  final String language;
+  final VoidCallback? onDontKnow;
 
   @override
   State<DurationAnswer> createState() => _DurationAnswerState();
@@ -544,6 +632,23 @@ class _DurationAnswerState extends State<DurationAnswer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // "three days" sets both halves. A number with no unit is not a
+        // duration, so `matchDuration` returns nothing rather than filling the
+        // figure and leaving whichever unit happened to be selected standing
+        // beside it.
+        _VoiceRow(
+          language: widget.language,
+          matcher: (t) => matchDuration(
+            transcript: t,
+            language: widget.language,
+            units: _units,
+          ),
+          onMatch: (m) => setState(() {
+            _controller.text = m.number!.round().toString();
+            _unit = m.unit!;
+          }),
+          onDontKnow: widget.onDontKnow,
+        ),
         TextField(
           key: const Key('answer.duration_n'),
           controller: _controller,
@@ -576,10 +681,24 @@ class _DurationAnswerState extends State<DurationAnswer> {
 }
 
 class DateAnswer extends StatefulWidget {
-  const DateAnswer({super.key, required this.question, required this.onAnswered});
+  const DateAnswer({
+    super.key,
+    required this.question,
+    required this.onAnswered,
+    this.language = 'en',
+    this.onDontKnow,
+  });
 
   final Question question;
   final OnAnswered onAnswered;
+
+  /// Taken like every other widget's, and not yet used to offer a mic: a spoken
+  /// date has to resolve "last Tuesday", "around Diwali" and "2nd of Jan" to a
+  /// calendar day, and the ones this interview asks for — when a surgery was,
+  /// when a period started — are the ones a wrong answer misleads on most.
+  /// The picker stays the only way in until that parser is worth trusting.
+  final String language;
+  final VoidCallback? onDontKnow;
 
   @override
   State<DateAnswer> createState() => _DateAnswerState();
@@ -680,7 +799,7 @@ class _FreeTextAnswerState extends State<FreeTextAnswer> {
         _VoiceRow(
           language: widget.language,
           matcher: (t) => matchDictation(transcript: t, language: widget.language),
-          onOption: (_, heard) => _dictated(heard),
+          onMatch: (m) => _dictated(m.heardLabel ?? ''),
           onDontKnow: widget.onDontKnow,
         ),
         TextField(
