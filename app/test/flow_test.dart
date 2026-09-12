@@ -93,6 +93,7 @@ void main() {
     ContentBundle? bundle,
     String language = 'en',
     List<ConfirmedFact> confirmed = const [],
+    String reporter = 'self',
   }) =>
       IntakeFlow.begin(
         database: db,
@@ -103,7 +104,7 @@ void main() {
         language: language,
         hospitalId: 'aiia-delhi',
         hospitalName: 'All India Institute of Ayurveda',
-        reporter: 'self',
+        reporter: reporter,
         appVersion: '1.0.0',
       );
 
@@ -112,6 +113,56 @@ void main() {
     final envelope = jsonDecode(draft!.queuedPayload!) as Map<String, dynamic>;
     return envelope['record'] as Map<String, dynamic>;
   }
+
+  group('who the intake is for is asked once', () {
+    // The app asks this on screen 4, before the interview starts. The bundle
+    // asks it again as `history.reporter`, with no precondition, seventy-odd
+    // questions in — so every patient answered it twice. The screen's answer is
+    // now seeded, which is the same mechanism carry-forward already uses.
+
+    ContentBundle bundleAskingReporter() => bundleWith(
+          questions: [
+            question('history.reporter',
+                field: 'general.reporter',
+                type: 'single_choice',
+                options: ['self', 'parent_guardian', 'family_attendant']),
+            question('other'),
+          ],
+          core: ['history.reporter', 'other'],
+        );
+
+    test('the bundle question is never put when the screen answered it', () async {
+      final flow = await begin(bundle: bundleAskingReporter());
+      expect(flow.question?.questionId, 'other',
+          reason: 'the reporter question was already answered on screen 4');
+    });
+
+    test('the seeded answer carries what the patient actually chose', () async {
+      final flow = await begin(
+        bundle: bundleAskingReporter(),
+        reporter: 'family_attendant',
+      );
+      final seeded = flow.answers['history.reporter']!;
+      expect(seeded.status, FieldStatus.answered);
+      expect((seeded.value as CodedValue).code, 'family_attendant');
+      // Not put by the interview, so Back from the first question must not
+      // land on it.
+      expect(seeded.wasPut, isFalse);
+      expect(flow.canGoBack, isFalse);
+    });
+
+    test('the submitted record still carries reporter at the root', () async {
+      // §12's contract has `reporter` at the top level, and seeding a field
+      // must not quietly move it.
+      backend.allOffline = true; // stays queued, so the payload is inspectable
+      final flow = await begin(bundle: bundleAskingReporter());
+      await flow.answer(const BoolValue(true), 'Yes');
+      flow.continueToReview();
+      await flow.submit();
+      final record = await queuedRecord(flow.intakeId);
+      expect(record['reporter'], 'self');
+    });
+  });
 
   group('a red flag ends the intake', () {
     late IntakeFlow flow;

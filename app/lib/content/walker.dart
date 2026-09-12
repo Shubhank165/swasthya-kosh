@@ -244,6 +244,12 @@ class IntakeWalker {
   /// reader would have to interpret.
   Question? next() {
     if (_firedFlag != null) return null;
+    // Built once: this loop runs the length of the plan, and nothing inside it
+    // settles a field — the only answers it writes are `not_asked`.
+    final settledFields = {
+      for (final answer in _answers.values)
+        if (answer.isSettled) answer.fieldId,
+    };
     for (final id in plan) {
       if (_answers.containsKey(id)) continue;
       final question = bundle.questions[id];
@@ -264,6 +270,29 @@ class IntakeWalker {
 
       if (question.answerType == AnswerType.unknown) {
         _degraded.add(id);
+        _answers[id] = Answer(
+          questionId: id,
+          fieldId: question.fieldId,
+          status: FieldStatus.notAsked,
+          language: language,
+        );
+        continue;
+      }
+
+      if (settledFields.contains(question.fieldId)) {
+        // Another question already settled this field. Two questions can carry
+        // one `field_id` — the bundle does not enforce uniqueness, and
+        // `pain.character` is the field of both `pain.character` and
+        // `pain.description` — so without this a patient who has described
+        // their pain is asked to describe it again in a different shape.
+        //
+        // This is the rule the server-side engine already applies when it
+        // drops a question whose target slots are all known; it was lost when
+        // the bundle was compiled down to a fixed order.
+        //
+        // Only `answered` counts. A field left unresolved or refused is a field
+        // nobody has settled, and a differently-worded question is entitled to
+        // try again.
         _answers[id] = Answer(
           questionId: id,
           fieldId: question.fieldId,

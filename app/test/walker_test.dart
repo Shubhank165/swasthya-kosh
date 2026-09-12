@@ -286,6 +286,86 @@ void main() {
     });
   });
 
+  group('a settled field is not asked twice', () {
+    // Two questions may carry one `field_id` — the bundle compiler does not
+    // enforce uniqueness, and the shipped bundle has `pain.character` as the
+    // field of both `pain.character` and `pain.description`. A patient who
+    // described their pain was asked to describe it again in a different
+    // shape. The server-side engine drops a question whose target slots are
+    // all known; that rule was lost when the bundle was flattened to a fixed
+    // order, and these tests are it being put back.
+
+    IntakeWalker twoQuestionsOneField() => IntakeWalker(
+          bundle: bundleWith(
+            questions: [
+              question('pain.character',
+                  field: 'pain.character',
+                  type: 'single_choice',
+                  options: ['burning', 'dull']),
+              question('pain.description',
+                  field: 'pain.character', type: 'free_text'),
+            ],
+            core: ['pain.character', 'pain.description'],
+          ),
+          language: 'en',
+        );
+
+    test('the second question for a settled field is never put', () {
+      final walker = twoQuestionsOneField();
+      expect(walker.next()!.questionId, 'pain.character');
+      walker.record(answered('pain.character', const CodedValue('burning'),
+          field: 'pain.character'));
+      expect(walker.next(), isNull, reason: 'the field is already settled');
+    });
+
+    test('it is recorded not_asked, not omitted and not answered', () {
+      // §4's rule: an absence is a hole a reader has to interpret, a status is
+      // a statement. The question genuinely was never put, so `not_asked` is
+      // the true thing to say — and it must not inherit the other question's
+      // answer, which would claim the patient was asked something they were
+      // not.
+      final walker = twoQuestionsOneField();
+      walker.next();
+      walker.record(answered('pain.character', const CodedValue('burning'),
+          field: 'pain.character'));
+      walker.next();
+
+      final skipped = walker.answers['pain.description']!;
+      expect(skipped.status, FieldStatus.notAsked);
+      expect(skipped.value, isNull);
+      expect(skipped.wasPut, isFalse);
+    });
+
+    test('an unresolved field does not suppress a differently-worded question', () {
+      // "I don't know" is not a settled field. A second question asking it
+      // another way is entitled to try — suppressing it would turn one
+      // unanswered question into two, silently.
+      final walker = twoQuestionsOneField();
+      walker.next();
+      walker.record(const Answer(
+        questionId: 'pain.character',
+        fieldId: 'pain.character',
+        status: FieldStatus.unresolved,
+        language: 'en',
+      ));
+      expect(walker.next()?.questionId, 'pain.description');
+    });
+
+    test('a question with its own unsettled field is still asked', () {
+      // The guard must key on the field, not on "some answer exists".
+      final walker = IntakeWalker(
+        bundle: bundleWith(
+          questions: [question('a', field: 'f.a'), question('b', field: 'f.b')],
+          core: ['a', 'b'],
+        ),
+        language: 'en',
+      );
+      walker.next();
+      walker.record(answered('a', const BoolValue(true), field: 'f.a'));
+      expect(walker.next()?.questionId, 'b');
+    });
+  });
+
   group('walking', () {
     test('the branch follows the chosen complaint', () {
       final walker = IntakeWalker(

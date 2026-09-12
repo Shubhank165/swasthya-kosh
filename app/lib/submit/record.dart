@@ -73,6 +73,13 @@ class IntakeRecordBuilder {
   }) {
     final turns = <Map<String, dynamic>>[];
     final fields = <String, dynamic>{};
+    // `fields` is keyed by field id, and two questions can carry one field id —
+    // the bundle does not enforce uniqueness. The walker settles the field on
+    // the first of them and records the second `not_asked`, which is true of
+    // the question and false of the field. Writing both in plan order would let
+    // the second erase the answer the patient actually gave, so remember what
+    // each field id has already been filed under.
+    final filedBy = <String, Answer>{};
 
     var turnId = 0;
     for (final answer in answers.values) {
@@ -107,6 +114,12 @@ class IntakeRecordBuilder {
           'resolved': answer.status == FieldStatus.answered,
         });
       }
+      // A settled answer is never displaced by an unsettled one for the same
+      // field. Anything else — first write, or an answer arriving where there
+      // was only a skip — takes the slot.
+      final existing = filedBy[answer.fieldId];
+      if (existing != null && existing.isSettled && !answer.isSettled) continue;
+      filedBy[answer.fieldId] = answer;
       fields[answer.fieldId] = answer.toFieldJson(
         sourceTurn: sourceTurn,
         schemaVersion: bundle.schemaVersion,

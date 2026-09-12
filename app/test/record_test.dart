@@ -191,6 +191,47 @@ void main() {
       expect(asked, contains('tobacco'), reason: 'refused means it WAS asked');
     });
 
+    test('a skipped twin question does not erase the answer already given', () {
+      // Two questions can carry one `field_id`. The walker settles the field on
+      // the first and records the second `not_asked` — true of the question,
+      // false of the field. In plan order the skip comes second, so without a
+      // guard it would overwrite the answer in `fields` and the patient's
+      // answer would never reach the hospital.
+      final record = IntakeRecordBuilder(
+        intakeId: '5c2f9a44-0000-4000-8000-00000000ab02',
+        hospitalId: 'aiia-delhi',
+        bundle: testBundle(),
+        language: 'hi',
+        reporter: 'self',
+        appVersion: '1.0.0',
+      ).build(
+        answers: <String, Answer>{
+          'pain.character': const Answer(
+            questionId: 'pain.character',
+            fieldId: 'pain.character',
+            status: FieldStatus.answered,
+            value: CodedValue('burning'),
+            askedText: 'दर्द कैसा है?',
+            language: 'hi',
+          ),
+          'pain.description': const Answer(
+            questionId: 'pain.description',
+            fieldId: 'pain.character',
+            status: FieldStatus.notAsked,
+            language: 'hi',
+          ),
+        },
+        startedAt: DateTime.utc(2026, 9, 3, 10, 14, 22),
+        completedAt: DateTime.utc(2026, 9, 3, 10, 21, 5),
+      );
+
+      final field = (record['fields'] as Map)['pain.character'] as Map;
+      expect(field['status'], 'answered');
+      expect(field['value'], 'burning');
+      // And exactly one turn: the question that was actually put.
+      expect((record['turns'] as List).length, 1);
+    });
+
     test('a red-flag abort is submitted partial, and names no condition', () {
       final record = buildRecord(
         flag: RedFlagHitRecord(

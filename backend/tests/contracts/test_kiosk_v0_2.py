@@ -149,3 +149,33 @@ class TestItReachesTheApi:
             "confirmed_today": True,
         }
         assert out.status == FieldStatus.ANSWERED.value
+
+
+class TestTheAppsReporterField:
+    """The app asks "who is this for?" on its own screen and seeds the bundle's
+    `general.reporter` question from the answer, so it never puts that question
+    twice. The seeded answer travels in `fields` alongside the root `reporter`,
+    and both of those are true statements about the same thing."""
+
+    def test_the_contract_accepts_it(self) -> None:
+        payload = _payload()
+        payload["fields"]["general.reporter"] = {
+            "value": "family_attendant",
+            "status": "answered",
+        }
+        record = normalize(payload, now=NOW)
+        fact = next(f for f in record.facts if f.field_id == "general.reporter")
+        assert fact.status is FieldStatus.ANSWERED
+
+    def test_it_is_filed_under_identity_and_so_stays_off_the_report(self) -> None:
+        """HPI is the fallback section, and the report prints HPI. A duplicate
+        of the reporter has no business under history of present illness."""
+        from app.domain.clinical.enums import Section
+        from app.domain.report.builder import BODY_SECTIONS
+
+        payload = _payload()
+        payload["fields"]["general.reporter"] = {"value": "self", "status": "answered"}
+        record = normalize(payload, now=NOW)
+        fact = next(f for f in record.facts if f.field_id == "general.reporter")
+        assert fact.section is Section.IDENTITY
+        assert fact.section not in BODY_SECTIONS

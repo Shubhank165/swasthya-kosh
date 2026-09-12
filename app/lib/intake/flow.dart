@@ -66,6 +66,15 @@ enum FlowStage {
   submitted,
 }
 
+/// The slot the bundle files "who are you answering for?" under.
+///
+/// The app asks this on screen 4 and the bundle asks it again as
+/// `history.reporter`; matching on the *field* rather than the question id is
+/// what lets the seed suppress it, and keeps working if the question is ever
+/// renamed. The four codes `ReporterScreen` emits are the four this slot
+/// allows, which is what makes seeding it honest rather than approximate.
+const _reporterField = 'general.reporter';
+
 class IntakeFlow extends ChangeNotifier {
   IntakeFlow({
     required LocalDatabase database,
@@ -124,7 +133,7 @@ class IntakeFlow extends ChangeNotifier {
         bundle: bundle,
         language: language,
         returnVisit: returnVisit,
-        answers: _seed(bundle, language, confirmed),
+        answers: _seed(bundle, language, confirmed, reporter),
       ),
       intakeId: _newId('intake', random),
       idempotencyKey: _newId('idem', random),
@@ -548,17 +557,44 @@ class IntakeFlow extends ChangeNotifier {
     ContentBundle bundle,
     String language,
     List<ConfirmedFact> confirmed,
+    String reporter,
   ) {
-    if (confirmed.isEmpty) return const {};
     final byField = <String, Question>{
       for (final question in bundle.questions.values) question.fieldId: question,
     };
     final seeded = <String, Answer>{};
+
+    // Who the intake is for was answered on screen 4, before the interview
+    // started (`ReporterGate`). The bundle also carries a question for it, with
+    // no precondition and no idea the patient has already said — so without
+    // this the walker put "Who are you answering for?" a second time, seventy
+    // questions in. Seeding is the same mechanism carry-forward uses: the
+    // walker skips what it already holds, and nothing about how it chooses
+    // changes.
+    //
+    // `askedText` is left null, because it was not put by the interview.
+    // `wasPut` reads that, and `lastAsked` and `retract` read `wasPut` — so
+    // Back from the first real question must not land on a screen the patient
+    // already passed.
+    final reporterQuestion = byField[_reporterField];
+    if (reporterQuestion != null && reporter.isNotEmpty) {
+      seeded[reporterQuestion.questionId] = Answer(
+        questionId: reporterQuestion.questionId,
+        fieldId: _reporterField,
+        status: FieldStatus.answered,
+        value: CodedValue(reporter),
+        language: language,
+      );
+    }
+
     for (final fact in confirmed) {
       final question = byField[fact.fieldId];
       // A carried fact the current bundle asks no question for is still the
       // hospital's record; it is simply not this interview's to restate.
       if (question == null) continue;
+      // A carried fact never overwrites something this interview already
+      // settled — the reporter above is settled, and it was settled today.
+      if (seeded.containsKey(question.questionId)) continue;
       seeded[question.questionId] = Answer(
         questionId: question.questionId,
         fieldId: fact.fieldId,

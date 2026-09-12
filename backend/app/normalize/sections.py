@@ -22,6 +22,12 @@ FIELD_SECTIONS: Mapping[str, Section] = {
     "age": Section.IDENTITY,
     "sex": Section.IDENTITY,
     "reporter": Section.IDENTITY,
+    # The app answers "who is this for?" on its own screen and seeds the
+    # bundle's question from it, so the same statement arrives twice: once at
+    # the record root, once as this field. Identity is not a body section, so
+    # filing it here keeps it out of the report rather than printing
+    # "general.reporter: self" under history of present illness.
+    "general.reporter": Section.IDENTITY,
     "preferred_language": Section.IDENTITY,
     # chief complaint
     "chief_complaint": Section.CHIEF_COMPLAINT,
