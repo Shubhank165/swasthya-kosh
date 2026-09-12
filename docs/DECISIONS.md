@@ -1225,3 +1225,76 @@ and no Indian language at all — it is off the list. Until one of those lands,
 offering a Hindi microphone would be claiming a capability this build does not
 have, which is the thing the sign-in stand-in notice and the OCR "read but not
 placed" line both exist to avoid.
+
+## 70. A patient's history is joined by a link table, not by a column
+
+Setting `patients.abha_address` looks like it links a history and does not.
+
+Prior visits come from `IntakeRepository.history_for`, which matches the exact
+`(patient_ref_type, patient_ref_value)` an intake was **filed under**. It never
+matches `patients.id` — `intakes.py` writes that as NULL at creation and nothing
+backfills it. So the patient who took two visits in the app, filed under a
+peppered phone HMAC, and one at the counter, filed under a UHID, had two
+histories that could not see each other, and an ABHA address on their chart
+changed nothing: `known_here: true`, zero prior intakes.
+
+`patient_identifier_links` is `(hospital_id, patient_id, ref_type, ref_value)`,
+unique on the last three. Every row pointing at one `patient_id` is one person;
+`aliases_for` expands any reference into the whole set, and `history_for` now
+takes that set and ORs it. An unlinked reference expands to itself, so a patient
+nobody has linked behaves exactly as they did before the table existed.
+
+Not a `phone_ref` column on `patients`. That is 1:1, cannot hold a number the
+patient has stopped using, and reuses a nullable column as a join key.
+`patients.abha_address` keeps its meaning — the ABHA on the chart — and the link
+table means something different: every identifier that has ever resolved here.
+
+Three properties are enforced rather than intended. **It never stores a phone
+number**: the value for a phone ref is the same peppered HMAC
+`patient_sessions.phone_ref` holds, and a test asserts 64 hex characters.
+**Linking never merges two people**: pointing an identifier that already resolves
+to one patient at a different one raises `ConflictError`, because two people
+sharing a phone and a mis-keyed ABHA address both need a human, and joining two
+patients' histories quietly is the worst thing this table can do. **It is
+tenant-scoped**, so `tests/safety/test_tenancy.py` covers it and cross-hospital
+linkage is impossible by construction.
+
+The edge between a phone and an ABHA address is written in exactly one place:
+`POST /patients/me/abha`, the only request where both identifiers are in hand at
+once — and only when the ABHA verified. An unproven identifier joined to a real
+history is how one patient reads another's.
+
+Found while writing this: `IdentityService.resolve` had no `PHONE` branch, so a
+phone reference fell through to `abha.verify()` and came back "ABHA address
+could not be verified" — about a phone number. Nothing in the app calls
+`/patients/resolve`, which is why it went unnoticed, but the endpoint accepts
+`{"type": "phone"}` and answered nonsense. Possessing the HMAC *is* the
+verification: it cannot be constructed without having passed the OTP.
+
+## 71. The fake ABHA directory, and the three rules that keep it honest
+
+`MockABHAProvider` now reads `adapters/abha/fixtures/mock_directory.json` and
+returns the invented person behind a known address, so the demo can show a
+returning patient rather than an address being typed into a box.
+
+Fixtures make a mock more convincing, which is exactly when §56 — a mocked
+government integration is never presented as a live one — stops being a
+paragraph and needs enforcing:
+
+- `source` stays `"mock"` on every answer. The app keys `isMocked` off that
+  field, not off the notice text, and the notice string is unchanged.
+- Every demographic block carries `synthetic: true`, **re-asserted in code**
+  rather than trusted from the file, so an entry somebody adds without it still
+  cannot read as a real person.
+- An unknown address keeps the original `sha256(address)[0] % 8 == 0` rule.
+  Roughly one in eight comes back unverified, so "could not be verified, carry
+  on as a guest" stays a state the demo can show instead of becoming theoretical
+  the moment fixtures existed.
+
+A README beside the file says in one line that these people do not exist.
+
+The seeder computes the demo patient's phone reference rather than storing it:
+it is `HMAC(pepper, number)`, so a literal would be wrong on every deployment
+with a different pepper and would produce a patient whose history nobody can
+reach, silently. With no pepper set the phone half is skipped, the result says
+so, and `scripts/seed.py` prints it.

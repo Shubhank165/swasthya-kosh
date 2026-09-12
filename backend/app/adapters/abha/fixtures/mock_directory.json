@@ -1,0 +1,29 @@
+{
+  "_readme": "These people do not exist. See README.md in this directory.",
+  "entries": {
+    "asha.devi@sbx": {
+      "display_name": "Asha Devi",
+      "birth_year": 1968,
+      "sex": "female",
+      "preferred_language": "hi",
+      "external_mrn": "UHID-100241",
+      "synthetic": true
+    },
+    "ramesh.kumar@sbx": {
+      "display_name": "Ramesh Kumar",
+      "birth_year": 1981,
+      "sex": "male",
+      "preferred_language": "en",
+      "external_mrn": "UHID-100518",
+      "synthetic": true
+    },
+    "lakshmi.n@sbx": {
+      "display_name": "Lakshmi Narayanan",
+      "birth_year": 1955,
+      "sex": "female",
+      "preferred_language": "ta",
+      "external_mrn": null,
+      "synthetic": true
+    }
+  }
+}

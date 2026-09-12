@@ -91,6 +91,11 @@ class Settings(BaseSettings):
     #: presented as live.
     abha_provider: str = "mock"
     abdm_base_url: str | None = None
+    #: Invented people, for the demo. Mirrors `ocr_fixtures_dir`: a directory of
+    #: fixtures the mock provider reads, so "who is behind this ABHA address"
+    #: can be answered without an ABDM call. Every entry declares itself
+    #: synthetic — see the README beside the file.
+    abha_fixtures_dir: Path = BACKEND_ROOT / "app" / "adapters" / "abha" / "fixtures"
 
     # --- demo ----------------------------------------------------------------
     #: Serves cached OCR results for known fixture documents and marks every

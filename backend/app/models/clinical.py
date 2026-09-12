@@ -94,6 +94,65 @@ class PatientRecord(Base, TimestampMixin):
     )
 
 
+class PatientIdentifierLink(Base, TimestampMixin):
+    """Every identifier that has ever resolved to one patient here.
+
+    **This is what makes a history join up.** Prior visits are found by
+    `IntakeRepository.history_for`, which matches the exact
+    `(patient_ref_type, patient_ref_value)` an intake was *filed under* — never
+    `patients.id`, which `intakes.py` writes as `None` at creation anyway. So a
+    patient who signed in by phone in the app and later linked an ABHA address
+    had two disjoint histories and no way to know it, and setting
+    `patients.abha_address` would not have joined them: it says which ABHA is on
+    the chart, not which references point at this person.
+
+    Every row pointing at the same `patient_id` is the same person. A phone
+    HMAC, an ABHA address and a UHID all become rows, and `aliases_for` expands
+    any one of them into the set.
+
+    Not a `phone_ref` column on `patients`: that is 1:1, cannot hold a number
+    the patient has stopped using, and reuses a nullable column as a join key.
+
+    **Never a raw phone number.** The value for a phone ref is the peppered
+    HMAC the app already sends, the same one `patient_sessions.phone_ref` holds.
+    Tenant-scoped like everything else, so linking across hospitals is
+    impossible by construction rather than by policy.
+    """
+
+    __tablename__ = "patient_identifier_links"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    hospital_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("hospitals.id"), nullable=False, index=True
+    )
+    #: Nullable: an identifier can be known before a patient row exists for it.
+    patient_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("patients.id"), index=True
+    )
+    #: A `PatientRefType` value — `phone`, `abha`, `hospital_id`.
+    ref_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: The reference as an intake would be filed under it. For `phone` this is
+    #: the peppered HMAC and never the number.
+    ref_value: Mapped[str] = mapped_column(String(256), nullable=False)
+    #: How the link came to exist — `seed`, `abha_link`, `registration`. Kept
+    #: because "who joined these two people together" is the first question
+    #: asked when a link turns out to be wrong.
+    source: Mapped[str] = mapped_column(String(32), nullable=False, default="unknown")
+    linked_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+
+    __table_args__ = (
+        # One identifier resolves to one patient at one hospital. The database
+        # holds that, rather than the service promising it.
+        UniqueConstraint(
+            "hospital_id",
+            "ref_type",
+            "ref_value",
+            name="uq_patient_links_hospital_ref",
+        ),
+        Index("ix_patient_links_hospital_patient", "hospital_id", "patient_id"),
+    )
+
+
 class IntakeRecord(Base, TimestampMixin):
     """One intake received from a kiosk."""
 

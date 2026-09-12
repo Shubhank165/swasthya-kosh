@@ -26,15 +26,27 @@ from app.events.bus import InProcessBus
 from app.normalize.from_kiosk_v0_1 import intake_uuid
 from app.repositories.consent import AuditRepository, IngestRawRepository
 from app.repositories.intakes import IntakeRepository
-from app.repositories.patients import HospitalRepository, PatientRepository
+from app.repositories.patients import (
+    HospitalRepository,
+    PatientLinkRepository,
+    PatientRepository,
+)
 from app.repositories.terminology import TerminologyRepository
 from app.services.ingest import IngestService
+from app.services.patient_auth import phone_ref
 from app.services.terminology import seed_terminology
 
 logger = get_logger(__name__)
 
 HOSPITAL_ID = "aiia-delhi"
 DEPARTMENTS: list[str] = ["kayachikitsa", "panchakarma", "shalya", "general"]
+
+#: The demo patient. Sign in to the app with this number and the visits below
+#: are already there. An invented number in the reserved-for-fiction range, and
+#: an ABHA address from `adapters/abha/fixtures/mock_directory.json`.
+DEMO_PHONE = "9876543210"
+DEMO_ABHA = "asha.devi@sbx"
+SECOND_ABHA = "ramesh.kumar@sbx"
 
 #: Fixed, so a seeded demo reads the same on every machine.
 _BASE = datetime(2026, 9, 3, 9, 0, 0, tzinfo=UTC)
@@ -239,15 +251,109 @@ def sample_payloads() -> list[dict[str, Any]]:
     ]
 
 
+def app_visit_payloads(reference: str) -> list[dict[str, Any]]:
+    """Two earlier visits taken in the app, filed under the phone reference.
+
+    These are what makes the ABHA link visible rather than theoretical: they
+    are reachable by phone and not by ABHA until a link row exists, and then by
+    both. Filed under `phone` because that is how the app files an intake —
+    `app/lib/submit/record.dart` sends the peppered HMAC as `patient_ref`.
+
+    Older than the kiosk intakes above, so a merged history is obviously
+    chronological rather than accidentally in order.
+    """
+    ref = {"type": "phone", "value": reference}
+    return [
+        {
+            "schema_version": "0.1",
+            "intake_id": "3f1c2a10-0000-4000-8000-0000000000a1",
+            "kiosk_id": None,
+            "hospital_id": HOSPITAL_ID,
+            "started_at": (_BASE - timedelta(days=95)).isoformat(),
+            "completed_at": (_BASE - timedelta(days=95) + timedelta(minutes=6)).isoformat(),
+            "status": "complete",
+            "language": "hi",
+            "reporter": "self",
+            "department_code": "kayachikitsa",
+            "patient_ref": ref,
+            "turns": [_turn(1, "ask_complaint", "घुटनों में दर्द", 0.92)],
+            "fields": {
+                "chief_complaint": {
+                    "value": "joint_pain",
+                    "status": "answered",
+                    "original_text": "घुटनों में दर्द",
+                    "source_turn": 1,
+                },
+                "duration": {
+                    "value": {"n": 2, "unit": "month"},
+                    "status": "answered",
+                    "source_turn": 2,
+                },
+                "known_diabetes": {"value": True, "status": "answered", "source_turn": 4},
+                "current_medications": {
+                    "value": "Metformin 500",
+                    "status": "answered",
+                    "source_turn": 4,
+                },
+            },
+            "red_flags": [],
+            "engine_version": None,
+            "content_version": "questions-2026-09-01",
+        },
+        {
+            "schema_version": "0.1",
+            "intake_id": "3f1c2a10-0000-4000-8000-0000000000a2",
+            "kiosk_id": None,
+            "hospital_id": HOSPITAL_ID,
+            "started_at": (_BASE - timedelta(days=40)).isoformat(),
+            "completed_at": (_BASE - timedelta(days=40) + timedelta(minutes=5)).isoformat(),
+            "status": "complete",
+            "language": "hi",
+            "reporter": "self",
+            "department_code": "kayachikitsa",
+            "patient_ref": ref,
+            "turns": [_turn(1, "ask_complaint", "पैर में चोट", 0.88)],
+            "fields": {
+                # Deliberately unrelated to today's abdominal pain. When the
+                # timeline agent lands, this is the candidate it must decide to
+                # leave out — the foot injury under a fever complaint.
+                "chief_complaint": {
+                    "value": "injury",
+                    "status": "answered",
+                    "original_text": "पैर में चोट",
+                    "source_turn": 1,
+                },
+                "duration": {
+                    "value": {"n": 2, "unit": "day"},
+                    "status": "answered",
+                    "source_turn": 2,
+                },
+            },
+            "red_flags": [],
+            "engine_version": None,
+            "content_version": "questions-2026-09-01",
+        },
+    ]
+
+
 async def seed(
     session: AsyncSession,
     *,
     terminology_dir: Path | None = None,
     clock: Clock | None = None,
+    patient_ref_pepper: str | None = None,
 ) -> dict[str, Any]:
     """Create the hospital, the terminology tables and the sample intakes.
 
     Idempotent: an existing hospital short-circuits everything.
+
+    `patient_ref_pepper` is what makes the app half of the demo work. The phone
+    reference an intake is filed under is `HMAC(pepper, number)`, so the value
+    is **different in every deployment** and must be computed here rather than
+    written down: a hardcoded digest produces a patient whose history nobody
+    can reach, silently, on any machine with a different pepper. With no pepper
+    set the phone half is skipped and said so in the result — the seeded
+    intakes and the ABHA link still land.
     """
     clock = clock or SystemClock()
     hospitals = HospitalRepository(session)
@@ -269,11 +375,13 @@ async def seed(
         concepts = await seed_terminology(TerminologyRepository(session), terminology_dir)
 
     patients = PatientRepository(session)
+    links = PatientLinkRepository(session)
     with tenant_scope(HOSPITAL_ID):
         await patients.create(
             patient_id="pat_seed_0001",
             hospital_id=HOSPITAL_ID,
             external_mrn="UHID-100241",
+            abha_address=DEMO_ABHA,
             display_name=None,
             preferred_language="hi",
         )
@@ -281,6 +389,7 @@ async def seed(
             patient_id="pat_seed_0002",
             hospital_id=HOSPITAL_ID,
             external_mrn="UHID-100518",
+            abha_address=SECOND_ABHA,
             display_name=None,
             preferred_language="en",
         )
@@ -308,13 +417,67 @@ async def seed(
                 )
             created.append(result.intake_id)
 
-    logger.info("seed_complete", count=len(created), concepts=concepts)
+        # The link rows. `(hospital_id, UHID)` and the ABHA address both point
+        # at pat_seed_0001, so a history asked for under either comes back the
+        # same — which is the thing the ABHA feature actually delivers, and it
+        # does not work by setting `patients.abha_address` alone.
+        now = clock.now()
+        link_refs: list[tuple[str, str, str]] = [
+            ("pat_seed_0001", "abha", DEMO_ABHA),
+            ("pat_seed_0001", "hospital_id", "UHID-100241"),
+            ("pat_seed_0002", "abha", SECOND_ABHA),
+            ("pat_seed_0002", "hospital_id", "UHID-100518"),
+        ]
+
+        phone_linked = False
+        phone_intakes: list[str] = []
+        if patient_ref_pepper:
+            # **Never hardcode this digest.** It is HMAC(pepper, number), so a
+            # literal is wrong on every deployment with a different pepper and
+            # produces a patient whose history nobody can reach.
+            reference = phone_ref(DEMO_PHONE, pepper=patient_ref_pepper)
+            for payload in app_visit_payloads(reference):
+                result = await service.ingest(
+                    payload, hospital_id=HOSPITAL_ID, actor_id="seed"
+                )
+                if result.intake_id is None:
+                    raise RuntimeError(
+                        f"seed payload was not usable ({result.reason}): {result.errors}"
+                    )
+                phone_intakes.append(result.intake_id)
+            link_refs.append(("pat_seed_0001", "phone", reference))
+            phone_linked = True
+        else:
+            logger.info("seed_phone_link_skipped", reason="no_patient_ref_pepper")
+
+        for index, (patient_id, ref_type, ref_value) in enumerate(link_refs):
+            await links.link(
+                link_id=f"lnk_seed_{index:04d}",
+                hospital_id=HOSPITAL_ID,
+                patient_id=patient_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
+                source="seed",
+                linked_at=now,
+            )
+
+    logger.info(
+        "seed_complete",
+        count=len(created) + len(phone_intakes),
+        concepts=concepts,
+        phone_linked=phone_linked,
+    )
     return {
         "hospital_id": HOSPITAL_ID,
         "created": True,
         "departments": DEPARTMENTS,
-        "intakes": created,
+        "intakes": created + phone_intakes,
         "terminology_concepts": concepts,
+        # The demo script prints these. The number is invented; the reference
+        # is not printed, because it identifies a patient.
+        "demo_phone": DEMO_PHONE if phone_linked else None,
+        "demo_abha": DEMO_ABHA,
+        "phone_linked": phone_linked,
     }
 
 

@@ -17,7 +17,9 @@ not have.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
+from pathlib import Path
 from typing import Any
 
 from app.core.config import Settings
@@ -50,32 +52,80 @@ def is_wellformed(abha_address: str) -> bool:
 class MockABHAProvider:
     """Deterministic fixtures. Visibly a mock, by design.
 
-    Verification is derived from a hash of the address, so the same address
-    always gives the same answer and a demo is reproducible — and roughly one
-    address in eight comes back unverified, so the not-found path is on screen
-    rather than theoretical.
+    Two behaviours, and the second is the older one kept deliberately.
+
+    A **known** address — one in `fixtures/mock_directory.json` — comes back
+    with the invented person behind it, so the demo can show a returning
+    patient rather than an address being typed into a box. Every one of those
+    blocks carries `synthetic: true`.
+
+    An **unknown** address falls back to the original hash rule: the same
+    address always gives the same answer, and roughly one in eight comes back
+    unverified. That path is kept precisely because fixtures would otherwise
+    make the not-found case theoretical, and "this ABHA could not be verified,
+    carry on as a guest" is a state the demo has to be able to show.
+
+    `source` stays `"mock"` throughout. The app keys `isMocked` off that field,
+    and §56 is that a mocked government integration is never presented as a
+    live one.
     """
 
     name = "mock"
+
+    #: Never varies by fixture. The app reads this, not the notice text.
+    NOTICE = (
+        "Mock ABHA response. No ABDM call was made and no government "
+        "system was contacted."
+    )
+
+    def __init__(self, fixtures_dir: Path | None = None) -> None:
+        self._directory = _load_directory(fixtures_dir)
 
     async def verify(self, abha_address: str) -> dict[str, Any] | None:
         address = abha_address.strip()
         if not is_wellformed(address):
             return None
-        digest = hashlib.sha256(address.encode("utf-8")).digest()
-        if digest[0] % 8 == 0:
-            return None
-        return {
+
+        entry = self._directory.get(address.lower())
+        if entry is None:
+            digest = hashlib.sha256(address.encode("utf-8")).digest()
+            if digest[0] % 8 == 0:
+                return None
+
+        body: dict[str, Any] = {
             # Every field a caller might key off says this is not real data.
             "source": "mock",
             "verified": True,
             "abha_address": address,
             "linked_care_contexts": 0,
-            "notice": (
-                "Mock ABHA response. No ABDM call was made and no government "
-                "system was contacted."
-            ),
+            "notice": self.NOTICE,
         }
+        if entry is not None:
+            # `synthetic` is re-asserted here rather than trusted from the file,
+            # so an entry that forgot it still cannot read as a real person.
+            body["demographics"] = {**entry, "synthetic": True}
+        return body
+
+
+def _load_directory(fixtures_dir: Path | None) -> dict[str, dict[str, Any]]:
+    """The invented people, keyed by lowercased address.
+
+    A missing or unreadable file is not an error: the provider falls back to
+    hash-derived answers, which is exactly what it did before fixtures existed.
+    Failing to start because a demo fixture is absent would be the wrong trade.
+    """
+    if fixtures_dir is None:
+        return {}
+    path = Path(fixtures_dir) / "mock_directory.json"
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        logger.info("abha_mock_directory_absent", path=str(path))
+        return {}
+    entries = raw.get("entries", {})
+    if not isinstance(entries, dict):
+        return {}
+    return {str(key).lower(): dict(value) for key, value in entries.items()}
 
 
 class SandboxABHAProvider:
@@ -108,4 +158,4 @@ def build_provider(settings: Settings) -> MockABHAProvider | SandboxABHAProvider
     """The configured provider."""
     if settings.abha_provider == "sandbox":
         return SandboxABHAProvider(settings)
-    return MockABHAProvider()
+    return MockABHAProvider(settings.abha_fixtures_dir)

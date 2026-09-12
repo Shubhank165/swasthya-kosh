@@ -75,7 +75,11 @@ async def prepare() -> None:
 
     async with db_module.session_scope() as session:
         with unscoped():
-            await seed(session, terminology_dir=settings.terminology_dir)
+            await seed(
+                session,
+                terminology_dir=settings.terminology_dir,
+                patient_ref_pepper=settings.patient_ref_pepper,
+            )
 
     await _ingest_fixtures()
 

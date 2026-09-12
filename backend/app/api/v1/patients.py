@@ -80,9 +80,22 @@ async def link_abha(
     today — the app is expected to say so on screen, so nobody demos a mocked
     government integration as a live one.
     """
+    # The phone the patient signed in with, and the ABHA they just offered, are
+    # both in hand here and nowhere else. Recording that they are one person is
+    # what makes the visits they took in the app and the ones on their OPD card
+    # come back as one history: prior intakes are found by the reference they
+    # were *filed under*, so without this edge the two sets never meet.
+    #
+    # Written only when the ABHA verifies — see `IdentityService.resolve`.
+    phone_ref = (
+        PatientRef(type=PatientRefType.PHONE, value=principal.patient_ref)
+        if principal.patient_ref
+        else None
+    )
     resolved = await service.resolve(
         PatientRef(type=PatientRefType.ABHA, value=request.abha_address),
         hospital_id=principal.hospital_id,
+        link_to_ref=phone_ref,
     )
     return ResolveResponse.model_validate(resolved.to_dict())
 

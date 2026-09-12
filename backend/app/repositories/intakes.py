@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import case, func, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
@@ -330,20 +330,41 @@ class IntakeRepository:
         return list(result.scalars())
 
     async def history_for(
-        self, *, hospital_id: str, ref_type: str, ref_value: str, limit: int = 20
+        self,
+        *,
+        hospital_id: str,
+        refs: Sequence[tuple[str, str]],
+        limit: int = 20,
     ) -> Sequence[IntakeRecord]:
         """Previous intakes for this patient **at this hospital only**.
 
+        `refs` is every reference that resolves to the same person — the phone
+        HMAC they used in the app, the ABHA address they linked later, the UHID
+        on their OPD card — and the intakes filed under any of them are theirs.
+        Expanding one reference into that set is `PatientLinkRepository`'s job;
+        this only has to OR them, and the `received_at` ordering means a merged
+        set still reads as one chronology rather than one list after another.
+
         Cross-hospital retrieval requires ABDM consent and is out of scope; the
         `hospital_id` predicate here is what makes that a fact rather than a
-        promise.
+        promise — and it applies to every ref in the set, so an alias cannot be
+        a way around it.
         """
+        if not refs:
+            return []
         result = await self._session.execute(
             select(IntakeRecord)
             .where(
                 IntakeRecord.hospital_id == hospital_id,
-                IntakeRecord.patient_ref_type == ref_type,
-                IntakeRecord.patient_ref_value == ref_value,
+                or_(
+                    *(
+                        and_(
+                            IntakeRecord.patient_ref_type == ref_type,
+                            IntakeRecord.patient_ref_value == ref_value,
+                        )
+                        for ref_type, ref_value in refs
+                    )
+                ),
             )
             .order_by(IntakeRecord.received_at.desc())
             .limit(limit)

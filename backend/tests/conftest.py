@@ -288,7 +288,7 @@ def identity_service(
     content: ClinicalContent,
 ) -> Any:
     from app.repositories.intakes import IntakeRepository
-    from app.repositories.patients import PatientRepository
+    from app.repositories.patients import PatientLinkRepository, PatientRepository
     from app.services.identity import IdentityService
 
     return IdentityService(
@@ -297,6 +297,7 @@ def identity_service(
         abha=providers.abha,
         clock=clock,
         ids=ids,
+        links=PatientLinkRepository(session),
         labels=content.field_labels(),
     )
 

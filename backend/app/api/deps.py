@@ -39,7 +39,11 @@ from app.repositories.consent import (
 )
 from app.repositories.documents import DocumentRepository
 from app.repositories.intakes import IntakeRepository
-from app.repositories.patients import HospitalRepository, PatientRepository
+from app.repositories.patients import (
+    HospitalRepository,
+    PatientLinkRepository,
+    PatientRepository,
+)
 from app.repositories.terminology import TerminologyRepository
 from app.services.documents import DocumentService
 from app.services.identity import IdentityService
@@ -243,6 +247,7 @@ async def get_identity_service(
         abha=providers.abha,
         clock=clock,
         ids=ids,
+        links=PatientLinkRepository(session),
         labels=content.field_labels(),
     )
 

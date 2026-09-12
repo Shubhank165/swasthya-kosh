@@ -32,7 +32,7 @@ from app.domain.record import (
     PatientRefType,
 )
 from app.repositories.intakes import IntakeRepository
-from app.repositories.patients import PatientRepository
+from app.repositories.patients import PatientLinkRepository, PatientRepository
 
 logger = get_logger(__name__)
 
@@ -175,6 +175,7 @@ class IdentityService:
         abha: ABHAProvider,
         clock: Clock,
         ids: IdFactory,
+        links: PatientLinkRepository | None = None,
         labels: dict[str, str] | None = None,
     ) -> None:
         self._patients = patients
@@ -182,14 +183,45 @@ class IdentityService:
         self._abha = abha
         self._clock = clock
         self._ids = ids
+        self._links = links
         self._labels = labels or {}
 
-    async def resolve(self, ref: PatientRef, *, hospital_id: str) -> ResolvedPatient:
+    async def _refs_for(self, ref: PatientRef, *, hospital_id: str) -> tuple[tuple[str, str], ...]:
+        """Every reference that resolves to the same person as `ref`.
+
+        Without a link repository — and there is none in the older call sites —
+        this is `ref` alone, which is exactly the behaviour before the link
+        table existed. History never silently widens because a dependency
+        happened to be wired.
+        """
+        assert ref.value is not None
+        me = ((ref.type.value, ref.value),)
+        if self._links is None:
+            return me
+        return await self._links.aliases_for(
+            hospital_id=hospital_id, ref_type=ref.type.value, ref_value=ref.value
+        )
+
+    async def resolve(
+        self,
+        ref: PatientRef,
+        *,
+        hospital_id: str,
+        link_to_ref: PatientRef | None = None,
+    ) -> ResolvedPatient:
         """Identify a patient, without ever requiring that identification succeed.
 
         A failed ABHA lookup does not fail the request. It comes back
         unverified, and the intake proceeds as a guest — the alternative is
         turning someone away because a government API was down.
+
+        `link_to_ref` records that `ref` and that reference are the same person.
+        `POST /patients/me/abha` is the only caller: it is the one place where
+        an ABHA address and the phone the patient signed in with are both in
+        hand at once, and therefore the only honest place to assert the edge
+        between them. The link is written **only when the ABHA verified** — an
+        unproven identifier joined to a real history is how one patient reads
+        another's.
         """
         if ref.type is PatientRefType.GUEST:
             return ResolvedPatient(ref=ref, verified=False)
@@ -219,28 +251,138 @@ class IdentityService:
                 ),
             )
 
+        if ref.type is PatientRefType.PHONE:
+            # There was no branch for this, so a phone ref fell through to
+            # `self._abha.verify()` and came back "ABHA address could not be
+            # verified" — about a phone number. Nothing in the app hits
+            # `/patients/resolve`, which is why it went unnoticed, but the
+            # endpoint accepts `{"type": "phone"}` and answered nonsense.
+            #
+            # The value is the peppered HMAC the app's sign-in issued, and
+            # possessing it *is* the verification: it cannot be constructed
+            # without having passed the OTP.
+            assert ref.value is not None
+            patient_id = None
+            if self._links is not None:
+                link = await self._links.get(
+                    hospital_id=hospital_id,
+                    ref_type=ref.type.value,
+                    ref_value=ref.value,
+                )
+                patient_id = link.patient_id if link else None
+            refs = await self._refs_for(ref, hospital_id=hospital_id)
+            rows = await self._intakes.history_for(
+                hospital_id=hospital_id, refs=refs, limit=1
+            )
+            return ResolvedPatient(
+                ref=ref,
+                patient_id=patient_id,
+                verified=True,
+                known_here=bool(rows) or patient_id is not None,
+                source="app_sign_in",
+            )
+
         assert ref.value is not None
         result = await self._abha.verify(ref.value)
         row = await self._patients.by_abha(hospital_id=hospital_id, abha_address=ref.value)
+        linked_patient_id = None
+        if row is None and self._links is not None:
+            # `patients.abha_address` says which ABHA is on the chart. The link
+            # table says which references have ever resolved here, and an ABHA
+            # linked after registration is only in the second.
+            link = await self._links.get(
+                hospital_id=hospital_id, ref_type=ref.type.value, ref_value=ref.value
+            )
+            linked_patient_id = link.patient_id if link else None
         if result is None:
             return ResolvedPatient(
                 ref=ref,
-                patient_id=row.id if row else None,
+                patient_id=row.id if row else linked_patient_id,
                 verified=False,
-                known_here=row is not None,
+                known_here=row is not None or linked_patient_id is not None,
                 source=self._abha.name,
                 notice="ABHA address could not be verified. Intake may proceed as guest.",
             )
+        verified = bool(result.get("verified"))
+        patient_id = row.id if row else linked_patient_id
+        if verified and link_to_ref is not None:
+            patient_id = await self._join(
+                hospital_id=hospital_id,
+                patient_id=patient_id,
+                abha_address=ref.value,
+                refs=(ref, link_to_ref),
+            )
         return ResolvedPatient(
             ref=ref,
-            patient_id=row.id if row else None,
-            verified=bool(result.get("verified")),
-            known_here=row is not None,
+            patient_id=patient_id,
+            verified=verified,
+            known_here=row is not None or linked_patient_id is not None,
             # `"mock"` travels all the way to the client. A mocked government
             # integration is never presented as a live one.
             source=str(result.get("source", self._abha.name)),
             notice=result.get("notice"),
         )
+
+    async def _join(
+        self,
+        *,
+        hospital_id: str,
+        patient_id: str | None,
+        abha_address: str | None,
+        refs: tuple[PatientRef, ...],
+    ) -> str | None:
+        """Record that every reference in `refs` is the same person.
+
+        A link needs something to point at, so when neither reference is
+        attached to a patient yet this creates the thin identity row that
+        anchors them. That row is the hospital's record that these identifiers
+        belong together — not demographics, which the HMIS owns — and it is
+        created here rather than at sign-in because this is the first moment
+        anything is known beyond a phone number.
+
+        Raises through `PatientLinkRepository.link` if one of these references
+        already resolves to somebody else. Two people sharing a phone, or a
+        mis-keyed ABHA address, are both things a human must look at; merging
+        them quietly would join two patients' histories.
+        """
+        if self._links is None:
+            return patient_id
+
+        if patient_id is None:
+            for candidate in refs:
+                if candidate.value is None:
+                    continue
+                link = await self._links.get(
+                    hospital_id=hospital_id,
+                    ref_type=candidate.type.value,
+                    ref_value=candidate.value,
+                )
+                if link is not None and link.patient_id is not None:
+                    patient_id = link.patient_id
+                    break
+
+        if patient_id is None:
+            created = await self._patients.create(
+                patient_id=self._ids.new_id("pat"),
+                hospital_id=hospital_id,
+                abha_address=abha_address,
+            )
+            patient_id = created.id
+
+        now = self._clock.now()
+        for candidate in refs:
+            if candidate.value is None:
+                continue
+            await self._links.link(
+                link_id=self._ids.new_id("lnk"),
+                hospital_id=hospital_id,
+                patient_id=patient_id,
+                ref_type=candidate.type.value,
+                ref_value=candidate.value,
+                source="abha_link",
+                linked_at=now,
+            )
+        return patient_id
 
     async def history(
         self, ref: PatientRef, *, hospital_id: str, limit: int = 20
@@ -251,11 +393,12 @@ class IdentityService:
             # rather than an error keeps the kiosk's flow identical either way.
             return PatientHistory(ref=ref, hospital_id=hospital_id)
 
+        # The reference the caller holds, plus every other one that resolves to
+        # the same person. This is the line that makes "link my ABHA and see my
+        # app visits" work; without it the two histories never meet.
+        refs = await self._refs_for(ref, hospital_id=hospital_id)
         rows = await self._intakes.history_for(
-            hospital_id=hospital_id,
-            ref_type=ref.type.value,
-            ref_value=ref.value,
-            limit=limit,
+            hospital_id=hospital_id, refs=refs, limit=limit
         )
         # `complaint` is filled in below, from the record each row's
         # carry-forward pass already loads. Without it a patient's own list of
