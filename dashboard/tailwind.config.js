@@ -19,7 +19,28 @@ export default {
         verified: { DEFAULT: '#1a6b45', soft: '#eef8f2' },
         urgent: { DEFAULT: '#b3261e', soft: '#fdecea' },
       },
-      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+      // Inter was declared here and never loaded — no @font-face, no link in
+      // index.html — so every screen has always rendered in system-ui while
+      // the config claimed otherwise. A declared font that never arrives is a
+      // design system that lies about itself, and the fix is to drop the name
+      // rather than add the network request: this dashboard runs inside a
+      // hospital, where a blocked CDN would mean the report reflows on the one
+      // machine that could not reach it. What is listed is what renders.
+      //
+      // The Devanagari fallbacks are explicit because the report shows the
+      // patient's own words in their own script (§9), and a stack that ends at
+      // `sans-serif` leaves that to whatever the machine happens to pick.
+      fontFamily: {
+        sans: [
+          'system-ui',
+          '-apple-system',
+          'Segoe UI',
+          'Roboto',
+          'Noto Sans',
+          'Noto Sans Devanagari',
+          'sans-serif',
+        ],
+      },
     },
   },
   plugins: [],

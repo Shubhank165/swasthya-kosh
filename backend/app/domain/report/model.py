@@ -35,6 +35,22 @@ class ReportLine(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     text: str
+    #: The two halves of `text`, for a reader that can lay them out.
+    #:
+    #: `text` is `"{label}: {value}"` and stays that way — the plain-text
+    #: renderer and the golden files are built on it. But a screen that has only
+    #: that string can do nothing with it except print it, and a page of
+    #: `label: value` in one weight is a pretty-printed dictionary, which is
+    #: what a physician said the dashboard looked like. Splitting on `": "` in
+    #: the client would be the dashboard deriving structure the builder already
+    #: has, which §12 forbids, so the builder states it.
+    #:
+    #: `value` excludes the parenthesised "patient said …" that `text` carries,
+    #: because `original_text` below already holds those words and a screen that
+    #: renders both prints them twice. Both are `None` on a line that has no
+    #: such halves — an unresolved line is a sentence, not a pair.
+    label: str | None = None
+    value: str | None = None
     field_ids: tuple[str, ...] = ()
     fact_ids: tuple[str, ...] = ()
     sources: tuple[SourceRef, ...] = ()
@@ -130,6 +146,15 @@ class PhysicianReport(BaseModel):
     #: section.
     document_timeline: tuple[TimelineEntry, ...] = ()
     document_notes: tuple[ReportLine, ...] = ()
+    #: Display label for every field id this report mentions.
+    #:
+    #: Conflicts and timeline entries carry field ids and no labels, and a
+    #: reader with only an id can do nothing better than de-underscore it — so
+    #: the dashboard was printing `chief_complaint` as a clinical heading, and
+    #: the Hindi report was printing English ids. Resolving a label is the
+    #: builder's job; it is the only place that holds the label table and the
+    #: language at once.
+    field_labels: dict[str, str] = Field(default_factory=dict)
     #: True when any fact was produced by the repair model.
     contains_repaired: bool = False
     #: True when any value needs a human to check it against the original.

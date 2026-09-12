@@ -31,6 +31,48 @@ import { ReportView } from './ReportView';
 import { VerifyControls } from './VerifyControls';
 import { HeaderStrip } from './HeaderStrip';
 
+/**
+ * Puts the backend's rendered text on the clipboard.
+ *
+ * The result is stated rather than assumed: `navigator.clipboard` is absent
+ * over plain HTTP and can be refused by permissions policy, and a button that
+ * silently does nothing is worse than one that says it could not.
+ */
+function CopyTextButton({ text }: { text: string }) {
+  const t = useT();
+  const [result, setResult] = useState<'idle' | 'copied' | 'failed'>('idle');
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setResult('copied');
+    } catch {
+      setResult('failed');
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="copy-report-text"
+        onClick={copy}
+        className="rounded border border-line px-3 py-1.5 text-sm text-ink hover:bg-surface-sunken"
+      >
+        {t('report.copy')}
+      </button>
+      {result !== 'idle' && (
+        <span
+          role="status"
+          className={`text-sm ${result === 'copied' ? 'text-verified' : 'text-urgent'}`}
+        >
+          {result === 'copied' ? t('report.copied') : t('report.copyFailed')}
+        </span>
+      )}
+    </>
+  );
+}
+
 export function ReportPage() {
   const t = useT();
   const { intakeId = '' } = useParams();
@@ -95,8 +137,11 @@ export function ReportPage() {
     <div className="space-y-4">
       <HeaderStrip intake={intake.data} />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),minmax(320px,26rem)]">
-        <section aria-label={t('report.label')} className="rounded border border-line bg-surface p-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),minmax(320px,26rem)] print:block">
+        <section
+          aria-label={t('report.label')}
+          className="rounded border border-line bg-surface p-4 sm:p-6 print:border-0 print:p-0"
+        >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-ink">{t('report.draft')}</h2>
             {isPhysician && (
@@ -132,19 +177,29 @@ export function ReportPage() {
             renderActions={renderActions}
           />
 
-          {/* The rendered text, for the physician who prints it or pastes it
-              into the HMIS. The backend renders it; nothing here re-renders. */}
-          <details className="mt-6">
-            <summary className="cursor-pointer text-xs text-ink-muted">
-              {t('report.plainText')}
-            </summary>
-            <pre className="mt-2 whitespace-pre-wrap rounded bg-surface-sunken p-3 text-xs text-ink">
-              {report.data.text}
-            </pre>
-          </details>
+          {/* The backend's rendered text is "what a physician reads, prints, or
+              pastes into the HMIS" — a capability worth keeping, and the worst
+              possible thing to *display*. Shown as a wall of monospace with
+              UPPERCASE headings it was the single most machine-like thing on
+              the page, and it is the reason this screen read as JSON. So it
+              stays available as an action and is not rendered. */}
+          <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-line pt-3 print:hidden">
+            <CopyTextButton text={report.data.text ?? ''} />
+            <button
+              type="button"
+              data-testid="print-report"
+              onClick={() => window.print()}
+              title={t('report.printHint')}
+              className="rounded border border-line px-3 py-1.5 text-sm text-ink hover:bg-surface-sunken"
+            >
+              {t('report.print')}
+            </button>
+          </div>
         </section>
 
-        <div className="lg:sticky lg:top-4 lg:self-start">
+        {/* Evidence is a screen interaction — click a line, see the page it
+            came from. On paper there is nothing to click. */}
+        <div className="lg:sticky lg:top-4 lg:self-start print:hidden">
           <EvidencePanel
             loading={evidence.isLoading}
             evidence={

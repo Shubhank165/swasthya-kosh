@@ -15,12 +15,37 @@ import type { Intake } from '../api/types';
 import { useT, type StringKey } from '../i18n';
 import { dateAndTime, humanise } from '../lib/format';
 
-const IDENTIFICATION: Record<string, StringKey> = {
+export const IDENTIFICATION: Record<string, StringKey> = {
   abha: 'id.abha',
   hospital_id: 'id.hospital_id',
   phone: 'id.phone',
   aadhaar_last4: 'id.aadhaar_last4',
   guest: 'id.guest',
+};
+
+/**
+ * Chrome, not clinical content — so these live here and in `strings.ts` rather
+ * than coming from the backend. A language tag and an intake status are facts
+ * about the *record*, and naming them in the reader's language is the same act
+ * as translating a column heading.
+ */
+const LANGUAGE_NAMES: Record<string, StringKey> = {
+  en: 'lang.en',
+  hi: 'lang.hi',
+  bn: 'lang.bn',
+  ta: 'lang.ta',
+  te: 'lang.te',
+  mr: 'lang.mr',
+  gu: 'lang.gu',
+  kn: 'lang.kn',
+  pa: 'lang.pa',
+};
+
+export const INTAKE_STATUS: Record<string, StringKey> = {
+  complete: 'intakeStatus.complete',
+  partial: 'intakeStatus.partial',
+  aborted_red_flag: 'intakeStatus.aborted_red_flag',
+  abandoned: 'intakeStatus.abandoned',
 };
 
 export function HeaderStrip({ intake }: { intake: Intake }) {
@@ -48,15 +73,22 @@ export function HeaderStrip({ intake }: { intake: Intake }) {
       )}
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+        {/* Eight characters of a uuid, and the monospace says so: it is a
+            handle to quote down a phone, not a number that means anything. */}
         <Item label={t('header.reference')}>
-          <span className="font-mono">{intake.intake_id.slice(0, 8)}</span>
+          <span className="font-mono text-sm tracking-tight">
+            {intake.intake_id.slice(0, 8)}
+          </span>
         </Item>
         <Item label={t('header.identifiedBy')}>
           {IDENTIFICATION[refType] ? t(IDENTIFICATION[refType]!) : humanise(refType)}
         </Item>
-        {/* The intake language is a tag — `hi`, `ta` — not a word to translate:
-            it says which language the record below is in. */}
-        <Item label={t('header.language')}>{intake.language}</Item>
+        {/* Which language the record below is in. Named, not tagged. */}
+        <Item label={t('header.language')}>
+          {LANGUAGE_NAMES[intake.language]
+            ? t(LANGUAGE_NAMES[intake.language]!)
+            : intake.language}
+        </Item>
         <Item label={t('header.source')}>
           {refType === 'phone' ? t('header.sourceApp') : t('header.sourceKiosk')}
         </Item>
@@ -64,7 +96,9 @@ export function HeaderStrip({ intake }: { intake: Intake }) {
           {intake.department_code ? humanise(intake.department_code) : '—'}
         </Item>
         <Item label={t('header.received')}>{dateAndTime(intake.received_at)}</Item>
-        <Item label={t('header.intakeStatus')}>{humanise(intake.status)}</Item>
+        <Item label={t('header.intakeStatus')}>
+          {INTAKE_STATUS[intake.status] ? t(INTAKE_STATUS[intake.status]!) : humanise(intake.status)}
+        </Item>
         <Item label={t('header.coverage')}>
           {/* The count, not a percentage. */}
           <span data-testid="coverage">

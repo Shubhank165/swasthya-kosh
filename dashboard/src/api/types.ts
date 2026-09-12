@@ -73,6 +73,14 @@ export interface LineMarker {
 
 export interface ReportLine {
   text: string;
+  /**
+   * The two halves of `text`, when it has two — the builder states them so this
+   * screen does not have to split on `": "`, which would be the dashboard
+   * deriving structure (§12). Both null on a line that is a sentence rather
+   * than a pair, and then `text` is what to render.
+   */
+  label?: string | null;
+  value?: string | null;
   field_ids?: readonly string[];
   fact_ids?: readonly string[];
   sources?: readonly Record<string, unknown>[];
@@ -126,6 +134,22 @@ export interface InteractionLine {
   source: string;
 }
 
+/**
+ * Where one uploaded document sits in time relative to this intake.
+ * `app/domain/report/model.py::TimelineEntry`.
+ *
+ * `dated: false` is the line's whole point: a document with no legible date
+ * cannot be placed at all, and that is a problem to state rather than hide.
+ */
+export interface TimelineEntry {
+  document_id: string;
+  document_date?: string | null;
+  days_before_intake?: number | null;
+  dated: boolean;
+  text: string;
+  fact_ids?: readonly string[];
+}
+
 export interface PhysicianReport {
   intake_id: string;
   hospital_id: string;
@@ -136,7 +160,10 @@ export interface PhysicianReport {
   conflicts?: readonly Contradiction[];
   alerts?: readonly RedFlagLine[];
   interactions?: readonly InteractionLine[];
+  document_timeline?: readonly TimelineEntry[];
   document_notes?: readonly ReportLine[];
+  /** Display label for every field id the report mentions. */
+  field_labels?: Readonly<Record<string, string>>;
   contains_repaired?: boolean;
   needs_verification?: boolean;
   demo?: boolean;

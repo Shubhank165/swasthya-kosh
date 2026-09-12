@@ -82,7 +82,14 @@ export function VerifyControls({
   }
 
   return (
-    <span className="flex shrink-0 gap-1 self-center opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+    // Verification is the primary workflow on this screen, and it used to have
+    // no affordance until the pointer happened to cross the line: `opacity-0`
+    // until hover means a physician who has not yet discovered the interaction
+    // sees a report with nothing to do on it. The controls are visible, and
+    // quiet — muted until the line is hovered or something in them has focus,
+    // which keeps a long report from reading as a wall of buttons without
+    // hiding that the buttons exist. Printing drops them entirely.
+    <span className="flex shrink-0 gap-1 self-center opacity-60 transition group-hover:opacity-100 group-focus-within:opacity-100 print:hidden">
       <Action
         label={t('verify.accept')}
         testId="accept"

@@ -151,11 +151,16 @@ def _effective_section(fact: Fact) -> Section:
 def _line_for(fact: Fact, templates: TemplateSet, labels: FieldLabels) -> ReportLine:
     """One answered fact as one line."""
     label = labels(fact.field_id)
+    value: str | None
     if fact.denies():
         text = templates.format("denies", field=label)
+        # "Denies fever" is one statement, not a label and a value. Saying
+        # otherwise would let a screen print "Fever — denies fever".
+        value = None
     else:
         rendered = fact.rendered_value()
         text = f"{label}: {rendered}" if rendered is not None else label
+        value = rendered
 
     if fact.original_text:
         # Verbatim, in the script it was spoken in. Printed beside the
@@ -165,6 +170,8 @@ def _line_for(fact: Fact, templates: TemplateSet, labels: FieldLabels) -> Report
 
     return ReportLine(
         text=text,
+        label=label,
+        value=value,
         field_ids=(fact.field_id,),
         fact_ids=(fact.fact_id,),
         sources=(fact.source,),
@@ -481,11 +488,16 @@ def build(
         for finding in interactions
     )
 
+    # Sorted, because this dict is serialised into the report and the report is
+    # byte-deterministic.
+    mentioned = {f.field_id for f in live} | {c.field_id for c in record.contradictions}
+
     return PhysicianReport(
         intake_id=str(record.intake_id),
         hospital_id=record.hospital_id,
         language=templates.language,
         template_version=TEMPLATE_VERSION,
+        field_labels={fid: labels(fid) for fid in sorted(mentioned)},
         sections=tuple(sections),
         unresolved=unresolved,
         conflicts=tuple(record.contradictions),
@@ -545,7 +557,10 @@ def render_text(report: PhysicianReport, templates: TemplateSet) -> str:
     if report.conflicts:
         for conflict in report.conflicts:
             today = conflict.reported_today
-            out.append(f"  {conflict.field_id.replace('_', ' ')}")
+            heading = report.field_labels.get(conflict.field_id) or conflict.field_id.replace(
+                "_", " "
+            )
+            out.append(f"  {heading}")
             out.append(
                 f"    {templates.text('conflict_today'):<16}: "
                 + (

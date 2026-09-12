@@ -127,6 +127,23 @@ const en = {
   'id.phone': 'Phone, in the app',
   'id.aadhaar_last4': 'Aadhaar last four',
   'id.guest': 'Guest — identity not established',
+  // The language the interview happened in. A tag on the wire, a name on
+  // screen — `hi` is not a word a physician should have to decode.
+  'lang.en': 'English',
+  'lang.hi': 'Hindi',
+  'lang.bn': 'Bengali',
+  'lang.ta': 'Tamil',
+  'lang.te': 'Telugu',
+  'lang.mr': 'Marathi',
+  'lang.gu': 'Gujarati',
+  'lang.kn': 'Kannada',
+  'lang.pa': 'Punjabi',
+  // How the intake ended on the device. `aborted_red_flag` humanised reads
+  // "aborted red flag", which is not a sentence anyone wrote on purpose.
+  'intakeStatus.complete': 'Completed',
+  'intakeStatus.partial': 'Left part-way',
+  'intakeStatus.aborted_red_flag': 'Stopped — urgent criteria',
+  'intakeStatus.abandoned': 'Abandoned',
 
   // Report
   'report.label': 'Report',
@@ -147,6 +164,26 @@ const en = {
   'report.reportedToday': 'Reported today',
   'report.onRecord': 'Already on record',
   'report.notMentioned': 'Not mentioned in today’s intake.',
+
+  // Sections the backend computes and this screen renders. Drug interactions
+  // and the document timeline were being sent and thrown away.
+  'report.alerts': 'Urgent review criteria',
+  'report.alertsNone': 'No urgent review criteria fired.',
+  'report.alertAcknowledged': 'Acknowledged by {actor}.',
+  'report.alertUnacknowledged': 'Not yet acknowledged.',
+  'report.interactions': 'Medicines to look at together',
+  'report.interactionsNone': 'No pairs flagged.',
+  'report.interactionSource': 'Source: {source}',
+  'report.documentTimeline': 'Uploaded documents, in time',
+  'report.documentTimelineNone': 'No documents were uploaded.',
+  'report.documentUndated': 'No legible date',
+  'report.documentNotes': 'Notes on the documents',
+  'report.copy': 'Copy report text',
+  'report.copied': 'Copied.',
+  'report.copyFailed': 'Could not copy. Use print instead.',
+  'report.print': 'Print',
+  'report.printHint':
+    'Prints the report as laid out here, without the evidence panel or the controls.',
 
   // Verification
   'verify.accept': 'Accept',
@@ -345,6 +382,19 @@ const hi: Record<StringKey, string> = {
   'id.phone': 'फ़ोन, ऐप में',
   'id.aadhaar_last4': 'Aadhaar के अंतिम चार अंक',
   'id.guest': 'अतिथि — पहचान स्थापित नहीं',
+  'lang.en': 'अंग्रेज़ी',
+  'lang.hi': 'हिन्दी',
+  'lang.bn': 'बांग्ला',
+  'lang.ta': 'तमिल',
+  'lang.te': 'तेलुगु',
+  'lang.mr': 'मराठी',
+  'lang.gu': 'गुजराती',
+  'lang.kn': 'कन्नड़',
+  'lang.pa': 'पंजाबी',
+  'intakeStatus.complete': 'पूर्ण',
+  'intakeStatus.partial': 'बीच में छूटा',
+  'intakeStatus.aborted_red_flag': 'रोका गया — तत्काल मानदंड',
+  'intakeStatus.abandoned': 'परित्यक्त',
 
   'report.label': 'रिपोर्ट',
   'report.draft': 'मसौदा रिपोर्ट — चिकित्सक सत्यापन आवश्यक',
@@ -364,6 +414,24 @@ const hi: Record<StringKey, string> = {
   'report.reportedToday': 'आज बताया गया',
   'report.onRecord': 'पहले से अभिलेख में',
   'report.notMentioned': 'आज के इनटेक में उल्लेख नहीं।',
+
+  'report.alerts': 'तत्काल समीक्षा मानदंड',
+  'report.alertsNone': 'कोई तत्काल समीक्षा मानदंड सक्रिय नहीं हुआ।',
+  'report.alertAcknowledged': '{actor} द्वारा स्वीकृत।',
+  'report.alertUnacknowledged': 'अभी तक स्वीकृत नहीं।',
+  'report.interactions': 'साथ में देखने योग्य दवाएँ',
+  'report.interactionsNone': 'कोई युग्म चिह्नित नहीं।',
+  'report.interactionSource': 'स्रोत: {source}',
+  'report.documentTimeline': 'अपलोड किए गए दस्तावेज़, समय-क्रम में',
+  'report.documentTimelineNone': 'कोई दस्तावेज़ अपलोड नहीं हुआ।',
+  'report.documentUndated': 'कोई पठनीय तिथि नहीं',
+  'report.documentNotes': 'दस्तावेज़ों पर टिप्पणियाँ',
+  'report.copy': 'रिपोर्ट का पाठ कॉपी करें',
+  'report.copied': 'कॉपी हो गया।',
+  'report.copyFailed': 'कॉपी नहीं हो सका। इसके बजाय प्रिंट करें।',
+  'report.print': 'प्रिंट करें',
+  'report.printHint':
+    'रिपोर्ट यहाँ दिखे अनुसार प्रिंट होती है — साक्ष्य पैनल और नियंत्रणों के बिना।',
 
   'verify.accept': 'स्वीकारें',
   'verify.amend': 'संशोधित करें',

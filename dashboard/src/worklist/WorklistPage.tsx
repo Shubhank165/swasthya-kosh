@@ -26,6 +26,7 @@ import { ConnectionState } from '../components/ConnectionState';
 import { useT, type StringKey, type Translate } from '../i18n';
 import { useWorklistSocket } from '../lib/realtime';
 import { humanise, timeOfDay } from '../lib/format';
+import { IDENTIFICATION, INTAKE_STATUS } from '../report/HeaderStrip';
 
 const STATE_KEYS: Record<WorklistState, StringKey> = {
   ready: 'state.ready',
@@ -215,13 +216,21 @@ function Row({ entry, t }: { entry: WorklistEntry; t: Translate }) {
         </Link>
         {/* How the patient was identified, not who they are. This table can be
             visible from a waiting room. */}
-        <span className="ml-2 text-xs text-ink-faint">{entry.patient_ref_type}</span>
+        <span className="ml-2 text-xs text-ink-faint">
+          {IDENTIFICATION[entry.patient_ref_type]
+            ? t(IDENTIFICATION[entry.patient_ref_type]!)
+            : humanise(entry.patient_ref_type)}
+        </span>
       </td>
       <td className="py-2 pr-3 tabular-nums text-ink-muted">
         {timeOfDay(entry.arrived_at)}
       </td>
       <td className="py-2 pr-3 text-ink-muted">{sourceOf(entry, t)}</td>
-      <td className="py-2 pr-3 text-ink-muted">{humanise(entry.intake_status)}</td>
+      <td className="py-2 pr-3 text-ink-muted">
+        {INTAKE_STATUS[entry.intake_status]
+          ? t(INTAKE_STATUS[entry.intake_status]!)
+          : humanise(entry.intake_status)}
+      </td>
       <td className="py-2 pr-3">
         <span
           data-state={state}

@@ -26,7 +26,7 @@ export function App() {
       <div className="min-h-screen">
         <TopBar />
         <IdleWarning enabled={session !== null} />
-        <main className="mx-auto max-w-7xl p-4">
+        <main className="mx-auto max-w-7xl p-4 print:max-w-none print:p-0">
           <Routes>
             <Route path="/" element={<WorklistPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
@@ -58,7 +58,7 @@ function TopBar() {
   const signOut = useSession((state) => state.signOut);
 
   return (
-    <header className="border-b border-line bg-surface">
+    <header className="border-b border-line bg-surface print:hidden">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-2">
         <span className="font-semibold text-ink">{t('app.name')}</span>
         <nav className="flex gap-3 text-sm">
