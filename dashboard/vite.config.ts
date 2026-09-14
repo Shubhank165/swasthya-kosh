@@ -11,7 +11,14 @@ export default defineConfig({
       // proxy reproduces that, rather than teaching the client about a second
       // origin it will never see again.
       '/api': { target: process.env.MEDIKIOSK_API ?? 'http://localhost:8000', changeOrigin: true },
-      '/ws': { target: process.env.MEDIKIOSK_API ?? 'http://localhost:8000', ws: true },
+      // `changeOrigin` matters as much here as on `/api`: Cloud Run routes by
+      // Host, so an upgrade forwarded with the dev server's own Host never
+      // reaches the service and the worklist sits on "reconnecting" forever.
+      '/ws': {
+        target: process.env.MEDIKIOSK_API ?? 'http://localhost:8000',
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
   test: {
