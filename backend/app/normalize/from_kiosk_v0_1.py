@@ -26,6 +26,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 from app.contracts.kiosk.v0_1 import SCHEMA_VERSION, KioskField, KioskIntakeV0_1, KioskTurn
 from app.domain.clinical.enums import ReporterRole
+from app.domain.clinical.sections import section_for
 from app.domain.record import (
     CanonicalRecord,
     Fact,
@@ -38,7 +39,6 @@ from app.domain.record import (
     RedFlagEvent,
     TurnSource,
 )
-from app.normalize.sections import section_for
 from app.normalize.values import certainty_for, coerce
 
 #: Namespace for deterministic fact ids. Ids must be a pure function of the

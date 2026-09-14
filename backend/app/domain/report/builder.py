@@ -29,6 +29,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from app.domain.clinical.enums import SECTION_ORDER, Certainty, ReporterRole, Section
+from app.domain.clinical.sections import DEFAULT_SECTION, section_for
 from app.domain.documents.extraction import (
     DocumentExtraction,
     DocumentItem,
@@ -131,21 +132,38 @@ def _markers_for(fact: Fact, templates: TemplateSet) -> tuple[LineMarker, ...]:
 
 
 def _effective_section(fact: Fact) -> Section:
-    """`fact.section`, except a chief-complaint field always renders as one.
+    """Where this fact renders, which is not always where it was filed.
 
-    The kiosk's core `chief_complaint` field already carries
-    `Section.CHIEF_COMPLAINT`. Content built on a different question set can
-    file the same clinical fact under a routing or triage field — the deployed
-    app bundle's `routing.chief_complaint` lands in HPI (2026-09-11) — and a
-    physician opening the report to a header that says "Nothing recorded" while
-    the actual complaint sits a section down is worse than a content bug: it
-    reads as no complaint was ever taken. Matched on field id suffix rather than
-    an exact string so any `<namespace>.chief_complaint` field is covered
-    without a content change.
+    Two corrections, and both exist because a section is decided at ingest and
+    read back months later.
+
+    A **chief-complaint** field always renders as one. Content built on a
+    different question set can file the same clinical fact under a routing or
+    triage field — the deployed app bundle's `routing.chief_complaint` lands in
+    HPI (2026-09-11) — and a physician opening the report to a header that says
+    "Nothing recorded" while the actual complaint sits a section down is worse
+    than a content bug: it reads as no complaint was ever taken. Matched on
+    field id suffix rather than an exact string so any
+    `<namespace>.chief_complaint` field is covered without a content change.
+
+    A fact filed under the **fallback** section is re-looked-up against the
+    current table. `DEFAULT_SECTION` is what an unrecognised field id gets, so
+    it means "nothing knew where this went" rather than "a physician's answer
+    belongs in the history of the presenting illness" — and every app-bundle
+    field id was unrecognised until the table learned them, which put age,
+    family history and the whole Ayurveda assessment into HPI. Re-deriving here
+    repairs intakes already in the database; re-ingesting them is not an option
+    and leaving them unreadable is not either.
+
+    A section the device or the table genuinely chose is never overridden. The
+    stored `fact.section` is untouched either way: this changes where a line
+    prints, not what was recorded.
     """
     field_id = fact.field_id
     if field_id == "chief_complaint" or field_id.endswith(".chief_complaint"):
         return Section.CHIEF_COMPLAINT
+    if fact.section is DEFAULT_SECTION:
+        return section_for(field_id)
     return fact.section
 
 
@@ -189,6 +207,10 @@ def _unresolved_line(fact: Fact, templates: TemplateSet, labels: FieldLabels) ->
     the distinction the whole record model exists to preserve: "we never asked",
     "we asked and could not pin it down" and "the patient declined" are three
     different things for a physician about to ask the same question.
+
+    `NOT_APPLICABLE` is kept here even though `build` no longer sends it: this
+    is a renderer, and a renderer that silently mislabels a status it was handed
+    is a worse failure than one branch that the current caller does not reach.
     """
     label = labels(fact.field_id)
     key = {
@@ -479,10 +501,27 @@ def build(
             )
         )
 
-    # Everything that did not settle, in field order. Nothing is omitted: a
-    # field the interview never reached is as much a finding as one it did.
+    # Everything that did not settle, in field order — except the fields that
+    # never applied.
+    #
+    # A gap and an exclusion are different findings. "Allergies — not
+    # established" is work a physician has to finish; "Last menstrual period —
+    # not applicable" on a male patient with a headache is the interview
+    # working correctly. One real intake produced fifty-five unresolved lines of
+    # which fifty-one were the second kind, burying the four of the first, and a
+    # section a physician learns to skip is worse than no section.
+    #
+    # `NOT_APPLICABLE` is dropped from the report only. The fact keeps its
+    # status in the record, the evidence endpoint still returns it, and the FHIR
+    # export is untouched — what was considered and excluded stays recoverable,
+    # it just stops competing for attention on the page.
     unsettled = sorted(
-        (f for f in voice if f.status is not FieldStatus.ANSWERED),
+        (
+            f
+            for f in voice
+            if f.status is not FieldStatus.ANSWERED
+            and f.status is not FieldStatus.NOT_APPLICABLE
+        ),
         key=lambda f: (f.field_id, f.fact_id),
     )
     unresolved = tuple(_unresolved_line(f, templates, labels) for f in unsettled)

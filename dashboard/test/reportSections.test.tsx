@@ -261,3 +261,35 @@ describe('markers', () => {
     ).toBeNull();
   });
 });
+
+describe('a section with nothing in it', () => {
+  /**
+   * An absent heading and an empty one say different things. A doctor who does
+   * not see "Allergies" cannot tell whether the patient has none or whether
+   * nobody asked — and the second is the one that matters, because it is work
+   * still to do. The report also has to keep the same shape from patient to
+   * patient, or there is nothing to learn to scan.
+   */
+  it('still renders its heading, and says it was not asked', () => {
+    show({
+      sections: [
+        { section: 'allergies', title: 'Allergies', lines: [] },
+        {
+          section: 'chief_complaint',
+          title: 'Chief complaint',
+          lines: [{ text: 'Chief complaint: headache', label: 'Chief complaint', value: 'headache' }],
+        },
+      ],
+    });
+
+    const empty = screen.getByRole('region', { name: 'Allergies' });
+    expect(within(empty).getByText('Not asked.')).toBeInTheDocument();
+    // Not a fact line: nothing here is clickable, because there is no evidence
+    // behind a question that was never put.
+    expect(within(empty).queryByRole('listitem')).toBeNull();
+
+    const filled = screen.getByRole('region', { name: 'Chief complaint' });
+    expect(within(filled).queryByText('Not asked.')).toBeNull();
+    expect(within(filled).getByText('headache')).toBeInTheDocument();
+  });
+});

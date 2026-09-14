@@ -64,19 +64,22 @@ export function ReportView({
           section a reader should have to scroll to. */}
       <AlertsBlock alerts={report.alerts ?? []} t={t} />
 
-      {sections
-        .filter((section) => section.lines.length > 0)
-        .map((section) => (
-          <ReportSectionBlock
-            key={section.section}
-            section={section}
-            lead={section.section === LEAD_SECTION}
-            facts={facts}
-            selectedFactId={selectedFactId}
-            onSelectFact={onSelectFact}
-            renderActions={renderActions}
-          />
-        ))}
+      {/* Every section the backend sent, including the empty ones. An absent
+          Allergies heading and an empty one say different things — "we never
+          asked" is not "no allergies" — and a report whose shape changes from
+          patient to patient is one a physician cannot learn to scan. */}
+      {sections.map((section) => (
+        <ReportSectionBlock
+          key={section.section}
+          section={section}
+          lead={section.section === LEAD_SECTION}
+          facts={facts}
+          selectedFactId={selectedFactId}
+          onSelectFact={onSelectFact}
+          renderActions={renderActions}
+          t={t}
+        />
+      ))}
 
       {/* Computed by the backend and, until now, discarded by this screen. */}
       <InteractionsBlock interactions={report.interactions ?? []} t={t} />
@@ -144,6 +147,7 @@ function ReportSectionBlock({
   selectedFactId,
   onSelectFact,
   renderActions,
+  t,
 }: {
   section: ReportSection;
   lead: boolean;
@@ -151,7 +155,16 @@ function ReportSectionBlock({
   selectedFactId: string | null;
   onSelectFact: (factId: string) => void;
   renderActions?: (factId: string) => React.ReactNode;
+  t: Translate;
 }) {
+  if (section.lines.length === 0) {
+    return (
+      <section aria-labelledby={`section-${section.section}`} data-empty="true">
+        <SectionHeading id={`section-${section.section}`}>{section.title}</SectionHeading>
+        <p className="text-ink-soft">{t('report.sectionEmpty')}</p>
+      </section>
+    );
+  }
   return (
     <section aria-labelledby={`section-${section.section}`}>
       <SectionHeading id={`section-${section.section}`}>{section.title}</SectionHeading>

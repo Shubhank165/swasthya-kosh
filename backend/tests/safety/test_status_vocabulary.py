@@ -11,6 +11,13 @@ is there so this cannot regress quietly.
 Getting it wrong is not a cosmetic bug. "We never asked about breathlessness"
 rendered as "denies breathlessness" is a false negative in a document a
 physician acts on, and it looks exactly like a true one.
+
+One status is deliberately not *printed*: `not_applicable`. It still has to
+survive ingest and storage distinctly, and it does — what changed is only that
+the report stops listing questions that never applied to this patient, because
+fifty-one of them will bury the four that are real outstanding work. "Survives
+distinctly" is a property of the record; it was never a promise that every
+status appears in every rendering.
 """
 
 from __future__ import annotations
@@ -135,7 +142,7 @@ class TestTheyRenderDistinctly:
     async def test_the_report_says_something_different_for_each(
         self, ingest_service: Any, report_service: Any, kiosk_payload: dict[str, Any]
     ) -> None:
-        """Four statuses, four sentences, none of them a denial."""
+        """Three statuses on the page, three sentences, none of them a denial."""
         result = await ingest_service.ingest(
             kiosk_payload, hospital_id=HOSPITAL_ID, actor_id="kiosk-1"
         )
@@ -149,21 +156,27 @@ class TestTheyRenderDistinctly:
         assert "not established" in lines["severity"]
         assert "not established" in lines["breathlessness"]
         assert "declined to answer" in lines["tobacco"]
-        assert "not applicable" in lines["pregnancy"]
 
-        # Four fields, four distinct lines.
-        assert len(set(lines.values())) == 4
+        # `not_applicable` is the one status that does not reach the report.
+        # A question that never applied is not a gap in the history, and on a
+        # real intake fifty-one of fifty-five unresolved lines were this status,
+        # burying the four that were actual outstanding work. See
+        # `TestNotApplicableSurvivesInTheRecord`: the distinction survives in
+        # the record, which is where §13.6 requires it to survive.
+        assert "pregnancy" not in lines
 
-        # Three distinct *phrasings* underneath. `unresolved` and `not_asked`
+        # Three fields, three distinct lines.
+        assert len(set(lines.values())) == 3
+
+        # Two distinct *phrasings* underneath. `unresolved` and `not_asked`
         # share one deliberately — the physician's next action is the same, ask
         # the question — and the machine-readable status stays on the structured
-        # line for anything that needs to tell them apart. `refused` and
-        # `not_applicable` each get their own, because both tell the physician
-        # not to ask again, for opposite reasons.
+        # line for anything that needs to tell them apart. `refused` gets its
+        # own, because it tells the physician not to ask again.
         phrasings = {
             text.split("—", 1)[1].strip() for text in lines.values() if "—" in text
         }
-        assert len(phrasings) == 3
+        assert len(phrasings) == 2
 
     async def test_nothing_unsettled_renders_as_a_denial(
         self,
@@ -203,11 +216,19 @@ class TestTheyRenderDistinctly:
     async def test_unsettled_fields_are_never_omitted(
         self, ingest_service: Any, report_service: Any, kiosk_payload: dict[str, Any]
     ) -> None:
-        """Every unsettled field appears somewhere on the report.
+        """Every unsettled field appears on the report — except the ones that
+        never applied.
 
         Omission is the other way to lose the distinction: a field that is
         simply absent reads, to a physician skimming, exactly like a field that
-        was asked and came back negative.
+        was asked and came back negative. That risk is what keeps `unresolved`,
+        `not_asked` and `refused` on the page unconditionally — each of them is
+        a question somebody still has to put.
+
+        `not_applicable` is not one of those. Nobody is going to ask a man with
+        a headache about his last menstrual period, so its absence cannot be
+        misread as a negative answer to a question that was asked. The record
+        still holds it; `TestNotApplicableSurvivesInTheRecord` says so.
         """
         result = await ingest_service.ingest(
             kiosk_payload, hospital_id=HOSPITAL_ID, actor_id="kiosk-1"
@@ -220,7 +241,9 @@ class TestTheyRenderDistinctly:
         )
         rendered = {fid for line in bundle.report.unresolved for fid in line.field_ids}
         expected = {
-            f.field_id for f in record.live_facts() if f.status is not FieldStatus.ANSWERED
+            f.field_id
+            for f in record.live_facts()
+            if f.status not in (FieldStatus.ANSWERED, FieldStatus.NOT_APPLICABLE)
         }
         assert expected <= rendered
 
@@ -239,3 +262,41 @@ class TestTheyRenderDistinctly:
         assert texts[FieldStatus.REFUSED] != texts[FieldStatus.UNRESOLVED]
         assert texts[FieldStatus.NOT_APPLICABLE] != texts[FieldStatus.UNRESOLVED]
         assert all("denies" not in t.lower() for t in texts.values())
+
+
+class TestNotApplicableSurvivesInTheRecord:
+    """Dropping it from the report must not drop it from the record.
+
+    This is the test that makes the display decision safe. The status is what
+    lets somebody later answer "was she ever asked about pregnancy?" — and "the
+    question did not apply" is a different answer from "nobody knows", which is
+    what a deleted fact would give. §13.6 is about the record, and the record is
+    untouched.
+    """
+
+    async def test_the_fact_is_still_stored_with_its_status(
+        self, session: Any, ingest_service: Any, kiosk_payload: dict[str, Any]
+    ) -> None:
+        from app.repositories.intakes import IntakeRepository
+
+        result = await ingest_service.ingest(
+            kiosk_payload, hospital_id=HOSPITAL_ID, actor_id="kiosk-1"
+        )
+        loaded = await IntakeRepository(session).load(
+            hospital_id=HOSPITAL_ID, intake_id=result.intake_id
+        )
+        by_field = {f.field_id: f for f in loaded.live_facts()}
+        assert by_field["pregnancy"].status is FieldStatus.NOT_APPLICABLE
+        assert by_field["pregnancy"].denies() is False
+
+    def test_the_renderer_still_has_a_sentence_for_it(self, content: Any) -> None:
+        """`_unresolved_line` keeps the branch even though `build` no longer
+        feeds it one. A renderer handed a status it silently mislabels is a
+        worse failure than a branch the current caller does not reach."""
+        templates = content.templates.require("en")
+        line = builder._unresolved_line(
+            _fact("pregnancy", FieldStatus.NOT_APPLICABLE),
+            templates,
+            builder.FieldLabels({}),
+        )
+        assert "not applicable" in line.text

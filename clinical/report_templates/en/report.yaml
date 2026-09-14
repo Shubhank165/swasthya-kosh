@@ -92,6 +92,168 @@ strings:
 
   demo_banner: "DEMONSTRATION MODE — this report was generated from fixture data."
 
+
+# Field labels — what each recorded answer is called on the report.
+#
+# A field id is a key in a question bank, not a clinical term. Without an entry
+# here the builder falls back to the id itself, and a physician reads
+# `ayush.after_eating` and `general.known_conditions` — the JSON, in other
+# words, which tells them about our data model and nothing about their patient.
+#
+# Per language, and written rather than translated, for the same reason as
+# every other string in this file: the Hindi label for an Ayurveda concept is
+# the term a vaidya actually uses, not a gloss of the English one.
+#
+# Ids are grouped by the section they render under. An id missing from this
+# file still prints — it is a label to write, never a fact to drop.
+labels:
+  # chief complaint
+  routing.chief_complaint: "Chief complaint"
+  routing.complaints: "Problems reported"
+
+  # identity
+  general.age: "Age"
+  general.reporter: "Answered by"
+  general.sex: "Sex"
+  reporter: "Answered by"
+
+  # history of presenting illness
+  bowel.blood_in_stool: "Blood in stool"
+  bowel.consistency: "Stool consistency"
+  bowel.incomplete_evacuation: "Incomplete evacuation"
+  bowel.stool_frequency: "Stool frequency"
+  digestive.acidity: "Acidity"
+  digestive.appetite_change: "Change in appetite"
+  digestive.nausea: "Nausea"
+  digestive.relation_to_food: "Relation to food"
+  fatigue.effect_on_activity: "Effect on daily activity"
+  fatigue.weight_change: "Change in weight"
+  fever.chills: "Chills"
+  fever.fever_pattern: "Fever pattern"
+  fever.maximum_temperature: "Highest temperature"
+  fever.measured: "Temperature measured"
+  fixed.timeline: "Patient's own account"
+  general.aggravating: "Made worse by"
+  general.duration: "Duration"
+  general.onset: "Onset"
+  general.pattern: "Timing pattern"
+  general.previous_episodes: "Happened before"
+  general.progression: "Progression"
+  general.relieving: "Relieved by"
+  general.severity: "Severity"
+  general.treatment_tried: "Treatment already tried"
+  headache.character: "Headache character"
+  headache.light_sound_sensitivity: "Light or sound sensitivity"
+  headache.site: "Headache site"
+  headache.vision_change: "Change in vision"
+  joint.joints_affected: "Joints affected"
+  joint.movement_limited: "Movement limited"
+  joint.stiffness_timing: "When stiffness is worst"
+  joint.swelling: "Joint swelling"
+  mental.appetite_or_sleep_affected: "Appetite or sleep affected"
+  mental.effect_on_daily_life: "Effect on daily life"
+  mental.mood: "Mood"
+  other.description: "Other problem, in the patient's words"
+  pain.character: "Pain character"
+  pain.radiation: "Pain spreads to"
+  pain.site: "Pain site"
+  respiratory.breathlessness: "Breathlessness"
+  respiratory.cough_type: "Cough type"
+  respiratory.sputum_colour: "Sputum colour"
+  respiratory.wheeze: "Wheezing"
+  skin.distribution: "Where it appears"
+  skin.itching: "Itching"
+  skin.lesion_type: "Type of skin lesion"
+  skin.spreading: "Spreading"
+  sleep.difficulty: "Difficulty sleeping"
+  sleep.hours: "Hours of sleep"
+  sleep.refreshed: "Wakes refreshed"
+  urinary.blood_in_urine: "Blood in urine"
+  urinary.burning: "Burning on passing urine"
+  urinary.frequency_change: "Change in urinary frequency"
+  urinary.night_urination: "Passing urine at night"
+  urinary.urine_colour: "Urine colour"
+
+  # past medical history
+  general.known_conditions: "Known conditions"
+
+  # past surgical history
+  general.past_surgery: "Past surgery"
+
+  # drug history
+  general.current_medications: "Current medicines"
+
+  # allergies
+  general.allergies: "Allergies"
+
+  # family history
+  general.family_history: "Family history"
+
+  # personal history
+  general.alcohol: "Alcohol use"
+  general.pregnancy: "Pregnancy"
+  general.tobacco: "Tobacco use"
+  menstrual.cycle_length: "Cycle length"
+  menstrual.cycle_regular: "Cycle regular"
+  menstrual.flow: "Menstrual flow"
+  menstrual.last_period: "Last menstrual period"
+  menstrual.pain_with_periods: "Pain with periods"
+
+  # ayurveda, patient-reported
+  ayush.after_eating: "How they feel after eating"
+  ayush.appetite: "Appetite and digestion (Agni)"
+  ayush.bowel_habit: "Bowel pattern (Koshtha)"
+  ayush.daily_routine: "Daily routine (Dinacharya)"
+  ayush.diet_type: "Type of diet"
+  ayush.energy_through_day: "Energy through the day (Bala)"
+  ayush.environment: "Effect of season and surroundings (Ritu)"
+  ayush.food_preferences: "Taste preferences (Rasa)"
+  ayush.meal_regularity: "Regularity of meals"
+  ayush.physical_activity: "Physical activity (Vyayama)"
+  ayush.sleep_quality: "Sleep quality (Nidra)"
+  ayush.stress: "Mental stress (Manas)"
+  ayush.sweating: "Perspiration (Sweda)"
+  ayush.thirst: "Thirst (Trishna)"
+  ayush.urine_pattern: "Urine pattern (Mutra)"
+
+  # screening responses
+  bleeding: "Bleeding"
+  bleeding.amount: "Amount of bleeding"
+  bleeding.ongoing: "Bleeding still going on"
+  bleeding.site: "Site of bleeding"
+  breathlessness: "Breathlessness"
+  chest_pain: "Chest pain"
+  screen_fever: "Fever"
+  screen_sweating: "Sweating"
+  screen_vomiting: "Vomiting"
+
+  adherence: "Medicine adherence"
+  agni: "Digestive capacity (Agni)"
+  alcohol: "Alcohol use"
+  allergy: "Allergy"
+  appetite: "Appetite"
+  associated_symptoms: "Associated symptoms"
+  bladder_habit: "Bladder pattern"
+  bowel_habit: "Bowel pattern"
+  complaint_site: "Site"
+  diet: "Diet"
+  family_history: "Family history"
+  fever_duration: "Duration of fever"
+  hospitalisation: "Previous hospitalisation"
+  koshtha: "Bowel constitution (Koshtha)"
+  loss_of_consciousness: "Loss of consciousness"
+  mala: "Stool (Mala)"
+  mutra: "Urine (Mutra)"
+  nidra: "Sleep (Nidra)"
+  past_medical_history: "Past medical history"
+  prakriti_self_report: "Constitution, patient-reported (Prakriti)"
+  previous_episodes: "Previous episodes"
+  prior_investigations: "Prior investigations"
+  sleep: "Sleep"
+  timing: "Timing"
+  tobacco: "Tobacco use"
+  weight_loss: "Weight loss"
+
 sections:
   identity: "Patient"
   chief_complaint: "Chief complaint"

@@ -45,10 +45,9 @@ SCREENING RESPONSES
   Nothing recorded.
 
 UNRESOLVED
-  - breathlessness — not established
-  - Currently pregnant — not applicable
+  - Breathlessness — not established
   - Severity — not established
-  - tobacco — patient declined to answer
+  - Tobacco use — patient declined to answer
   - doc_000002 read with low confidence — verify against the original [low-confidence reading — verify against the original]
 
 HISTORY TIMELINE

@@ -28,6 +28,7 @@ from typing import Any
 
 from app.contracts.kiosk.v0_2 import SCHEMA_VERSION, KioskFieldV0_2, KioskIntakeV0_2
 from app.domain.clinical.enums import ReporterRole
+from app.domain.clinical.sections import section_for
 from app.domain.record import (
     CanonicalRecord,
     CarriedForward,
@@ -47,7 +48,6 @@ from app.normalize.from_kiosk_v0_1 import (
     fact_id_for,
     intake_uuid,
 )
-from app.normalize.sections import section_for
 from app.normalize.values import certainty_for, coerce
 
 

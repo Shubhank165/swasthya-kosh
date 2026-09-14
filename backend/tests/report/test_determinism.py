@@ -333,10 +333,64 @@ class TestChiefComplaintPromotion:
         assert builder._effective_section(fact) is Section.CHIEF_COMPLAINT
 
     def test_a_field_that_merely_contains_the_word_is_not_promoted(self) -> None:
-        """`routing.complaints` (plural) is the multi-select of complaint
-        areas used for triage, not the chief complaint itself. A substring
-        match would have promoted it too."""
+        """The suffix rule must not fire on a field that only contains the word.
+
+        `x.complaints` (plural) is not `x.chief_complaint`, and a substring
+        match would have promoted it. Asserted on an id the section table does
+        not know, so this tests the suffix rule on its own: the real
+        `routing.complaints` now reaches CHIEF COMPLAINT by the table instead,
+        which is a different mechanism and has its own test below.
+        """
+        fact = self._fact("triage.complaints", Section.HPI)
+        assert builder._effective_section(fact) is Section.HPI
+
+
+class TestFallbackFieldsAreReFiled:
+    """A fact filed under the fallback section is re-looked-up at render time.
+
+    Every app-bundle field id was unknown to the section table until it learned
+    them, so every one of them was stored as `DEFAULT_SECTION` — which put the
+    patient's age, their family history and the entire Ayurveda assessment
+    under *History of presenting illness*, thirty-four lines deep, with an empty
+    Ayurveda heading beneath. Those intakes are in the database and cannot be
+    re-ingested, so the repair has to happen on the way out.
+
+    The boundary matters as much as the repair: a section something actually
+    chose is never second-guessed.
+    """
+
+    def _fact(self, field_id: str, section: Section) -> Fact:
+        return Fact(
+            fact_id="f1",
+            field_id=field_id,
+            status=FieldStatus.ANSWERED,
+            source=TurnSource(turn_id=1),
+            section=section,
+            recorded_at=FROZEN_NOW,
+        )
+
+    def test_an_ayurveda_field_stored_as_hpi_renders_under_ayurveda(self) -> None:
+        fact = self._fact("ayush.appetite", Section.HPI)
+        assert builder._effective_section(fact) is Section.AYURVEDA
+
+    def test_age_stored_as_hpi_renders_under_identity(self) -> None:
+        fact = self._fact("general.age", Section.HPI)
+        assert builder._effective_section(fact) is Section.IDENTITY
+
+    def test_the_complaint_multi_select_reaches_chief_complaint(self) -> None:
+        """By the table, not by the suffix rule — see the class above."""
         fact = self._fact("routing.complaints", Section.HPI)
+        assert builder._effective_section(fact) is Section.CHIEF_COMPLAINT
+
+    def test_a_deliberate_section_is_never_overridden(self) -> None:
+        """A device that filed this under personal history meant it. The table
+        would say Ayurveda; the stored answer wins because it is not the
+        fallback."""
+        fact = self._fact("ayush.appetite", Section.PERSONAL_HISTORY)
+        assert builder._effective_section(fact) is Section.PERSONAL_HISTORY
+
+    def test_an_unknown_field_stays_in_the_fallback(self) -> None:
+        fact = self._fact("nobody.knows_this", Section.HPI)
         assert builder._effective_section(fact) is Section.HPI
 
 
