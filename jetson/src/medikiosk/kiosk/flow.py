@@ -387,7 +387,8 @@ class KioskFlow:
             value=bpm if measured else None,
             method="camera",
         )
-        self.stage = Stage.HUB
+        # Stay here: this is the only screen that shows the reading, and staying is what makes a
+        # retry possible when the camera could not hold the patient's face.
 
     def record_answer(
         self,
@@ -613,13 +614,16 @@ class KioskFlow:
             if action == "measure":
                 return "measure"
             if action in {"skip", "unknown", "refuse"}:
-                self.record_answer(
-                    "vitals.heart_rate",
-                    t("vitals", self.language),
-                    "",
-                    "refused" if action == "refuse" else "unresolved",
-                    method=method,
-                )
+                # A reading already on file was recorded when it was taken; leaving the screen
+                # afterwards is not a refusal and must not supersede it with an empty answer.
+                if self.vitals is None:
+                    self.record_answer(
+                        "vitals.heart_rate",
+                        t("vitals", self.language),
+                        "",
+                        "refused" if action == "refuse" else "unresolved",
+                        method=method,
+                    )
                 self.stage = Stage.HUB
             else:
                 raise ValueError("Measure or skip")
