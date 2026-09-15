@@ -52,15 +52,15 @@ describe('who may open this dashboard', () => {
   it('shows the sign-in screen when there is no session at all', async () => {
     stubFetch({});
     renderWithProviders(<App />);
-    expect(await screen.findByRole('button', { name: /open the worklist/i })).toBeVisible();
-    expect(screen.queryByRole('table')).toBeNull();
+    expect(await screen.findByRole('button', { name: /sign in to opd queue/i })).toBeVisible();
+    expect(screen.queryByRole('list', { name: /opd queue/i })).toBeNull();
   });
 
   it('lets a physician through to the worklist', async () => {
     stubFetch({ 'GET /worklist*': () => ({ body: WORKLIST }) });
     signInAs('physician');
     renderWithProviders(<App />, { route: '/' });
-    expect(await screen.findByRole('table')).toBeVisible();
+    expect(await screen.findByRole('list', { name: /opd queue/i })).toBeVisible();
   });
 
   it('refuses a physician the admin-only quality view without hiding half of it', async () => {
@@ -86,7 +86,7 @@ describe('who may open this dashboard', () => {
     renderWithProviders(<App />);
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /open the worklist/i })).toBeVisible(),
+      expect(screen.getByRole('button', { name: /sign in to opd queue/i })).toBeVisible(),
     );
     expect(screen.getByText(/server refused/i)).toBeVisible();
   });

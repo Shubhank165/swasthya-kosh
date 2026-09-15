@@ -8,7 +8,7 @@ import {
   Search,
 } from 'lucide-react';
 
-import { useWorklist } from '../api/queries';
+import { useHospitals, useWorklist } from '../api/queries';
 import { useSession } from '../auth/session';
 import { ConnectionState } from '../components/ConnectionState';
 import { useWorklistSocket } from '../lib/realtime';
@@ -16,13 +16,45 @@ import { humanise, timeOfDay } from '../lib/format';
 import { HOSPITALS } from '../auth/LoginPage';
 import { useLocale } from '../i18n';
 
-const DEPT_PILLS = [
-  { id: 'all', labelEn: 'All Departments', labelHi: 'सभी विभाग' },
-  { id: 'kayachikitsa', labelEn: 'Kayachikitsa', labelHi: 'कायचिकित्सा' },
-  { id: 'panchakarma', labelEn: 'Panchakarma', labelHi: 'पंचकर्म' },
-  { id: 'shalya-tantra', labelEn: 'Shalya Tantra', labelHi: 'शल्य तंत्र' },
-  { id: 'kaumarbhritya', labelEn: 'Kaumarbhritya', labelHi: 'कौमारभृत्य' },
-];
+/**
+ * The five states the backend actually reports, each with its own badge.
+ *
+ * Collapsing them into three loses the two that matter most to a physician
+ * scanning the queue: `seen` is a consultation that already happened, and
+ * `needs_review` is a record with something wrong in it. Both previously
+ * rendered as "Interview in Progress" — a patient who had already been seen
+ * appeared to still be answering questions at the kiosk.
+ */
+const STATE_BADGES: Record<
+  string,
+  { en: string; hi: string; tone: string }
+> = {
+  red_flag_pending: {
+    en: 'Emergency Red-Flag',
+    hi: 'आपातकालीन रेड-फ्लैग',
+    tone: 'bg-alert-soft text-alert',
+  },
+  ready: {
+    en: 'Ready for Review',
+    hi: 'समीक्षा के लिए तैयार',
+    tone: 'bg-herb-soft text-herb',
+  },
+  needs_review: {
+    en: 'Needs Review',
+    hi: 'समीक्षा आवश्यक',
+    tone: 'bg-conflict-soft text-conflict',
+  },
+  partial: {
+    en: 'Interview in Progress',
+    hi: 'साक्षात्कार जारी है',
+    tone: 'bg-saffron-soft text-saffron',
+  },
+  seen: {
+    en: 'Seen',
+    hi: 'परामर्श हो चुका',
+    tone: 'bg-surface-sunken text-ink-muted',
+  },
+};
 
 export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
   const session = useSession((state) => state.session);
@@ -31,6 +63,20 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
 
   const [department, setDepartment] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const hospitals = useHospitals();
+  const deptPills = useMemo(() => {
+    const facility = hospitals.data?.hospitals?.find(
+      (h) => h.hospital_id === session?.hospitalId,
+    );
+    return [
+      { id: 'all', label: isHi ? 'सभी विभाग' : 'All Departments' },
+      ...(facility?.departments ?? []).map((d) => ({
+        id: d.code,
+        label: d.display,
+      })),
+    ];
+  }, [hospitals.data, session?.hospitalId, isHi]);
 
   const worklist = useWorklist(department, []);
   const refetch = worklist.refetch;
@@ -62,7 +108,10 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
   const progressCount = rawEntries.filter(
     (e) => e.state === 'partial' || e.state === 'needs_review',
   ).length;
-  const redFlagCount = pending.length + rawEntries.filter((e) => e.state === 'red_flag_pending').length;
+  // `pending_alerts` is *defined* as the entries in `red_flag_pending`
+  // (domain/worklist.py:142), so adding the two counted every red-flag patient
+  // twice: one patient with chest pain read as "2 Emergency Red-Flags".
+  const redFlagCount = rawEntries.filter((e) => e.state === 'red_flag_pending').length;
 
   const matchedHospital = HOSPITALS.find((h) => h.id === session?.hospitalId);
   const hospitalName = isHi
@@ -214,7 +263,7 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
         </div>
 
         <div className="flex flex-wrap gap-1.5">
-          {DEPT_PILLS.map((dept) => {
+          {deptPills.map((dept) => {
             const isSelected =
               (dept.id === 'all' && department === null) || department === dept.id;
             return (
@@ -228,7 +277,7 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
                     : 'border border-line bg-white text-ink-muted hover:border-herb/50 hover:text-ink'
                 }`}
               >
-                {isHi ? dept.labelHi : dept.labelEn}
+                {dept.label}
               </button>
             );
           })}
@@ -258,15 +307,17 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
               : isHi ? 'वर्तमान में कतार में कोई रोगी नहीं है।' : 'No patients currently in queue.'}
           </div>
         ) : (
-          <div className="divide-y divide-line">
+          <div role="list" aria-label={isHi ? 'ओपीडी कतार' : 'OPD queue'} className="divide-y divide-line">
             {entries.map((entry, index) => {
               const tokenNum = `#OPD-${101 + index}`;
-              const isAlert = entry.state === 'red_flag_pending';
-              const isReady = entry.state === 'ready';
+              const badge = STATE_BADGES[entry.state] ?? STATE_BADGES.partial!;
 
               return (
                 <div
                   key={entry.intake_id}
+                  role="listitem"
+                  data-testid="worklist-row"
+                  data-state={entry.state}
                   className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-[#fbfcfb]"
                 >
                   <div className="flex items-center gap-4">
@@ -287,8 +338,10 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
                         <span className="rounded-md bg-surface-sunken px-2 py-0.5 text-[10px] font-semibold text-ink-muted uppercase border border-line">
                           {entry.patient_ref_type === 'phone'
                             ? (isHi ? 'ऐप उपयोगकर्ता' : 'App User')
+                            : entry.patient_ref_type === 'abha'
+                            ? (isHi ? 'आभा (ABDM)' : 'ABHA / ABDM')
                             : entry.patient_ref_type === 'hospital_id'
-                            ? (isHi ? 'आयुष्मान भारत (ABDM)' : 'ABDM / ABHA')
+                            ? (isHi ? 'अस्पताल यूएचआईडी' : 'Hospital UHID')
                             : (isHi ? 'कियोस्क आगंतुक' : 'Kiosk Guest')}
                         </span>
                         <span className="text-xs text-ink-muted">
@@ -317,19 +370,10 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
                   {/* Status & Action */}
                   <div className="flex items-center gap-4">
                     <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        isAlert
-                          ? 'bg-alert-soft text-alert'
-                          : isReady
-                          ? 'bg-herb-soft text-herb'
-                          : 'bg-saffron-soft text-saffron'
-                      }`}
+                      data-state={entry.state}
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${badge.tone}`}
                     >
-                      {isAlert
-                        ? isHi ? 'आपातकालीन रेड-फ्लैग' : 'Emergency Red-Flag'
-                        : isReady
-                        ? isHi ? 'समीक्षा के लिए तैयार' : 'Ready for Review'
-                        : isHi ? 'साक्षात्कार जारी है' : 'Interview in Progress'}
+                      {isHi ? badge.hi : badge.en}
                     </span>
 
                     <Link

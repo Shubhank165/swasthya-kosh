@@ -12,7 +12,7 @@
  * anyway — see `canSeeClinicalContent` and `RequireDashboardRole`. Nothing is
  * written to localStorage, on this screen or any other.
  */
-import { useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   ClipboardList,
   Leaf,
@@ -21,10 +21,18 @@ import {
   Stethoscope,
   UserRound,
 } from 'lucide-react';
+import { useHospitals } from '../api/queries';
 import { LocaleSwitch } from '../components/LocaleSwitch';
 import { useLocale, useT } from '../i18n';
 import { useSession, type DashboardRole } from './session';
 
+/**
+ * Fallback only, used when `/hospitals` cannot be reached.
+ *
+ * The live list comes from the backend — see `useHospitals`. A facility that
+ * exists only in this array is one a physician can select and then find an
+ * empty worklist behind, because every query is scoped by `hospital_id`.
+ */
 export const HOSPITALS = [
   { id: 'aiia-delhi', nameEn: 'All India Institute of Ayurveda (AIIA), New Delhi', nameHi: 'अखिल भारतीय आयुर्वेद संस्थान (AIIA), नई दिल्ली' },
   { id: 'nia-jaipur', nameEn: 'National Institute of Ayurveda (NIA), Jaipur', nameHi: 'राष्ट्रीय आयुर्वेद संस्थान (NIA), जयपुर' },
@@ -53,8 +61,35 @@ export function LoginPage() {
   const signIn = useSession((state) => state.signIn);
   const endedBecause = useSession((state) => state.endedBecause);
 
+  const hospitals = useHospitals();
+  const facilities = useMemo(
+    () => hospitals.data?.hospitals ?? [],
+    [hospitals.data],
+  );
+
   const [hospitalId, setHospitalId] = useState(HOSPITALS[0]!.id);
   const [departmentCode, setDepartmentCode] = useState(DEPARTMENTS[0]!.id);
+
+  // Once the real list arrives, settle on a facility and a department that
+  // actually exist. Selecting one that does not is indistinguishable from an
+  // outage: the worklist simply comes back empty.
+  const firstFacility = facilities[0]?.hospital_id;
+  useEffect(() => {
+    if (firstFacility && !facilities.some((h) => h.hospital_id === hospitalId)) {
+      setHospitalId(firstFacility);
+    }
+  }, [facilities, firstFacility, hospitalId]);
+
+  const departments = useMemo(
+    () => facilities.find((h) => h.hospital_id === hospitalId)?.departments ?? [],
+    [facilities, hospitalId],
+  );
+  const firstDepartment = departments[0]?.code;
+  useEffect(() => {
+    if (firstDepartment && !departments.some((d) => d.code === departmentCode)) {
+      setDepartmentCode(firstDepartment);
+    }
+  }, [departments, firstDepartment, departmentCode]);
   const [role, setRole] = useState<'doctor' | 'receptionist'>('doctor');
   const [doctorName, setDoctorName] = useState(DOCTORS[0]!);
   const [pin, setPin] = useState('');
@@ -227,11 +262,17 @@ export function LoginPage() {
                 onChange={(e) => setHospitalId(e.target.value)}
                 className="h-11 w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none transition-colors hover:border-herb focus:ring-2 focus:ring-herb cursor-pointer"
               >
-                {HOSPITALS.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {isHi ? h.nameHi : h.nameEn}
-                  </option>
-                ))}
+                {facilities.length > 0
+                  ? facilities.map((h) => (
+                      <option key={h.hospital_id} value={h.hospital_id}>
+                        {h.display_name}
+                      </option>
+                    ))
+                  : HOSPITALS.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {isHi ? h.nameHi : h.nameEn}
+                      </option>
+                    ))}
               </select>
             </label>
 
@@ -244,11 +285,17 @@ export function LoginPage() {
                 onChange={(e) => setDepartmentCode(e.target.value)}
                 className="h-11 w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none transition-colors hover:border-herb focus:ring-2 focus:ring-herb cursor-pointer"
               >
-                {DEPARTMENTS.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {isHi ? d.nameHi : d.nameEn}
-                  </option>
-                ))}
+                {departments.length > 0
+                  ? departments.map((d) => (
+                      <option key={d.code} value={d.code}>
+                        {d.display}
+                      </option>
+                    ))
+                  : DEPARTMENTS.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {isHi ? d.nameHi : d.nameEn}
+                      </option>
+                    ))}
               </select>
             </label>
 

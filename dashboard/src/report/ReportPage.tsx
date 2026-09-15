@@ -52,7 +52,11 @@ export function ReportPage() {
   const documents = useDocuments(intakeId);
   const [selectedFactId, setSelectedFactId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<ReportTab>('complaint');
+  // Opens on the whole record, not on one tab. A physician's first look must
+  // show everything that is there — prior investigations included, which is
+  // where the scanned-document evidence trail starts. The tabs then narrow the
+  // view for someone who wants to focus; they never decide what gets seen.
+  const [activeTab, setActiveTab] = useState<ReportTab>('all');
 
   const evidence = useEvidence(intakeId, selectedFactId);
   const verifyFact = useVerifyFact(intakeId);
@@ -63,6 +67,12 @@ export function ReportPage() {
     for (const fact of intake.data?.facts ?? []) byId[fact.fact_id] = fact;
     return byId;
   }, [intake.data]);
+
+  // Coverage as a count, never a percentage (§5). A percentage reads as a score
+  // and invites "83% is fine"; "9 of 12 answered" states what is missing.
+  const factList = intake.data?.facts ?? [];
+  const answered = factList.filter((fact) => fact.status === 'answered').length;
+  const total = factList.length;
 
   const documentUrl = useCallback(
     (documentId: string) =>
@@ -186,6 +196,29 @@ export function ReportPage() {
           )}
         </div>
       </section>
+
+      {/* The report must say what it is before anyone reads it (§11): an
+          unverified draft, and how much of the interview was actually answered.
+          Both were on the old HeaderStrip; the redesign replaced that header
+          and they went with it. */}
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-5 py-3 text-xs sm:text-sm ${
+          isVerified
+            ? 'border-verified/30 bg-verified-soft text-verified'
+            : 'border-uncertain/30 bg-uncertain-soft text-uncertain'
+        }`}
+      >
+        <span className="font-semibold">
+          {isVerified
+            ? isHi
+              ? 'चिकित्सक द्वारा सत्यापित'
+              : 'Verified by physician'
+            : t('report.draft')}
+        </span>
+        <span className="font-medium text-ink-muted" data-testid="coverage">
+          {t('header.answered', { answered, total })}
+        </span>
+      </div>
 
       {/* Tabs navigation */}
       <div className="flex flex-wrap gap-1.5 rounded-2xl border border-line bg-white p-1.5 shadow-sm">

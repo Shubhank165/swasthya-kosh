@@ -101,10 +101,10 @@ export function ReportView({
 
   return (
     <article className="space-y-6" aria-label={label}>
-      {/* Alerts block on complaint or all */}
-      {(activeTab === 'all' || activeTab === 'complaint') && (
-        <AlertsBlock alerts={report.alerts ?? []} t={t} />
-      )}
+      {/* Alerts render on every tab. A red flag a physician cannot see because
+          they are looking at the Ayurveda tab is a red flag that did not fire —
+          the point of the block is that it is impossible to miss. */}
+      <AlertsBlock alerts={report.alerts ?? []} t={t} />
 
       {/* Render matching sections */}
       {filteredSections.map((section) => (
@@ -142,31 +142,35 @@ export function ReportView({
         </>
       )}
 
-      {/* Discrepancies, notes and unresolved on discrepancies or all */}
+      {/* Notes are supporting material and stay on their tab. */}
       {(activeTab === 'all' || activeTab === 'discrepancies') && (
-        <>
-          <DocumentNotesBlock
-            lines={report.document_notes ?? []}
-            facts={facts}
-            selectedFactId={selectedFactId}
-            onSelectFact={onSelectFact}
-            t={t}
-          />
-          <ConflictsBlock
-            conflicts={report.conflicts ?? []}
-            labelFor={labelFor}
-            selectedFactId={selectedFactId}
-            onSelectFact={onSelectFact}
-          />
-          <UnresolvedBlock
-            lines={report.unresolved ?? []}
-            facts={facts}
-            selectedFactId={selectedFactId}
-            onSelectFact={onSelectFact}
-            renderActions={renderActions}
-          />
-        </>
+        <DocumentNotesBlock
+          lines={report.document_notes ?? []}
+          facts={facts}
+          selectedFactId={selectedFactId}
+          onSelectFact={onSelectFact}
+          t={t}
+        />
       )}
+
+      {/* Conflicts and unresolved are NOT tab-scoped, and must not become so.
+          3/3 §12: they are full sections, never behind a toggle — and a tab is
+          a toggle. A physician on the default tab would otherwise read a report
+          that looks complete while three facts went unanswered and seven
+          disagree, with nothing on screen saying so. */}
+      <ConflictsBlock
+        conflicts={report.conflicts ?? []}
+        labelFor={labelFor}
+        selectedFactId={selectedFactId}
+        onSelectFact={onSelectFact}
+      />
+      <UnresolvedBlock
+        lines={report.unresolved ?? []}
+        facts={facts}
+        selectedFactId={selectedFactId}
+        onSelectFact={onSelectFact}
+        renderActions={renderActions}
+      />
     </article>
   );
 }
