@@ -1,4 +1,4 @@
-# MediKiosk — clinical intake for AYUSH OPDs
+# MediKiosk - clinical intake for AYUSH OPDs
 
 Ayurveda-first pre-consultation clinical intake for Indian AYUSH hospital OPDs.
 SIH 2026, PS 26047, Ministry of Ayush / All India Institute of Ayurveda.
