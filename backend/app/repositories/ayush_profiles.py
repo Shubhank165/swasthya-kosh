@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.ayush_profile import AyushAnswer, AyushProfileSnapshot
@@ -76,6 +76,50 @@ class AyushProfileRepository:
                 AyushProfileRecord.hospital_id == hospital_id,
                 AyushProfileRecord.patient_ref_type == patient_ref_type,
                 AyushProfileRecord.patient_ref_value == patient_ref_value,
+                AyushProfileRecord.id.not_in(superseded),
+            )
+            .order_by(AyushProfileRecord.submitted_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def current_for_refs(
+        self, *, hospital_id: str, refs: tuple[tuple[str, str], ...]
+    ) -> AyushProfileRecord | None:
+        """The live revision under any of one patient's identifiers.
+
+        **This is what makes filing under `phone` safe.** A profile is stored
+        against whatever reference the patient's session carried, and they may
+        later attend under an ABHA address or a hospital UHID. Looking it up by
+        the visit's own reference alone would miss it — the profile would exist,
+        belong to that patient, and be invisible on their report, which is the
+        failure `PatientIdentifierLink` exists to prevent. The caller expands
+        the reference through `aliases_for` and passes the whole set here.
+
+        Newest wins if two identifiers somehow carry live revisions. That is
+        already an anomaly — a patient should have one live profile per hospital
+        — and the newest is the one they most recently intended.
+        """
+        if not refs:
+            return None
+        superseded = select(AyushProfileRecord.supersedes).where(
+            AyushProfileRecord.hospital_id == hospital_id,
+            AyushProfileRecord.supersedes.is_not(None),
+        )
+        matches = or_(
+            *(
+                and_(
+                    AyushProfileRecord.patient_ref_type == ref_type,
+                    AyushProfileRecord.patient_ref_value == ref_value,
+                )
+                for ref_type, ref_value in refs
+            )
+        )
+        result = await self._session.execute(
+            select(AyushProfileRecord)
+            .where(
+                AyushProfileRecord.hospital_id == hospital_id,
+                matches,
                 AyushProfileRecord.id.not_in(superseded),
             )
             .order_by(AyushProfileRecord.submitted_at.desc())

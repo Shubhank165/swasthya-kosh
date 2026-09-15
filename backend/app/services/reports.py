@@ -160,16 +160,31 @@ class ReportService:
         patient who has not filled the module. All three render as an Ayurveda
         section without profile lines, which is what "we do not have this" looks
         like.
+
+        A guest is excluded rather than looked up. `guest` is not an identity —
+        it is the absence of one — so expanding it through the link table would
+        match every other guest at this hospital and hand one patient's
+        constitution to another.
         """
         if self._ayush_profiles is None:
             return None
         ref = record.patient_ref
-        if ref is None or not ref.value:
+        if ref is None or not ref.value or ref.type is PatientRefType.GUEST:
             return None
-        row = await self._ayush_profiles.current(
-            hospital_id=record.hospital_id,
-            patient_ref_type=ref.type.value,
-            patient_ref_value=ref.value,
+        # Expanded through the link table, exactly as `_prior_records` does.
+        # The profile is filed under whichever reference the patient's session
+        # carried — `phone`, today — and this visit may be filed under another.
+        # Matching on the visit's reference alone would leave a profile that
+        # exists, belongs to this patient, and is invisible on their report.
+        refs: tuple[tuple[str, str], ...] = ((ref.type.value, ref.value),)
+        if self._links is not None:
+            refs = await self._links.aliases_for(
+                hospital_id=record.hospital_id,
+                ref_type=ref.type.value,
+                ref_value=ref.value,
+            )
+        row = await self._ayush_profiles.current_for_refs(
+            hospital_id=record.hospital_id, refs=refs
         )
         return snapshot_of(row)
 
