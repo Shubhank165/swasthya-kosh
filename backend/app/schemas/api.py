@@ -324,6 +324,32 @@ class ResolveResponse(ApiModel):
     notice: str | None = None
 
 
+class ErasureResponse(ApiModel):
+    """What an erasure actually removed.
+
+    Counts rather than a bare `ok`, because the app tells the patient what went
+    — "3 visits and 2 documents deleted" is a sentence they can check against
+    what they remember, and a silent success is not.
+
+    `complete` is false when the object store refused to delete a scan. The
+    rows are gone either way; the bytes are not, and a screen that said
+    "deleted" over the top of that would be a lie.
+    """
+
+    intakes: int = 0
+    facts: int = 0
+    documents: int = 0
+    document_objects: int = 0
+    reports: int = 0
+    timelines: int = 0
+    red_flags: int = 0
+    consent_artefacts: int = 0
+    raw_payloads: int = 0
+    ayush_profiles: int = 0
+    identifier_links: int = 0
+    complete: bool = True
+
+
 class HistoryResponse(ApiModel):
     ref: dict[str, Any]
     hospital_id: str

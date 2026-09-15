@@ -61,6 +61,12 @@ EXPECTED: dict[tuple[str, str], set[Role]] = {
     # attribute it to, and staff entering it would be recording someone else's
     # self-report as their own.
     ("POST", "/api/v1/patients/me/ayush-profile"): {Role.PATIENT},
+    # Erasing your own record. Patient only, and the strongest case for it in
+    # the table: the route takes no path parameter and no body, so the only
+    # record it can destroy is the one belonging to the token's holder. Staff
+    # deleting a patient's history on their behalf is a different action with a
+    # different audit story, and would need a different route.
+    ("DELETE", "/api/v1/patients/me/history"): {Role.PATIENT},
     # Prefill suggests answers to questions not yet asked. Same three callers as
     # ingest, because it is the same interview: nothing is written to the record
     # here, and a suggestion becomes a fact only when the patient accepts it.

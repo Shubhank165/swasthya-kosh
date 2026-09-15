@@ -2,7 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:medikiosk_app/l10n/app_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medikiosk_app/core/theme.dart';
 import 'package:medikiosk_app/intake/screens/returning_patient_screen.dart';

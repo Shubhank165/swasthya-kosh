@@ -406,5 +406,45 @@
   "notLinked": "Not linked",
   "@notLinked": {
     "description": ""
+  },
+  "profileDeleteHistory": "Delete my history",
+  "@profileDeleteHistory": {
+    "description": "Profile row that opens the erasure confirmation"
+  },
+  "profileDeleteSubtitle": "Remove everything this hospital has recorded about you",
+  "@profileDeleteSubtitle": {
+    "description": "Explains what deleting removes"
+  },
+  "deleteHistoryTitle": "Delete your history?",
+  "@deleteHistoryTitle": {
+    "description": "Confirmation dialog title"
+  },
+  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Ayurveda assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
+  "@deleteHistoryBody": {
+    "description": "Names exactly what goes, before the patient confirms"
+  },
+  "deleteHistoryConfirm": "Delete everything",
+  "@deleteHistoryConfirm": {
+    "description": "Destructive confirm button"
+  },
+  "deleteHistoryCancel": "Keep my history",
+  "@deleteHistoryCancel": {
+    "description": "The safe way out of the dialog"
+  },
+  "deleteHistoryDone": "Your history has been deleted.",
+  "@deleteHistoryDone": {
+    "description": "Shown after a complete erasure"
+  },
+  "deleteHistoryNothing": "There was nothing recorded to delete.",
+  "@deleteHistoryNothing": {
+    "description": "Shown when there was no record to delete"
+  },
+  "deleteHistoryPartial": "Most of your history was deleted, but one scanned document could not be removed. Please tell the registration desk.",
+  "@deleteHistoryPartial": {
+    "description": "Shown when a stored document survived the erasure"
+  },
+  "deleteHistoryFailed": "Nothing was deleted. Check your connection and try again.",
+  "@deleteHistoryFailed": {
+    "description": "Shown when the request could not be made at all"
   }
 }

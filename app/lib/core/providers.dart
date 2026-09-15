@@ -19,6 +19,7 @@ import '../content/bundle_repository.dart';
 import '../documents/document_store.dart';
 import '../documents/patient_documents.dart';
 import '../identity/abha_repository.dart';
+import '../identity/erasure_repository.dart';
 import '../identity/auth_repository.dart';
 import '../identity/history_repository.dart';
 import '../identity/hospital_repository.dart';
@@ -81,6 +82,10 @@ final consentRepositoryProvider = Provider<ConsentRepository>(
 
 final abhaRepositoryProvider = Provider<AbhaRepository>(
   (ref) => AbhaRepository(api: ref.watch(apiProvider)),
+);
+
+final erasureRepositoryProvider = Provider<ErasureRepository>(
+  (ref) => ErasureRepository(api: ref.watch(apiProvider)),
 );
 
 final historyRepositoryProvider = Provider<HistoryRepository>(

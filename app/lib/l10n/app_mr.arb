@@ -150,5 +150,15 @@
   "notLinked": "लिंक केलेले नाही",
   "@notLinked": {
     "description": ""
-  }
+  },
+  "profileDeleteHistory": "Delete my history",
+  "profileDeleteSubtitle": "Remove everything this hospital has recorded about you",
+  "deleteHistoryTitle": "Delete your history?",
+  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Ayurveda assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
+  "deleteHistoryConfirm": "Delete everything",
+  "deleteHistoryCancel": "Keep my history",
+  "deleteHistoryDone": "Your history has been deleted.",
+  "deleteHistoryNothing": "There was nothing recorded to delete.",
+  "deleteHistoryPartial": "Most of your history was deleted, but one scanned document could not be removed. Please tell the registration desk.",
+  "deleteHistoryFailed": "Nothing was deleted. Check your connection and try again."
 }

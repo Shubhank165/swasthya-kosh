@@ -10,6 +10,7 @@ from app.api.auth import RequireKioskOrStaff, RequirePatient, RequireStaff
 from app.api.deps import (
     AyushProfileServiceDep,
     DocumentServiceDep,
+    ErasureServiceDep,
     IdentityServiceDep,
 )
 from app.core.errors import NotFoundError
@@ -18,6 +19,7 @@ from app.schemas.api import (
     ABHALinkRequest,
     AyushProfileRequest,
     AyushProfileResponse,
+    ErasureResponse,
     HistoryResponse,
     PatientDocumentOut,
     ResolveRequest,
@@ -142,6 +144,49 @@ async def my_history(
         ref, hospital_id=principal.hospital_id, limit=limit
     )
     return HistoryResponse.model_validate(history.to_dict())
+
+
+@router.delete(
+    "/me/history",
+    response_model=ErasureResponse,
+    summary="Erase everything this hospital holds about the signed-in patient",
+)
+async def erase_my_history(
+    principal: RequirePatient,
+    service: ErasureServiceDep,
+) -> ErasureResponse:
+    """The withdrawal clause in `consent_v1.yaml`, made self-service.
+
+    Every patient is shown "you can ask us to delete what we recorded, at any
+    time before or after your consultation". Until this route existed there was
+    no delete path in the service at all, so that sentence was a promise nobody
+    could keep without a database console.
+
+    **Registered beside the `GET` on the same path and before `/{ref}/history`**,
+    for the reason that route's docstring gives: FastAPI matches in registration
+    order, and a later `/{ref}` would bind `ref="me"`.
+
+    **The patient comes from the session, never from the request.** There is no
+    path parameter and no body — the only record this can erase is the one
+    belonging to the token's holder. That is what makes it safe to expose a
+    destructive verb to a patient role at all.
+
+    **It erases across linked identifiers**, not just the one in hand. A patient
+    who signed in by phone and later linked an ABHA address has one history
+    under two references, and deleting half of it while reporting success is
+    the failure worth engineering against.
+
+    Sign-in survives deliberately: erasure is not sign-out. A patient who
+    deletes their record and starts a new intake is starting fresh, not locked
+    out.
+    """
+    if principal.patient_ref is None:  # pragma: no cover - guarded by the role
+        raise NotFoundError("this session has no patient reference")
+    ref = PatientRef(type=PatientRefType.PHONE, value=principal.patient_ref)
+    result = await service.erase(
+        ref, hospital_id=principal.hospital_id, actor_id=principal.user_id
+    )
+    return ErasureResponse.model_validate(result.to_dict())
 
 
 @router.get(

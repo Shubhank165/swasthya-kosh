@@ -49,6 +49,7 @@ from app.repositories.terminology import TerminologyRepository
 from app.repositories.timelines import TimelineRepository
 from app.services.ayush_profile import AyushProfileService
 from app.services.documents import DocumentService
+from app.services.erasure import ErasureService
 from app.services.identity import IdentityService
 from app.services.ingest import IngestService
 from app.services.patient_auth import PatientAuthService
@@ -251,6 +252,24 @@ async def get_report_service(
     )
 
 
+async def get_erasure_service(
+    session: SessionDep,
+    clock: ClockDep,
+    hospital_id: TenantDep,
+    providers: ProvidersDep,
+) -> ErasureService:
+    """`hospital_id` is depended on rather than used — resolving it is what puts
+    the tenant in the session context, so every delete this service issues is
+    filtered by the same guard that protects every read."""
+    return ErasureService(
+        session,
+        storage=providers.storage,
+        clock=clock,
+        audit=AuditRepository(session),
+        links=PatientLinkRepository(session),
+    )
+
+
 async def get_ayush_profile_service(
     session: SessionDep,
     clock: ClockDep,
@@ -337,6 +356,7 @@ IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
 AyushProfileServiceDep = Annotated[
     AyushProfileService, Depends(get_ayush_profile_service)
 ]
+ErasureServiceDep = Annotated[ErasureService, Depends(get_erasure_service)]
 WorklistServiceDep = Annotated[WorklistService, Depends(get_worklist_service)]
 TerminologyServiceDep = Annotated[TerminologyService, Depends(get_terminology_service)]
 ConsentRepoDep = Annotated[ConsentRepository, Depends(get_consent_repository)]

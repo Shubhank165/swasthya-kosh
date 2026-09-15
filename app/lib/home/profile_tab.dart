@@ -85,6 +85,30 @@ class ProfileTab extends ConsumerWidget {
           ),
         ),
 
+        const Divider(height: Sizes.gutter * 2),
+
+        // Erasure — `consent_v1.yaml` promises every patient "you can ask us to
+        // delete what we recorded, at any time". This is that, without the walk
+        // to the registration desk.
+        //
+        // Below sign-out rather than above it, and visually separated: the two
+        // buttons do very different things and a patient reaching for "leave
+        // this phone" must not land on "destroy my medical record". Sign-out is
+        // the one people press often, so it keeps the position they expect.
+        ListTile(
+          key: const Key('profile.deleteHistory'),
+          leading: Icon(
+            Icons.delete_forever_outlined,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          title: Text(
+            strings.profileDeleteHistory,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+          subtitle: Text(strings.profileDeleteSubtitle),
+          onTap: () => _confirmErasure(context, ref, strings),
+        ),
+
         const SizedBox(height: Sizes.gutter),
         OutlinedButton(
           key: const Key('profile.signOut'),
@@ -108,5 +132,72 @@ class ProfileTab extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  /// Ask, then erase, then say what happened.
+  ///
+  /// The dialog names what goes — visits, answers, documents, the Ayurveda
+  /// assessment — rather than asking "are you sure?", because a patient cannot
+  /// consent to a consequence nobody has stated. The destructive action is the
+  /// second button and is not the default; the safe one is worded as a choice
+  /// ("Keep my history") rather than as a dismissal, so the way out is as
+  /// legible as the way through.
+  Future<void> _confirmErasure(
+    BuildContext context,
+    WidgetRef ref,
+    Strings strings,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(strings.deleteHistoryTitle),
+        content: Text(strings.deleteHistoryBody),
+        actions: [
+          TextButton(
+            key: const Key('profile.deleteCancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(strings.deleteHistoryCancel),
+          ),
+          TextButton(
+            key: const Key('profile.deleteConfirm'),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(strings.deleteHistoryConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final summary = await ref.read(erasureRepositoryProvider).eraseHistory();
+    if (!context.mounted) return;
+
+    // Four outcomes, four sentences. "Deleted" over the top of a failed request
+    // is the one thing this screen must never say, because the patient has no
+    // way to find out otherwise.
+    final String message;
+    if (summary == null) {
+      message = strings.deleteHistoryFailed;
+    } else if (!summary.complete) {
+      message = strings.deleteHistoryPartial;
+    } else if (summary.erasedNothing) {
+      message = strings.deleteHistoryNothing;
+    } else {
+      message = strings.deleteHistoryDone;
+    }
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+
+    // Everything that reads the record is now stale. Invalidated rather than
+    // refreshed so a screen showing a deleted visit cannot linger behind this
+    // one.
+    ref
+      ..invalidate(visitsProvider)
+      ..invalidate(patientDocumentsProvider)
+      ..invalidate(carryForwardProvider)
+      ..invalidate(resumableDraftProvider);
   }
 }

@@ -105,6 +105,16 @@ class ApiClient {
   }) =>
       _dio.post<T>(path, data: body, options: Options(headers: headers));
 
+  /// The one destructive verb this client offers.
+  ///
+  /// No body and no query: the only route that uses it takes its subject from
+  /// the session token, so there is nothing to pass and nothing to aim wrongly.
+  Future<Response<T>> delete<T>(
+    String path, {
+    Map<String, String>? headers,
+  }) =>
+      _dio.delete<T>(path, options: Options(headers: headers));
+
   /// A bounded retry with exponential backoff.
   ///
   /// Retries only what can succeed later: a timeout, a connection failure, or a

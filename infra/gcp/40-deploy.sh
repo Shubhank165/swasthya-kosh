@@ -38,7 +38,16 @@ common=(
 #
 # `^;^` picks semicolon as the separator, because some values contain commas
 # and none contains a semicolon.
-ENV_SHARED="ENVIRONMENT=${DEPLOY_ENVIRONMENT};CLINICAL_CONTENT_DIR=/app/clinical;LOG_JSON=true;STORAGE_BACKEND=gcs;GCS_BUCKET=${BUCKET};GCP_PROJECT=${PROJECT_ID};DOCUMENT_QUEUE=pubsub;PUBSUB_TOPIC=${TOPIC};VERTEX_PROJECT=${PROJECT_ID};VERTEX_REGION=${REGION};ALLOW_HEADER_AUTH=false"
+#
+# `ALLOW_HEADER_AUTH` defaults to **false** and must stay that way. With it on,
+# anyone who can reach the URL sends `X-User-Role: physician` and reads every
+# record in the database — there is no credential involved. It is overridable
+# only so a demo can pass `ALLOW_HEADER_AUTH=true` on the command line, where
+# the choice is visible in the shell history of whoever made it, rather than
+# being re-applied by hand with `gcloud run services update` after every deploy
+# and forgotten about. The default is the production setting; passing `true` is
+# a decision with a date on it, and the deploy says so out loud below.
+ENV_SHARED="ENVIRONMENT=${DEPLOY_ENVIRONMENT};CLINICAL_CONTENT_DIR=/app/clinical;LOG_JSON=true;STORAGE_BACKEND=gcs;GCS_BUCKET=${BUCKET};GCP_PROJECT=${PROJECT_ID};DOCUMENT_QUEUE=pubsub;PUBSUB_TOPIC=${TOPIC};VERTEX_PROJECT=${PROJECT_ID};VERTEX_REGION=${REGION};ALLOW_HEADER_AUTH=${ALLOW_HEADER_AUTH:-false}"
 
 # Which providers this revision runs. Both services get the same string: they
 # run the same image, `/readyz` on either has to say what that service would
@@ -209,6 +218,12 @@ if [[ "${DEPLOY_ENVIRONMENT}" != "production" ]]; then
   echo "           who knows a phone number can sign in as that patient. This is"
   echo "           for testing the app against a deployment holding no real"
   echo "           records. Redeploy without DEPLOY_ENVIRONMENT before it does."
+fi
+if [[ "${ALLOW_HEADER_AUTH:-false}" == "true" ]]; then
+  echo "  WARNING: ALLOW_HEADER_AUTH=true. There is no credential on this API."
+  echo "           Anyone who can reach the URL sends X-User-Role: physician"
+  echo "           and reads every record in the database. Deploy again without"
+  echo "           it the moment the demo is over."
 fi
 echo "  API    ${API_URL}"
 echo "  worker ${WORKER_URL} (not publicly invocable)"
