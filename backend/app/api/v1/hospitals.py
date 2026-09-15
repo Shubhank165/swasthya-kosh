@@ -19,15 +19,29 @@ router = APIRouter(prefix="/hospitals", tags=["hospitals"])
 #: every language it speaks, so what travels is the code plus a plain English
 #: display for a client that has no string for it yet — never a translation
 #: invented here.
+#: Every entry carries a gloss, or none would. Three-with-help and
+#: one-without reads as unfinished, and the one left bare is the one a patient
+#: who does not know the word most needs help with.
+#:
+#: The Sanskrit names stay. At an AYUSH institute the board outside the OPD
+#: says "Kayachikitsa", and a patient is looking for the word that matches the
+#: sign they walked past — anglicising it here would make the screen easier to
+#: read and harder to use.
 _DISPLAY = {
     "kayachikitsa": "Kayachikitsa (General medicine)",
-    "panchakarma": "Panchakarma",
+    "panchakarma": "Panchakarma (cleansing therapies)",
     "shalya": "Shalya (Surgery)",
     "shalakya": "Shalakya (ENT and Ophthalmology)",
-    "prasuti": "Prasuti and Stri Roga",
+    "prasuti": "Prasuti and Stri Roga (Maternity and gynaecology)",
     "kaumarbhritya": "Kaumarbhritya (Paediatrics)",
     "swasthavritta": "Swasthavritta (Preventive medicine)",
-    "general": "General",
+    # Not a department a patient recognises — an escape hatch for one who does
+    # not know where to go, which is what this code has always been. Named as
+    # what it is: sitting under "Kayachikitsa (General medicine)" while calling
+    # itself "General" gave a patient two options that read identically, and
+    # the patient who cannot tell them apart is the one who most needed
+    # guiding. The code is unchanged and the intake files exactly as before.
+    "general": "Not sure — the staff will guide me",
 }
 
 
