@@ -136,7 +136,7 @@ class AyushProfileRepository:
         patient_ref_value: str,
         language: str,
         content_version: str | None,
-        answers: list[dict],
+        answers: list[dict[str, object]],
         submitted_at: datetime,
         supersedes: str | None,
     ) -> AyushProfileRecord:

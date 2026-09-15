@@ -36,7 +36,7 @@ class AyushAnswer(BaseModel):
     certainty: str
     #: `None` for every status but `answered` — the same rule the fact table
     #: states for its own `value` column.
-    value: dict | list | str | float | bool | None = None
+    value: dict[str, object] | list[object] | str | float | bool | None = None
     #: The patient's own words where they gave any, kept beside the normalised
     #: value for the reason decision 3 gives: the words travel with the fact.
     original_text: str | None = None

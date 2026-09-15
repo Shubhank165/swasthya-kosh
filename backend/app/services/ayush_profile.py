@@ -25,12 +25,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
 from app.core.clock import Clock
 from app.core.errors import ValidationError
 from app.core.ids import IdFactory
+from app.domain.ayush_profile import AyushProfileSnapshot
 from app.domain.clinical.enums import Certainty
 from app.domain.record import FieldStatus
 from app.repositories.ayush_profiles import AyushProfileRepository
@@ -177,7 +177,7 @@ class AyushProfileService:
 
     async def current_snapshot(
         self, *, hospital_id: str, patient_ref_type: str, patient_ref_value: str
-    ):
+    ) -> AyushProfileSnapshot | None:
         """The live revision as a frozen value, or `None`."""
         from app.repositories.ayush_profiles import snapshot_of
 

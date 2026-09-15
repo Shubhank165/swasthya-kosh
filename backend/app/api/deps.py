@@ -29,6 +29,7 @@ from app.db import get_session
 from app.db.tenancy import reset_tenant, set_tenant
 from app.domain.report.builder import FieldLabels
 from app.events.bus import EventBus, get_event_bus
+from app.repositories.ayush_profiles import AyushProfileRepository
 from app.repositories.consent import (
     AuditRepository,
     ConsentRepository,
@@ -46,9 +47,8 @@ from app.repositories.patients import (
 )
 from app.repositories.terminology import TerminologyRepository
 from app.repositories.timelines import TimelineRepository
-from app.services.documents import DocumentService
-from app.repositories.ayush_profiles import AyushProfileRepository
 from app.services.ayush_profile import AyushProfileService
+from app.services.documents import DocumentService
 from app.services.identity import IdentityService
 from app.services.ingest import IngestService
 from app.services.patient_auth import PatientAuthService

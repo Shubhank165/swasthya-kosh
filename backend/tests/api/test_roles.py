@@ -56,6 +56,17 @@ EXPECTED: dict[tuple[str, str], set[Role]] = {
     # The patient app, reading its own records and nothing else. Note there is
     # no path parameter: the patient comes from the session token.
     ("POST", "/api/v1/patients/me/abha"): {Role.PATIENT},
+    # The AYUSH/Prakriti self-report is filed against the patient who answered
+    # it, so only a patient session may write one — a kiosk has no patient to
+    # attribute it to, and staff entering it would be recording someone else's
+    # self-report as their own.
+    ("POST", "/api/v1/patients/me/ayush-profile"): {Role.PATIENT},
+    # Prefill suggests answers to questions not yet asked. Same three callers as
+    # ingest, because it is the same interview: nothing is written to the record
+    # here, and a suggestion becomes a fact only when the patient accepts it.
+    ("POST", "/api/v1/intakes/{intake_id}/prefill"): {
+        Role.KIOSK, Role.STAFF, Role.PATIENT
+    },
     ("GET", "/api/v1/patients/me/history"): {Role.PATIENT},
     # The Documents tab. Same guard and strictly less content than the staff
     # route on the intake — no confidence figures and nothing read off the page.

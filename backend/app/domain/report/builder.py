@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from app.domain.ayush_profile import AyushProfileSnapshot
 from app.domain.clinical.enums import SECTION_ORDER, Certainty, ReporterRole, Section
 from app.domain.clinical.sections import DEFAULT_SECTION, section_for
 from app.domain.documents.extraction import (
@@ -54,7 +55,6 @@ from app.domain.report.model import (
     TimelineEntry,
 )
 from app.domain.report.templates import TemplateSet
-from app.domain.ayush_profile import AyushProfileSnapshot
 from app.domain.timeline.model import TimelineSnapshot, TimelineStatus
 
 #: 1.1 adds the DOCUMENT TIMELINE section; 1.2 adds HISTORY TIMELINE.

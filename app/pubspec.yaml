@@ -14,7 +14,12 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  intl: 0.20.3
+  # `any`, because nothing in `lib/` imports package:intl — it is here only
+  # so `flutter gen-l10n` sees it declared, and `flutter_localizations` pins
+  # the exact version anyway (0.19.0 on Flutter 3.22, 0.20.x on 3.35+).
+  # Pinning 0.20.3 here made the app unbuildable on any Flutter older than
+  # 3.35: that version needs Dart ^3.9, and version solving fails outright.
+  intl: any
 
   # State. Riverpod, per 2/3 §13.
   flutter_riverpod: ^2.5.1

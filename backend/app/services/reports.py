@@ -19,6 +19,7 @@ from app.core.clock import Clock
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.ids import IdFactory
 from app.core.logging import get_logger
+from app.domain.ayush_profile import AyushProfileSnapshot
 from app.domain.clinical.enums import Section
 from app.domain.contradictions import detector
 from app.domain.documents.alignment import align_medications
@@ -39,15 +40,14 @@ from app.domain.report.builder import FieldLabels
 from app.domain.report.model import PhysicianReport, ReportBundle
 from app.domain.report.templates import TemplateRegistry
 from app.domain.timeline.fallback import deterministic_timeline
-from app.domain.ayush_profile import AyushProfileSnapshot
 from app.domain.timeline.model import TimelineSnapshot
 from app.events.bus import EventBus
 from app.events.schemas import Event, EventName
+from app.repositories.ayush_profiles import AyushProfileRepository, snapshot_of
 from app.repositories.consent import AuditRepository, ReportRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.intakes import IntakeRepository
 from app.repositories.patients import PatientLinkRepository
-from app.repositories.ayush_profiles import AyushProfileRepository, snapshot_of
 from app.services.timeline import TimelineService
 
 logger = get_logger(__name__)
