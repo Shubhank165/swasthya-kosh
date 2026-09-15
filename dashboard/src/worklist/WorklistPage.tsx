@@ -1,265 +1,350 @@
-/**
- * The worklist — 3/3 §4.1.
- *
- * A list the doctor works down. **Not queue management**: no calling,
- * recalling, deferring, transferring or token issuing. `stale/queue/` holds a
- * version of that, the problem statement does not ask for it, and every line of
- * it is surface area to defend without marks attached.
- *
- * Ordering is arrival, and stays arrival. The alert band at the top is how
- * urgency is surfaced — the backend puts unacknowledged red flags in
- * `pending_alerts` and the list itself is not reordered, because reordering a
- * waiting room on a machine's reading of a symptom is a triage decision this
- * system does not make.
- *
- * A real `<table>` with real headers, per §9. A grid of divs is not navigable
- * by anything but a mouse.
- */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Building2,
+  Clock,
+  Search,
+} from 'lucide-react';
 
 import { useWorklist } from '../api/queries';
-import type { WorklistEntry, WorklistState } from '../api/types';
-import { WORKLIST_STATES } from '../api/types';
 import { useSession } from '../auth/session';
 import { ConnectionState } from '../components/ConnectionState';
-import { useT, type StringKey, type Translate } from '../i18n';
 import { useWorklistSocket } from '../lib/realtime';
 import { humanise, timeOfDay } from '../lib/format';
-import { IDENTIFICATION, INTAKE_STATUS } from '../report/HeaderStrip';
+import { HOSPITALS } from '../auth/LoginPage';
+import { useLocale } from '../i18n';
 
-const STATE_KEYS: Record<WorklistState, StringKey> = {
-  ready: 'state.ready',
-  partial: 'state.partial',
-  red_flag_pending: 'state.red_flag_pending',
-  needs_review: 'state.needs_review',
-  seen: 'state.seen',
-};
-
-/** Shape, not colour alone — §4.2, and the same rule applies to the list. */
-const STATE_STYLES: Record<WorklistState, string> = {
-  ready: 'border-line bg-surface-sunken text-ink-muted',
-  partial: 'border-uncertain/30 bg-uncertain-soft text-uncertain',
-  red_flag_pending: 'border-urgent/40 bg-urgent-soft text-urgent',
-  needs_review: 'border-repaired/30 bg-repaired-soft text-repaired',
-  seen: 'border-verified/30 bg-verified-soft text-verified',
-};
+const DEPT_PILLS = [
+  { id: 'all', labelEn: 'All Departments', labelHi: 'सभी विभाग' },
+  { id: 'kayachikitsa', labelEn: 'Kayachikitsa', labelHi: 'कायचिकित्सा' },
+  { id: 'panchakarma', labelEn: 'Panchakarma', labelHi: 'पंचकर्म' },
+  { id: 'shalya-tantra', labelEn: 'Shalya Tantra', labelHi: 'शल्य तंत्र' },
+  { id: 'kaumarbhritya', labelEn: 'Kaumarbhritya', labelHi: 'कौमारभृत्य' },
+];
 
 export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
-  const t = useT();
   const session = useSession((state) => state.session);
-  const [department, setDepartment] = useState<string | null>(
-    session?.departmentCode ?? null,
-  );
-  const [states, setStates] = useState<readonly WorklistState[]>([]);
+  const locale = useLocale((state) => state.locale);
+  const isHi = locale === 'hi';
 
-  const worklist = useWorklist(department, states);
+  const [department, setDepartment] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const worklist = useWorklist(department, []);
   const refetch = worklist.refetch;
 
-  // §7: on reconnect, refetch rather than replay. The socket says *something*
-  // changed; the list comes from the API, which is the only thing that knows
-  // what the change was.
   const onChange = useCallback(() => {
     void refetch();
   }, [refetch]);
+
   const { status } = useWorklistSocket({ department, onChange, enabled: realtime });
 
-  const entries = worklist.data?.entries ?? [];
+  const rawEntries = worklist.data?.entries ?? [];
   const pending = worklist.data?.pending_alerts ?? [];
-  const hidden = (worklist.data?.total ?? 0) - entries.length;
 
-  const toggleState = (state: WorklistState) =>
-    setStates((current) =>
-      current.includes(state)
-        ? current.filter((candidate) => candidate !== state)
-        : [...current, state],
+  // Filter entries strictly by search query
+  const entries = useMemo(() => {
+    if (!searchQuery.trim()) return rawEntries;
+    const q = searchQuery.toLowerCase().trim();
+    return rawEntries.filter(
+      (e) =>
+        e.intake_id.toLowerCase().includes(q) ||
+        (e.department_code && e.department_code.toLowerCase().includes(q)) ||
+        e.patient_ref_type.toLowerCase().includes(q),
     );
+  }, [rawEntries, searchQuery]);
 
-  // A plain filter rather than a memo: `entries` is a fresh array on every
-  // render because it comes out of a `??`, so memoising on it would recompute
-  // every time anyway while looking like it did not.
-  const needsManualReview = entries.filter((entry) => entry.needs_manual_review);
+  // KPIs
+  const totalWaiting = rawEntries.length;
+  const readyCount = rawEntries.filter((e) => e.state === 'ready').length;
+  const progressCount = rawEntries.filter(
+    (e) => e.state === 'partial' || e.state === 'needs_review',
+  ).length;
+  const redFlagCount = pending.length + rawEntries.filter((e) => e.state === 'red_flag_pending').length;
+
+  const matchedHospital = HOSPITALS.find((h) => h.id === session?.hospitalId);
+  const hospitalName = isHi
+    ? (matchedHospital?.nameHi ?? 'अखिल भारतीय आयुर्वेद संस्थान, नई दिल्ली')
+    : (matchedHospital?.nameEn ?? 'All India Institute of Ayurveda, New Delhi');
+
+  const todayStr = new Intl.DateTimeFormat(isHi ? 'hi-IN' : 'en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date());
 
   return (
-    <div className="space-y-4">
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-ink">{t('worklist.title')}</h1>
-          <p className="text-sm text-ink-muted">
-            {/* The department code is the hospital's own identifier and is not
-                translated; the words around it are. */}
-            {department ? humanise(department) : t('worklist.allDepartments')} ·{' '}
-            {t('worklist.arrivalOrder')}
-          </p>
+    <div className="space-y-6">
+      {/* Facility bar card */}
+      <div className="surface-card flex flex-wrap items-center justify-between gap-4 p-5 animate-fade-rise">
+        <div className="flex items-center gap-3.5">
+          <span className="flex size-11 items-center justify-center rounded-xl bg-herb-soft text-herb shadow-sm">
+            <Building2 className="size-6" />
+          </span>
+          <div>
+            <h1 className="text-lg font-bold text-ink sm:text-xl">
+              {hospitalName}
+            </h1>
+            <p className="text-xs text-ink-muted">
+              {session?.departmentCode
+                ? `${humanise(session.departmentCode)} ${isHi ? 'ओपीडी' : 'OPD'}`
+                : isHi ? 'सामान्य ओपीडी' : 'General OPD'}{' '}
+              • {isHi ? 'काउंटर ३' : 'Counter 3'} • {todayStr}
+            </p>
+          </div>
         </div>
-        <ConnectionState status={status} />
-      </header>
 
-      {/* The pinned band. Separate from the list rather than sorted into it, so
-          urgency is visible without pretending the queue was rearranged. */}
-      {pending.length > 0 && (
-        <section
-          aria-label={t('worklist.alertBandLabel')}
-          data-testid="alert-band"
-          className="rounded border border-urgent/40 bg-urgent-soft p-3"
-        >
-          <h2 className="text-sm font-semibold text-urgent">
-            {pending.length === 1
-              ? t('worklist.alertBandOne')
-              : t('worklist.alertBand', { count: pending.length })}
-          </h2>
-          <ul className="mt-2 space-y-1">
-            {pending.map((entry) => (
-              <li key={entry.intake_id}>
-                <Link
-                  to={`/intakes/${entry.intake_id}`}
-                  className="text-sm text-urgent underline"
-                >
-                  {entry.intake_id.slice(0, 8)} · {t('worklist.arrived')}{' '}
-                  {timeOfDay(entry.arrived_at)}
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <Link to="/alerts" className="mt-2 inline-block text-xs text-urgent underline">
-            {t('worklist.openAlerts')}
+        <div className="flex items-center gap-3">
+          <ConnectionState status={status} />
+          <Link
+            to="/login"
+            className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-sm transition-colors hover:bg-surface-sunken"
+          >
+            {isHi ? 'अस्पताल बदलें' : 'Change Facility'}
           </Link>
-        </section>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="surface-card overflow-hidden animate-fade-rise">
+          <div className="h-1.5 w-full bg-ink" />
+          <div className="p-5">
+            <p className="text-xs font-medium text-ink-muted">
+              {isHi ? 'कुल प्रतीक्षारत रोगी' : 'Total Patients Waiting'}
+            </p>
+            <p className="mt-2 text-3xl font-bold text-ink">{totalWaiting}</p>
+            <p className="mt-1 text-[11px] text-ink-muted">
+              {isHi ? 'सभी सक्रिय ओपीडी काउंटरों पर' : 'Across all active OPD counters'}
+            </p>
+          </div>
+        </div>
+
+        <div className="surface-card overflow-hidden animate-fade-rise">
+          <div className="h-1.5 w-full bg-herb" />
+          <div className="p-5">
+            <p className="text-xs font-medium text-ink-muted">
+              {isHi ? 'परामर्श हेतु तैयार' : 'Ready for Doctor'}
+            </p>
+            <p className="mt-2 text-3xl font-bold text-herb">{readyCount}</p>
+            <p className="mt-1 text-[11px] text-ink-muted">
+              {isHi ? 'कियोस्क इनटेक पूर्ण एवं सत्यापित' : 'Kiosk intake completed & verified'}
+            </p>
+          </div>
+        </div>
+
+        <div className="surface-card overflow-hidden animate-fade-rise">
+          <div className="h-1.5 w-full bg-saffron" />
+          <div className="p-5">
+            <p className="text-xs font-medium text-ink-muted">
+              {isHi ? 'प्रक्रियाधीन (कियोस्क पर)' : 'In-Progress at Kiosk'}
+            </p>
+            <p className="mt-2 text-3xl font-bold text-saffron">{progressCount}</p>
+            <p className="mt-1 text-[11px] text-ink-muted">
+              {isHi ? 'वर्तमान में इनटेक प्रश्नों के उत्तर दे रहे हैं' : 'Currently answering intake questions'}
+            </p>
+          </div>
+        </div>
+
+        <div className="surface-card overflow-hidden animate-fade-rise">
+          <div className="h-1.5 w-full bg-alert" />
+          <div className="p-5">
+            <p className="text-xs font-medium text-ink-muted">
+              {isHi ? 'आपातकालीन रेड-फ्लैग' : 'Emergency Red-Flags'}
+            </p>
+            <p className="mt-2 text-3xl font-bold text-alert">{redFlagCount}</p>
+            <p className="mt-1 text-[11px] text-ink-muted">
+              {isHi ? 'सक्रिय आपातकालीन ट्राइएज' : 'Active acute triage events'}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Urgent Red-Flag Banner */}
+      {pending.length > 0 && (
+        <div
+          role="alert"
+          className="animate-pulse-flag flex items-start gap-4 rounded-xl border border-alert/40 bg-alert-soft p-4 shadow-sm"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-alert text-white shadow-sm">
+            <AlertTriangle className="size-5" />
+          </span>
+          <div className="flex-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-alert">
+              {isHi ? '🚨 आपातकालीन रेड-फ्लैग अलर्ट' : '🚨 Urgent Red-Flag Alert'}
+            </p>
+            <p className="mt-1 text-sm font-medium text-ink">
+              {pending.length === 1 && pending[0]
+                ? isHi
+                  ? `टोकन #${pending[0].intake_id.slice(0, 8)} में तत्काल चिकित्सक ध्यान की आवश्यकता वाले तीव्र लक्षण रिपोर्ट हुए हैं।`
+                  : `Token #${pending[0].intake_id.slice(0, 8)} reported acute symptoms requiring immediate physician attention.`
+                : isHi
+                ? `कतार में ${pending.length} रोगियों ने आपातकालीन ट्राइएज मानदंड सक्रिय किए हैं।`
+                : `${pending.length} patients in queue triggered acute emergency triage criteria.`}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {pending.map((alert) => (
+                <Link
+                  key={alert.intake_id}
+                  to={`/intakes/${alert.intake_id}`}
+                  className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-alert shadow-sm hover:underline"
+                >
+                  {isHi ? 'समीक्षा करें #' : 'Review #'}{alert.intake_id.slice(0, 8)} <ArrowRight className="size-3" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
-      {needsManualReview.length > 0 && (
-        <p className="rounded border border-repaired/30 bg-repaired-soft px-3 py-2 text-sm text-repaired">
-          {t('worklist.manualReview', { count: needsManualReview.length })}
-        </p>
-      )}
-
-      <fieldset className="flex flex-wrap items-center gap-2">
-        <legend className="sr-only">{t('worklist.filterLegend')}</legend>
-        <label className="text-sm text-ink-muted">
-          {t('worklist.department')}{' '}
+      {/* Search & Department Filters */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="relative w-full max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
           <input
-            value={department ?? ''}
-            onChange={(event) => setDepartment(event.target.value || null)}
-            placeholder={t('worklist.departmentAll')}
-            className="ml-1 rounded border border-line bg-surface px-2 py-1 text-ink"
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={isHi ? 'इंटेक आईडी या विभाग से खोजें…' : 'Search by intake ID or department…'}
+            className="h-10 w-full rounded-xl border border-line bg-white pl-9 pr-4 text-xs text-ink outline-none transition-shadow placeholder:text-ink-muted focus:border-herb focus:ring-2 focus:ring-herb"
           />
-        </label>
-        {WORKLIST_STATES.map((state) => (
-          <label key={state} className="flex items-center gap-1 text-sm text-ink-muted">
-            <input
-              type="checkbox"
-              checked={states.includes(state)}
-              onChange={() => toggleState(state)}
-            />
-            {t(STATE_KEYS[state])}
-          </label>
-        ))}
-      </fieldset>
+        </div>
 
-      {worklist.isLoading && <p className="text-ink-muted">{t('common.loading')}</p>}
-      {worklist.isError && (
-        <p role="alert" className="text-urgent">
-          {t('worklist.error')}
-        </p>
-      )}
+        <div className="flex flex-wrap gap-1.5">
+          {DEPT_PILLS.map((dept) => {
+            const isSelected =
+              (dept.id === 'all' && department === null) || department === dept.id;
+            return (
+              <button
+                key={dept.id}
+                type="button"
+                onClick={() => setDepartment(dept.id === 'all' ? null : dept.id)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  isSelected
+                    ? 'bg-herb text-white shadow-sm'
+                    : 'border border-line bg-white text-ink-muted hover:border-herb/50 hover:text-ink'
+                }`}
+              >
+                {isHi ? dept.labelHi : dept.labelEn}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-      <table className="w-full border-collapse text-sm">
-        <caption className="sr-only">{t('worklist.caption')}</caption>
-        <thead>
-          <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-muted">
-            <th scope="col" className="py-2 pr-3">{t('worklist.colReference')}</th>
-            <th scope="col" className="py-2 pr-3">{t('worklist.colArrived')}</th>
-            <th scope="col" className="py-2 pr-3">{t('worklist.colSource')}</th>
-            <th scope="col" className="py-2 pr-3">{t('worklist.colIntake')}</th>
-            <th scope="col" className="py-2 pr-3">{t('worklist.colState')}</th>
-            <th scope="col" className="py-2 pr-3">{t('worklist.colUnresolved')}</th>
-            <th scope="col" className="py-2 pr-3">{t('worklist.colConflicts')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry) => (
-            <Row key={entry.intake_id} entry={entry} t={t} />
-          ))}
-          {entries.length === 0 && !worklist.isLoading && (
-            <tr>
-              <td colSpan={7} className="py-6 text-center text-ink-muted">
-                {t('worklist.empty')}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      {/* Queue List Table */}
+      <div className="surface-card overflow-hidden">
+        <div className="flex items-center justify-between border-b border-line bg-[#f8faf9] px-6 py-3.5">
+          <div className="flex items-center gap-2 text-xs font-semibold tracking-wider uppercase text-ink-muted">
+            <Clock className="size-4 text-herb" />
+            {isHi ? 'लाइव कतार — आगमन समय अनुसार' : 'Live Queue — Ordered by Arrival Time'}
+          </div>
+          <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-ink-muted border border-line">
+            {entries.length} {isHi ? 'रोगी' : entries.length === 1 ? 'patient' : 'patients'}
+          </span>
+        </div>
 
-      {/* A filter that hides thirty patients says so, rather than making the
-          department look quiet. */}
-      {hidden > 0 && (
-        <p className="text-xs text-ink-muted">
-          {t('worklist.hidden', { count: hidden })}
-        </p>
-      )}
+        {worklist.isLoading ? (
+          <div className="p-8 text-center text-xs text-ink-muted">
+            {isHi ? 'रीयल-टाइम ओपीडी कतार लोड हो रही है…' : 'Loading real-time OPD queue…'}
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="p-8 text-center text-xs text-ink-muted">
+            {searchQuery
+              ? isHi ? 'आपकी खोज के अनुसार कोई रोगी नहीं मिला।' : 'No patients match your search filter.'
+              : isHi ? 'वर्तमान में कतार में कोई रोगी नहीं है।' : 'No patients currently in queue.'}
+          </div>
+        ) : (
+          <div className="divide-y divide-line">
+            {entries.map((entry, index) => {
+              const tokenNum = `#OPD-${101 + index}`;
+              const isAlert = entry.state === 'red_flag_pending';
+              const isReady = entry.state === 'ready';
+
+              return (
+                <div
+                  key={entry.intake_id}
+                  className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-[#fbfcfb]"
+                >
+                  <div className="flex items-center gap-4">
+                    {/* Token & Arrival */}
+                    <div className="min-w-[90px]">
+                      <span className="block font-bold text-sm text-ink">{tokenNum}</span>
+                      <span className="block text-[11px] text-ink-muted tabular-nums">
+                        {timeOfDay(entry.arrived_at)}
+                      </span>
+                    </div>
+
+                    {/* Patient Reference & Metadata */}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-ink">
+                          {isHi ? 'इंटेक' : 'Intake'} #{entry.intake_id.slice(0, 8)}
+                        </span>
+                        <span className="rounded-md bg-surface-sunken px-2 py-0.5 text-[10px] font-semibold text-ink-muted uppercase border border-line">
+                          {entry.patient_ref_type === 'phone'
+                            ? (isHi ? 'ऐप उपयोगकर्ता' : 'App User')
+                            : entry.patient_ref_type === 'hospital_id'
+                            ? (isHi ? 'आयुष्मान भारत (ABDM)' : 'ABDM / ABHA')
+                            : (isHi ? 'कियोस्क आगंतुक' : 'Kiosk Guest')}
+                        </span>
+                        <span className="text-xs text-ink-muted">
+                          • {humanise(entry.department_code ?? 'general')}
+                        </span>
+                      </div>
+
+                      <div className="mt-1 flex items-center gap-3 text-[11px] text-ink-muted">
+                        <span>
+                          {isHi ? 'भाषा:' : 'Language:'} {entry.language.toUpperCase()}
+                        </span>
+                        {entry.unresolved_count > 0 && (
+                          <span className="text-uncertain">
+                            {entry.unresolved_count} {isHi ? 'अप्राप्त' : 'unresolved'}
+                          </span>
+                        )}
+                        {entry.contradiction_count > 0 && (
+                          <span className="text-conflict">
+                            {entry.contradiction_count} {isHi ? 'विरोधाभास' : 'conflict'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status & Action */}
+                  <div className="flex items-center gap-4">
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                        isAlert
+                          ? 'bg-alert-soft text-alert'
+                          : isReady
+                          ? 'bg-herb-soft text-herb'
+                          : 'bg-saffron-soft text-saffron'
+                      }`}
+                    >
+                      {isAlert
+                        ? isHi ? 'आपातकालीन रेड-फ्लैग' : 'Emergency Red-Flag'
+                        : isReady
+                        ? isHi ? 'समीक्षा के लिए तैयार' : 'Ready for Review'
+                        : isHi ? 'साक्षात्कार जारी है' : 'Interview in Progress'}
+                    </span>
+
+                    <Link
+                      to={`/intakes/${entry.intake_id}`}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-herb px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-herb-deep hover:-translate-y-px"
+                    >
+                      {isHi ? 'रोगी फ़ाइल खोलें' : 'Open Patient File'} <ArrowRight className="size-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
-}
-
-function Row({ entry, t }: { entry: WorklistEntry; t: Translate }) {
-  const state = entry.state as WorklistState;
-  return (
-    <tr className="border-b border-line/60 hover:bg-surface-sunken">
-      <td className="py-2 pr-3">
-        <Link
-          to={`/intakes/${entry.intake_id}`}
-          className="font-medium text-accent underline"
-          data-testid="worklist-row"
-          data-intake-id={entry.intake_id}
-        >
-          {entry.intake_id.slice(0, 8)}
-        </Link>
-        {/* How the patient was identified, not who they are. This table can be
-            visible from a waiting room. */}
-        <span className="ml-2 text-xs text-ink-faint">
-          {IDENTIFICATION[entry.patient_ref_type]
-            ? t(IDENTIFICATION[entry.patient_ref_type]!)
-            : humanise(entry.patient_ref_type)}
-        </span>
-      </td>
-      <td className="py-2 pr-3 tabular-nums text-ink-muted">
-        {timeOfDay(entry.arrived_at)}
-      </td>
-      <td className="py-2 pr-3 text-ink-muted">{sourceOf(entry, t)}</td>
-      <td className="py-2 pr-3 text-ink-muted">
-        {INTAKE_STATUS[entry.intake_status]
-          ? t(INTAKE_STATUS[entry.intake_status]!)
-          : humanise(entry.intake_status)}
-      </td>
-      <td className="py-2 pr-3">
-        <span
-          data-state={state}
-          className={`inline-flex rounded border px-1.5 py-0.5 text-xs font-medium ${STATE_STYLES[state]}`}
-        >
-          {STATE_KEYS[state] ? t(STATE_KEYS[state]) : state}
-          {entry.unacknowledged_alerts > 0 && ` (${entry.unacknowledged_alerts})`}
-        </span>
-      </td>
-      <td className="py-2 pr-3 tabular-nums text-ink-muted">
-        {entry.unresolved_count}
-      </td>
-      <td className="py-2 pr-3 tabular-nums text-ink-muted">
-        {entry.contradiction_count}
-      </td>
-    </tr>
-  );
-}
-
-/**
- * Kiosk or app.
- *
- * Derived from the patient reference, which is the only signal the worklist row
- * carries: a phone-referenced intake came from the app, because a kiosk in a
- * corridor has no phone number to sign in with. Stated as an inference rather
- * than dressed up as a field the backend sent.
- */
-function sourceOf(entry: WorklistEntry, t: Translate): string {
-  return entry.patient_ref_type === 'phone'
-    ? t('worklist.sourceApp')
-    : t('worklist.sourceKiosk');
 }

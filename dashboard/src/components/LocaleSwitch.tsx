@@ -10,7 +10,18 @@
  * next person to sit down inherits. The browser's own `Accept-Language` is the
  * default, which is right most of the time and costs nothing when it is not.
  */
-import { LOCALES, LOCALE_NAMES, useLocale, useT, type Locale } from '../i18n';
+import { Globe } from 'lucide-react';
+import { useLocale, useT, type Locale } from '../i18n';
+
+const ALL_LANGUAGES = [
+  { code: 'en', name: 'English', active: true },
+  { code: 'hi', name: 'हिंदी (Hindi)', active: true },
+  { code: 'ta', name: 'தமிழ் (Tamil)', active: false },
+  { code: 'te', name: 'తెలుగు (Telugu)', active: false },
+  { code: 'bn', name: 'বাংলা (Bengali)', active: false },
+  { code: 'mr', name: 'मराठी (Marathi)', active: false },
+  { code: 'gu', name: 'ગુજરાતી (Gujarati)', active: false },
+];
 
 export function LocaleSwitch() {
   const t = useT();
@@ -18,21 +29,30 @@ export function LocaleSwitch() {
   const setLocale = useLocale((state) => state.setLocale);
 
   return (
-    <label className="flex items-center gap-1 text-xs text-ink-muted">
-      <span className="sr-only">{t('common.language')}</span>
+    <div className="relative inline-flex items-center">
+      <Globe className="pointer-events-none absolute left-2.5 size-3.5 text-ink-muted" />
       <select
         value={locale}
         aria-label={t('common.language')}
         data-testid="locale-switch"
-        onChange={(event) => setLocale(event.target.value as Locale)}
-        className="rounded border border-line bg-surface px-1.5 py-0.5 text-ink"
+        onChange={(event) => {
+          const val = event.target.value;
+          if (val === 'en' || val === 'hi') {
+            setLocale(val as Locale);
+          }
+        }}
+        className="h-8 rounded-full border border-line bg-white/90 py-1 pl-8 pr-3 text-xs font-medium text-ink shadow-sm outline-none transition-colors hover:border-herb focus:ring-2 focus:ring-herb cursor-pointer"
       >
-        {LOCALES.map((candidate) => (
-          <option key={candidate} value={candidate}>
-            {LOCALE_NAMES[candidate]}
+        {ALL_LANGUAGES.map((lang) => (
+          <option
+            key={lang.code}
+            value={lang.code}
+            disabled={!lang.active}
+          >
+            {lang.name} {!lang.active ? '(Coming soon)' : ''}
           </option>
         ))}
       </select>
-    </label>
+    </div>
   );
 }

@@ -16,6 +16,7 @@
  * option are the patient's own, shown verbatim in their own script, with a
  * translation beneath where one exists and never over the top of it.
  */
+import { X, ScanSearch } from 'lucide-react';
 import { useT, type StringKey } from '../i18n';
 
 export interface Evidence {
@@ -43,6 +44,72 @@ export interface Evidence {
   confirmed_today?: boolean | null;
   /** Entered by a person: who. The act of entry is the evidence. */
   entered_by?: string | null;
+}
+
+export function EvidenceDrawer({
+  isOpen,
+  onClose,
+  evidence,
+  loading,
+  onOpenIntake,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  evidence: Evidence | null;
+  loading: boolean;
+  onOpenIntake?: (intakeId: string) => void;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-hidden">
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        className="fixed inset-0 bg-ink/40 backdrop-blur-sm transition-opacity"
+        aria-hidden="true"
+      />
+
+      {/* Drawer panel */}
+      <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
+        <aside
+          role="dialog"
+          aria-modal="true"
+          className="w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-line animate-fade-rise"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-line px-5 py-4 bg-[#f8faf9]">
+            <div className="flex items-center gap-2">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-herb-soft text-herb">
+                <ScanSearch className="size-4" />
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-ink">Source Evidence</h2>
+                <p className="text-[11px] text-ink-muted">Verbatim Kiosk & OCR Proof</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-surface-sunken hover:text-ink"
+              aria-label="Close evidence panel"
+            >
+              <X className="size-5" />
+            </button>
+          </div>
+
+          {/* Drawer content */}
+          <div className="flex-1 overflow-y-auto p-5">
+            <EvidencePanel
+              evidence={evidence}
+              loading={loading}
+              onOpenIntake={onOpenIntake}
+            />
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
 }
 
 export function EvidencePanel({
@@ -97,13 +164,15 @@ function Frame({
 }) {
   const t = useT();
   return (
-    <aside
+    <div
       aria-label={t('evidence.label')}
-      className="rounded border border-line bg-surface p-4"
+      className="rounded-2xl border border-line bg-[#f8faf9] p-4"
     >
-      <h2 className="mb-3 text-sm font-semibold text-ink">{t(titleKey)}</h2>
+      <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-ink-muted">
+        {t(titleKey)}
+      </h3>
       {children}
-    </aside>
+    </div>
   );
 }
 

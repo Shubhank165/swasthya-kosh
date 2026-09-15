@@ -6,7 +6,8 @@
  * The correction-rate view narrows that further to admin, matching the
  * backend's own guard rather than trusting it.
  */
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { Link, NavLink, Route, Routes } from 'react-router-dom';
+import { Leaf, LogOut } from 'lucide-react';
 
 import { AlertsPage } from './alerts/AlertsPage';
 import { LocaleSwitch } from './components/LocaleSwitch';
@@ -23,14 +24,16 @@ export function App() {
 
   return (
     <RequireDashboardRole>
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-[#f8faf9]">
         <TopBar />
         <IdleWarning enabled={session !== null} />
-        <main className="mx-auto max-w-7xl p-4 print:max-w-none print:p-0">
+        <main className="mx-auto max-w-7xl px-4 py-6 print:max-w-none print:p-0">
           <Routes>
             <Route path="/" element={<WorklistPage />} />
+            <Route path="/queue" element={<WorklistPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/intakes/:intakeId" element={<ReportPage />} />
+            <Route path="/patient/:intakeId" element={<ReportPage />} />
             <Route
               path="/metrics"
               element={
@@ -57,29 +60,59 @@ function TopBar() {
   const session = useSession((state) => state.session);
   const signOut = useSession((state) => state.signOut);
 
+  const initials = session?.userId
+    ? session.userId.slice(0, 2).toUpperCase()
+    : 'DR';
+
   return (
-    <header className="border-b border-line bg-surface print:hidden">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-2">
-        <span className="font-semibold text-ink">{t('app.name')}</span>
-        <nav className="flex gap-3 text-sm">
+    <header className="sticky top-0 z-30 border-b border-line/80 bg-white/95 backdrop-blur print:hidden">
+      <div className="tricolour-rule h-1 w-full" />
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
+        <Link to="/" className="flex items-center gap-3">
+          <span className="ayush-gradient flex size-10 items-center justify-center rounded-xl text-white shadow-sm">
+            <Leaf className="size-5" />
+          </span>
+          <span className="leading-tight">
+            <span className="block font-semibold text-ink text-base">MediKiosk</span>
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.13em] text-ink-muted">
+              Ministry of Ayush • Government of India
+            </span>
+          </span>
+        </Link>
+
+        <nav className="ml-6 hidden items-center gap-1 md:flex">
           <Tab to="/" label={t('nav.worklist')} />
           <Tab to="/alerts" label={t('nav.alerts')} />
           {session?.role === 'admin' && <Tab to="/metrics" label={t('nav.quality')} />}
         </nav>
-        <span className="ml-auto text-xs text-ink-muted">
-          {/* The user id, the role and the hospital id, untranslated: they are
-              identifiers, and a physician checking they are signed in as
-              themselves needs the string their badge says. */}
-          {session?.userId} · {session?.role} · {session?.hospitalId}
-        </span>
-        <LocaleSwitch />
-        <button
-          type="button"
-          onClick={() => signOut()}
-          className="rounded border border-line px-2 py-1 text-xs text-ink hover:bg-surface-sunken"
-        >
-          {t('nav.signOut')}
-        </button>
+
+        <div className="ml-auto flex items-center gap-3">
+          <LocaleSwitch />
+
+          <div className="hidden items-center gap-2.5 border-l border-line pl-3 sm:flex">
+            <span className="flex size-9 items-center justify-center rounded-full bg-herb-soft text-xs font-bold text-herb">
+              {initials}
+            </span>
+            <span className="leading-tight">
+              <span className="block text-xs font-semibold text-ink">
+                {session?.userId ?? 'Doctor'}
+              </span>
+              <span className="block text-[10px] text-ink-muted capitalize">
+                {session?.role} • {session?.hospitalId ?? 'Hospital'}
+              </span>
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => signOut()}
+            className="flex size-9 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:bg-surface-sunken hover:text-ink"
+            aria-label={t('nav.signOut')}
+            title={t('nav.signOut')}
+          >
+            <LogOut className="size-4" />
+          </button>
+        </div>
       </div>
     </header>
   );
@@ -91,7 +124,11 @@ function Tab({ to, label }: { to: string; label: string }) {
       to={to}
       end={to === '/'}
       className={({ isActive }) =>
-        isActive ? 'font-medium text-accent' : 'text-ink-muted hover:text-ink'
+        `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+          isActive
+            ? 'bg-herb-soft text-herb font-semibold'
+            : 'text-ink-muted hover:bg-surface-sunken hover:text-ink'
+        }`
       }
     >
       {label}
