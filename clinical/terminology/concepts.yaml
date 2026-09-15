@@ -412,6 +412,86 @@ manas_stress:
   section: ayurveda
   synonyms: ["tanav", "तनाव", "stress", "chinta"]
 
+# --- the Jetson kiosk's own field names -------------------------------------------
+# The kiosk runs its own interview and exports a fixed set of field ids
+# (`jetson/src/medikiosk/providers/intake_api.py`). Several of them are not the
+# names used above, and a field id absent from this registry is rendered by
+# title-casing the id itself, so a physician's sheet read
+# "ayurveda ahara shakti" where it should have read a clinical label.
+#
+# These are *aliases in the kiosk's vocabulary*, not new clinical concepts, and
+# they are deliberately not folded into the entries above. `screen_fever` is the
+# kiosk's yes/no screening question and `associated_fever` is the pathway
+# attribute; merging them would let a screening answer render as a pathway
+# finding. Same reason the kiosk itself refuses to map its `ahara_shakti` onto
+# `agni_appetite`.
+reporter:
+  display: History given by
+  section: identity
+allergy:
+  display: Allergies
+  section: allergies
+breathlessness:
+  display: Breathlessness
+  section: red_flag_screen
+  synonyms: ["saans phoolna", "साँस फूलना", "shortness of breath"]
+bleeding:
+  display: Active bleeding
+  section: red_flag_screen
+  synonyms: ["khoon aana", "खून आना"]
+screen_fever:
+  display: Fever (screening question)
+  section: red_flag_screen
+  synonyms: ["bukhar", "बुखार"]
+screen_vomiting:
+  display: Vomiting (screening question)
+  section: red_flag_screen
+  synonyms: ["ulti", "उल्टी"]
+screen_sweating:
+  display: Sweating (screening question)
+  section: red_flag_screen
+  synonyms: ["pasina", "पसीना"]
+screen_one_sided_weakness:
+  display: Weakness on one side (screening question)
+  section: red_flag_screen
+  synonyms: ["ek taraf kamzori", "एक तरफ कमजोरी"]
+screen_speech_difficulty:
+  display: Difficulty speaking (screening question)
+  section: red_flag_screen
+  synonyms: ["bolne mein dikkat", "बोलने में दिक्कत"]
+
+# --- Dashavidha parameters the kiosk asks the patient about -------------------------
+# Patient-reported capacities from the kiosk's Dashavidha Pariksha module. Each
+# names the classical parameter it asks about and says, in its own display text,
+# that the answer is the patient's. None of them is a Vaidya's assessment, and
+# the display names must not be shortened to the bare Sanskrit term later — a
+# line reading "Satva: anxious" would present a classical finding where a
+# patient described their own temperament.
+ayurveda_ahara_shakti:
+  display: Capacity for food (Ahara Shakti, patient-reported)
+  section: ayurveda
+  needs_clinical_review: true
+ayurveda_vyayama_shakti:
+  display: Capacity for exertion (Vyayama Shakti, patient-reported)
+  section: ayurveda
+  needs_clinical_review: true
+ayurveda_satva:
+  display: Mental temperament (Satva, patient-reported)
+  section: ayurveda
+  needs_clinical_review: true
+ayurveda_satmya:
+  display: What suits the patient (Satmya, patient-reported)
+  section: ayurveda
+  needs_clinical_review: true
+ayurveda_dosha_tendency:
+  display: Dosha tendency suggested by the kiosk tally (not a Prakriti)
+  section: ayurveda
+  needs_clinical_review: true
+prakriti_self_report:
+  display: Prakriti, self-reported and provisional
+  section: ayurveda
+  needs_clinical_review: true
+
 # --- documents and confirmation ----------------------------------------------------
 has_prior_documents:
   display: Brought previous prescriptions or reports

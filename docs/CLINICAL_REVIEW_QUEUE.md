@@ -425,6 +425,27 @@ on cream paper under OPD fluorescent light will not score like that.
       *(A14 — kept the default `800.0`, untuned against real photographs. No
       corpus was available here either.)*
 
+
+## A15 — the kiosk's Dashavidha display names
+
+`clinical/terminology/concepts.yaml` gained six entries so that the Jetson's
+Ayurveda answers render with a clinical label instead of a title-cased field id
+(`ayurveda ahara shakti`). The section placement is mechanical and safe; the
+*wording* is not reviewed.
+
+Each display name asserts two things an engineer chose: which classical
+parameter the kiosk's question is about, and that the answer is the patient's
+own report rather than an assessment. `ayurveda_dosha_tendency` reads "Dosha
+tendency suggested by the kiosk tally (not a Prakriti)" for that second reason,
+and `prakriti_self_report` carries "self-reported and provisional" to match the
+`scoring_reviewed: false` the kiosk already sends.
+
+- [ ] Confirm each display name names the right parameter, and that none of
+      them can be read as a Vaidya's finding. Shortening any of them to the
+      bare Sanskrit term is the specific regression to avoid: a line reading
+      "Satva: anxious" presents a classical finding where a patient described
+      their own temperament.
+
 ---
 
 ## Not on this list
