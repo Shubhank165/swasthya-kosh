@@ -6,6 +6,7 @@
 #   scripts/kiosk panel --probe                # read the SPI panel controller id
 #   scripts/kiosk runtime                      # the offline intake loop
 #   scripts/kiosk web                          # browser UI: phone/tablet mic + camera, tailnet only
+#   scripts/kiosk heart_rate                   # live camera heart rate (rPPG) over tailnet/display
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -16,14 +17,14 @@ export PYTHONPATH="$ROOT/src:$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 # and Jetson.GPIO for the screen and panel. Pick whichever can import what the tool needs.
 TOOL="${1:-}"
 if [[ -z "$TOOL" ]]; then
-  echo "usage: scripts/kiosk {camera|display|panel|runtime|capture|live_ocr|web} [options]" >&2
+  echo "usage: scripts/kiosk {camera|display|panel|runtime|capture|live_ocr|web|heart_rate} [options]" >&2
   exit 2
 fi
 shift
 
 VENV="$ROOT/offline/jetson/audio-venv/bin/python"
 case "$TOOL" in
-  runtime|capture|live_ocr|web) PYTHON="$VENV" ;;
+  runtime|capture|live_ocr|web|heart_rate) PYTHON="$VENV" ;;
   *)       PYTHON="${MEDIKIOSK_PYTHON:-python3}" ;;
 esac
 

@@ -40,7 +40,7 @@ async def test_websocket_flow():
     uri = f"ws://{HOST}:{WS_PORT}/ws/session"
     print(f"[*] Connecting WebSocket {uri} ...")
     try:
-        async with websockets.connect(uri, timeout=10) as ws:
+        async with websockets.connect(uri) as ws:
             # 1. Expect session.ready
             ready = json.loads(await ws.recv())
             print(f"    [+] Received: {ready.get('type')} session_id={ready.get('session_id')[:8]}")
