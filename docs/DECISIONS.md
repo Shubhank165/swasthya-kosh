@@ -1452,3 +1452,51 @@ words travel only to answer questions the patient is about to be asked anyway,
 are not stored by this call, and are already on the report verbatim under
 decision 3. That is a narrower claim than "no PHI leaves", and it is the honest
 one.
+
+## 76. The Hindi microphone reopens on a converted model, not a bigger Whisper
+
+§69 closed it on a measurement and named the condition for reopening it:
+IndicConformer, "an export job rather than a download". The job is done, and
+the numbers say it was the right family. Ten ordinary OPD answers, synthesised
+once and fed to every candidate unchanged, scored by the same CER code the
+kiosk uses:
+
+| model | asset | mean CER | `सांस लेने में तकलीफ़ है` becomes |
+|---|---:|---:|---|
+| whisper-tiny int8 — what the APK ships | 103 MB | 0.96 | `Sans Lenin Mithak Lee Thai` |
+| Dolphin base CTC int8 | 99 MB | 0.42 | `سانس लेने میں تکلیف है` |
+| IndicConformer hi, int8 | 140 MB | 0.04 | `साँस लेने में तकलीफ़ है` |
+
+**Dolphin was the tempting answer and is the wrong one.** It needs no
+conversion, is the same size as the asset already shipped, covers eight Indian
+languages, and its Dart binding is already in the pinned sherpa_onnx. But
+sherpa-onnx exposes no way to pin its language, so it auto-detects over a
+40-language inventory and changes script inside one sentence. Romanisation at
+least leaves a human able to guess the word; half a sentence rendered in Arabic
+script does not, and nothing downstream can repair it. **A per-language
+checkpoint is preferred here not because it scores better but because it cannot
+make that class of mistake at all** — the same reasoning that keeps the report
+builder pure: remove the failure mode, do not filter for it.
+
+**What the conversion actually was.** Not a retrain and not a re-export. The
+community ONNX export of IndicConformer targets the generic `onnx-asr` library,
+which reads tensor shapes off the graph; sherpa-onnx reads them off
+`metadata_props` and refuses to load without `vocab_size`. So the work is:
+stamp six metadata keys, write `tokens.txt` from `vocab.json` with the CTC blank
+last, and quantise fp32 → int8, which takes 493 MB to 140 MB and costs nothing
+measurable. `app/tool/asr/build_indicconformer.py` does all three and checks
+`vocab_size` against the model's own output dimension rather than trusting it —
+a mismatch there decodes to the wrong characters without failing.
+
+**The gate does not move yet.** `WhisperModel.servedLanguages` is still `{'en'}`
+because the app does not yet know how to build a NeMo-CTC recogniser — today
+`transcribe.dart` hard-codes `OfflineWhisperModelConfig`. Widening the set
+before that is wired would offer a microphone backed by nothing, which is the
+exact failure §69 exists to prevent. The measurement is recorded now so the
+person who does the wiring is not re-deriving it.
+
+**And one honest limit.** `हाँ` still comes back as `हा` or `ख`: CTC needs
+encoder context and a 400 ms utterance does not give it any. Yes/no and
+single-choice questions have buttons and `option_match.dart` refuses a
+low-confidence match rather than guessing, so the first place a Hindi
+microphone earns its keep is free-text answers — not the short ones.
