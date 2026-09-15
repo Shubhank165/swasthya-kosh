@@ -1,138 +1,23 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MediKiosk Voice Intake</title>
-    <style>
-      :root {
-        color-scheme: dark;
-        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-        background: #08131d;
-        color: #e8f2f7;
-      }
-      * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top, #12314a, #08131d 55%); }
-      main { width: min(1100px, 94vw); margin: 0 auto; padding: 28px 0 48px; }
-      h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 3rem); }
-      .subtitle { color: #a9c1d2; margin: 8px 0 24px; }
-      .warning { border-left: 4px solid #f5b942; background: #2c2616; padding: 12px 16px; border-radius: 8px; }
-      .grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; margin-top: 18px; }
-      .card { background: rgba(11, 29, 43, .9); border: 1px solid #27465a; border-radius: 16px; padding: 18px; box-shadow: 0 18px 48px #0005; }
-      .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-      button, select, input { border-radius: 10px; border: 1px solid #416479; padding: 11px 14px; font: inherit; }
-      button { background: #1e7f73; color: white; font-weight: 700; cursor: pointer; }
-      button.secondary { background: #273e50; }
-      button.danger { background: #a6313c; }
-      button:disabled { opacity: .45; cursor: not-allowed; }
-      select, input { background: #0b1b27; color: #e8f2f7; }
-      input { flex: 1; min-width: 220px; }
-      .status { display: inline-flex; align-items: center; gap: 8px; color: #b9cbd7; }
-      .dot { width: 10px; height: 10px; border-radius: 50%; background: #788b97; }
-      .dot.live { background: #41d39b; box-shadow: 0 0 14px #41d39b; }
-      .meter { height: 10px; border-radius: 99px; background: #142b3b; overflow: hidden; margin: 14px 0; }
-      .meter > div { width: 0%; height: 100%; background: linear-gradient(90deg, #41d39b, #f5b942, #ed5f68); transition: width 60ms linear; }
-      .transcript { min-height: 92px; background: #08151f; border-radius: 12px; padding: 14px; white-space: pre-wrap; }
-      .partial { color: #8eabbc; font-style: italic; }
-      .question { color: #77e5ce; font-size: 1.18rem; min-height: 58px; }
-      /* Sized for a finger on a tablet, not a mouse pointer. */
-      button.choice { font-size: 1.05rem; padding: 14px 18px; background: #2a6f9e; }
-      .question.alert { color: #ff9c9c; }
-      .choice-input { padding: 13px 14px; font-size: 1.05rem; min-width: 230px; }
-      pre { background: #071018; padding: 13px; border-radius: 10px; overflow: auto; max-height: 360px; font-size: .82rem; }
-      #events { max-height: 260px; overflow: auto; font-size: .85rem; color: #a9c1d2; }
-      .event { border-bottom: 1px solid #1d3545; padding: 7px 0; }
-      #alert { display: none; margin-top: 16px; background: #5b1720; border: 2px solid #ff6673; padding: 16px; border-radius: 12px; font-weight: 800; }
-      small { color: #8ea7b7; }
-      @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>MediKiosk Voice Intake</h1>
-      <p class="subtitle">Streaming multilingual intake prototype running through the Jetson.</p>
-      <p class="warning"><strong>Prototype only:</strong> not a diagnosis system. Emergency alerts must always be reviewed by hospital staff.</p>
-
-      <!-- The eight-step kiosk workflow. Stage, prompt and choices all come from the server; this
-           panel only draws them, so the browser and the tablet app stay in step automatically. -->
-      <section class="card" style="margin-bottom:18px">
-        <div class="row" style="justify-content:space-between">
-          <strong>Kiosk workflow</strong>
-          <code id="flowStage">connecting…</code>
-          <code id="engine">—</code>
-        </div>
-        <div id="flowHeadline" class="question" style="margin:10px 0"></div>
-        <div id="flowChoices" class="row" style="flex-wrap:wrap;gap:8px"></div>
-      </section>
-
-      <div class="grid">
-        <section class="card">
-          <div class="row">
-            <button id="start">Start microphone</button>
-            <button id="stop" class="danger" disabled>Stop</button>
-            <select id="language" aria-label="Language">
-              <option value="auto">Auto detect</option>
-              <option value="hi">Hindi</option>
-              <option value="en">English</option>
-              <option value="bn">Bengali</option>
-              <option value="mr">Marathi</option>
-              <option value="te">Telugu</option>
-              <option value="ta">Tamil</option>
-              <option value="gu">Gujarati</option>
-              <option value="kn">Kannada</option>
-              <option value="pa">Punjabi</option>
-            </select>
-            <span class="status"><span id="dot" class="dot"></span><span id="status">Disconnected</span></span>
-          </div>
-          <div class="meter" aria-label="Microphone level"><div id="meter"></div></div>
-          <small>Capture requests WebRTC echo cancellation, noise suppression, and automatic gain control. Audio is 16 kHz mono LINEAR16, recognised on the Jetson. Nothing leaves the device.</small>
-
-          <h3>Patient transcript</h3>
-          <div class="transcript">
-            <div id="final"></div>
-            <div id="partial" class="partial">Waiting for speech…</div>
-          </div>
-
-          <h3>Next question</h3>
-          <div id="question" class="question">Start a session or submit a typed test below.</div>
-
-          <div class="row">
-            <input id="typed" value="I have stomach pain for three days and I vomited twice." aria-label="Typed test transcript" />
-            <button id="submit" class="secondary">Submit test transcript</button>
-          </div>
-          <div id="alert"></div>
-        </section>
-
-        <aside class="card">
-          <h3>Structured patient state</h3>
-          <pre id="state">{}</pre>
-          <h3>Session events</h3>
-          <div id="events"></div>
-        </aside>
-      </div>
-
-      <section class="card" style="margin-top:18px">
-        <h3>Document capture</h3>
-        <p class="subtitle" style="margin:0 0 12px">
-          Photograph a prescription with this device's camera and read it with the on-device OCR.
-        </p>
-        <div class="row">
-          <button id="camStart">Start camera</button>
-          <button id="camShot" class="secondary" disabled>Capture &amp; read</button>
-          <button id="camStop" class="danger" disabled>Stop camera</button>
-          <span id="camStatus" class="status">Camera off</span>
-        </div>
-        <div class="row" style="align-items:flex-start; margin-top:12px">
-          <video id="camVideo" playsinline muted style="width:280px; max-width:44vw; border-radius:12px; background:#000"></video>
-          <div style="flex:1; min-width:220px">
-            <div id="camTiming" class="subtitle" style="margin:0 0 8px"></div>
-            <pre id="camResult" style="min-height:120px">Nothing captured yet.</pre>
-          </div>
-        </div>
-      </section>
-    </main>
-    <script type="module" src="/static/app.js"></script>
-    <script type="module" src="/static/camera.js"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MediKiosk Local Service</title>
+  <style>
+    body { margin: 0; padding: 24px; background: #f4f5f2; color: #172822; font: 18px/1.6 system-ui, sans-serif; }
+    main { max-width: 42rem; margin: 10vh auto; }
+    h1 { line-height: 1.2; }
+    a { color: #08674c; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>MediKiosk local service</h1>
+    <p>Patient intake now uses the tablet application's consent-based workflow. The older browser test interface is disabled because it does not support session ownership or consent.</p>
+    <p>Use the configured tablet to start or resume an intake. Internet access is not required, but the tablet must stay connected to this local backend.</p>
+    <p><a href="/dashboard">Staff sign-in</a></p>
+    <p>This prototype does not provide a diagnosis. For urgent symptoms, contact hospital staff directly.</p>
+  </main>
+</body>
 </html>
-

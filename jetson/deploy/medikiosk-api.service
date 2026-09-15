@@ -1,0 +1,17 @@
+[Unit]
+Description=MediKiosk FastAPI backend (tablet kiosk)
+After=network.target medikiosk-whisper.service
+Wants=medikiosk-whisper.service
+
+[Service]
+WorkingDirectory=/home/ubuntu/medikiosk
+EnvironmentFile=/home/ubuntu/medikiosk/.env
+# audio-venv, not .venv: only it has numpy/onnxruntime, without which the session
+# starts typed-only (no VAD) and the tablet microphone is dead.
+Environment=PYTHONPATH=/home/ubuntu/medikiosk/src
+ExecStart=/home/ubuntu/medikiosk/offline/jetson/audio-venv/bin/uvicorn medikiosk.app:app --host 100.104.251.40 --port 8000
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

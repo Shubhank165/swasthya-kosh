@@ -14,20 +14,25 @@ class Settings(BaseSettings):
     )
 
     deployment_profile: Literal["online", "pi", "jetson", "demo"] = "online"
-    openai_api_key: str | None = None
+    openai_api_key: str | None = Field(default=None, repr=False)
     openai_model: str = "gpt-5.6-terra"
-    sarvam_api_key: str | None = None
+    sarvam_api_key: str | None = Field(default=None, repr=False)
     sarvam_stt_language: str = "auto"
     sarvam_tts_language: str = "hi-IN"
     sarvam_tts_speaker: str = "shubh"
     session_store_path: Path = Path("data/medikiosk.db")
-    session_encryption_key: str | None = None
+    session_encryption_key: str | None = Field(default=None, repr=False)
+    staff_users_path: Path | None = None
+    staff_allow_insecure_http: bool = False
     host: str = "127.0.0.1"
     port: int = Field(default=8000, ge=1, le=65535)
 
     # Offline edge runtime. Devices are the PulseAudio echo-cancelled endpoints created by
     # scripts/setup_jetson_audio.sh; the VAD numbers are room-dependent calibration knobs.
     whisper_url: str = "http://127.0.0.1:11500"
+    # Hindi goes to IndicConformer (scripts/indic_asr_server.py); measured 2x lower CER and
+    # 3.7x faster than whisper on this board. Everything else stays on whisper.
+    indic_asr_url: str = "http://127.0.0.1:11600"
     bhashini_url: str = "http://127.0.0.1:11400"
     edge_language: str = "hi"
     # Whisper reports the language it heard, so the kiosk can follow the patient instead of making
@@ -56,6 +61,8 @@ class Settings(BaseSettings):
     barge_in_guard_ms: int = Field(default=600, ge=0)
     max_utterance_s: float = Field(default=15.0, gt=0)
     turn_timeout_s: float = Field(default=20.0, gt=0)
+    # Privacy timeout: an abandoned encounter is warned, then cleared for the next patient.
+    idle_timeout_s: float = Field(default=600.0, gt=0)
     max_unanswered_turns: int = Field(default=3, ge=1)
     max_question_attempts: int = Field(default=2, ge=1)
     # Whisper invents fluent speech from silence - on digital silence it returned " you" with
@@ -93,6 +100,15 @@ class Settings(BaseSettings):
     # A file rather than an environment variable: an env var is readable by anything that can see
     # the process and turns up in crash dumps and `ps e`. Mode 0600, outside the kiosk tree.
     intake_token_path: Path = Path("~/.config/medikiosk/kiosk_token")
+    # Which device an exported record came from. Defaults to the hostname, which is already
+    # unique per Jetson; set it explicitly when an OPD runs more than one and the hostnames
+    # do not say which desk is which.
+    kiosk_id: str | None = None
+    # Fonts for the PDF slip. Missing files fall back to Pillow's default (Latin only).
+    slip_font_devanagari: Path = Path(
+        "/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf"
+    )
+    slip_font_latin: Path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 
     @property
     def openai_configured(self) -> bool:

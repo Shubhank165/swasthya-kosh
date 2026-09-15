@@ -23,10 +23,20 @@ class ApiService {
     return {'status': 'down'};
   }
 
-  Future<Map<String, dynamic>> scanAbhaCard(Uint8List imageBytes) async {
+  /// The patient's slip as PDF bytes. Same ownership headers as a scan.
+  Future<Uint8List> slipPdf({required Map<String, String> headers}) async {
+    final response = await http.get(Uri.parse('$baseUrl/api/slip.pdf'), headers: headers)
+        .timeout(const Duration(seconds: 20));
+    if (response.statusCode != 200) throw Exception('Slip not ready (${response.statusCode})');
+    return response.bodyBytes;
+  }
+
+  Future<Map<String, dynamic>> scanAbhaCard(Uint8List imageBytes, {required Map<String, String> headers}) async {
     try {
       final uri = Uri.parse('$baseUrl/api/abha-scan');
       final request = http.MultipartRequest('POST', uri)
+        ..followRedirects = false
+        ..headers.addAll(headers)
         ..files.add(
           http.MultipartFile.fromBytes(
             'image',
@@ -48,10 +58,12 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> scanDocument(Uint8List imageBytes) async {
+  Future<Map<String, dynamic>> scanDocument(Uint8List imageBytes, {required Map<String, String> headers}) async {
     try {
       final uri = Uri.parse('$baseUrl/api/ocr');
       final request = http.MultipartRequest('POST', uri)
+        ..followRedirects = false
+        ..headers.addAll(headers)
         ..files.add(
           http.MultipartFile.fromBytes(
             'image',

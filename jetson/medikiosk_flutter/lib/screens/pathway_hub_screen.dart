@@ -3,14 +3,14 @@ import '../models/models.dart';
 import '../theme/app_theme.dart';
 
 class PathwayHubScreen extends StatelessWidget {
-  final PatientProfile profile;
+  final PatientProfile? profile;
   final VoidCallback onSelectSymptoms;
   final VoidCallback onSelectPrakriti;
   final VoidCallback onBackToRegistration;
 
   const PathwayHubScreen({
     super.key,
-    required this.profile,
+    this.profile,
     required this.onSelectSymptoms,
     required this.onSelectPrakriti,
     required this.onBackToRegistration,
@@ -31,7 +31,7 @@ class PathwayHubScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Patient Profile Summary Pill
-                  Container(
+                  if (profile != null) Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
@@ -56,13 +56,13 @@ class PathwayHubScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                profile.name,
+                                profile!.name,
                                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                'Age: ${profile.age ?? "--"} yrs • ${profile.gender} • ${profile.maskedAbha}',
+                                'Age: ${profile!.age ?? "--"} yrs • ${profile!.gender} • ${profile!.maskedAbha}',
                                 style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -271,7 +271,7 @@ class PathwayHubScreen extends StatelessWidget {
               // Description Bullet Points
               _buildBullet(Icons.balance_rounded, 'Discover your Vata, Pitta & Kapha constitution'),
               const SizedBox(height: 6),
-              _buildBullet(Icons.touch_app_rounded, 'Simple 5-point touch button questionnaire'),
+              _buildBullet(Icons.touch_app_rounded, 'Full 58-question CCRAS questionnaire, by touch or voice'),
               const SizedBox(height: 6),
               _buildBullet(Icons.health_and_safety_rounded, 'Personalized diet & Ayurvedic lifestyle balance'),
 

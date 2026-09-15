@@ -1,0 +1,14 @@
+[Unit]
+Description=MediKiosk Hindi ASR (IndicConformer, Bhashini checkpoints)
+After=network.target
+
+[Service]
+WorkingDirectory=/home/ubuntu/bhashini_models
+Environment=INDIC_ASR_PORT=11600
+ExecStart=/home/ubuntu/bhashini_models/venv/bin/python /home/ubuntu/medikiosk/scripts/indic_asr_server.py
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

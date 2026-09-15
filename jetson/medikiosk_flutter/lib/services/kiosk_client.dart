@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -8,429 +9,331 @@ import '../models/models.dart';
 
 enum ConnectionStatus { disconnected, connecting, connected, reconnecting }
 
+/// The tablet renders acknowledged backend state; it never walks stages locally.
 class KioskClient extends ChangeNotifier {
   String _host;
   final int _port;
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
-  Timer? _pingTimer;
   Timer? _reconnectTimer;
-
-  ConnectionStatus _status = ConnectionStatus.disconnected;
-  ConnectionStatus get status => _status;
-
-  String get host => _host;
-  set host(String newHost) {
-    if (_host != newHost) {
-      _sessionId = null;
-      _clearPatient();
-      _host = newHost;
-      reconnect();
-    }
-  }
-
-  // Current kiosk state from server
-  KioskStage _currentStage = KioskStage.language;
-  KioskStage get currentStage => _currentStage;
-
-  String _headline = 'अपनी भाषा चुनें / Choose your language';
-  String get headline => _headline;
-
-  String _language = 'hi-IN';
-  String get language => _language;
-
-  String? _questionId;
-  String? _answerUi;
-  String? get questionId => _questionId;
-
-  /// 'yes_no', 'faces', 'duration', 'body_map', 'age_bands' - chosen by the server so the tablet,
-  /// the browser and the wired panel offer the same control for the same question.
-  String? get answerUi => _answerUi;
-
-  List<Map<String, dynamic>> _options = [];
-  List<Map<String, dynamic>> get options => _options;
-
-  /// `[answered, total]` for questionnaire stages, as the server counts it.
-  List<int>? _progress;
-  List<int>? get progress => _progress;
-
-  Map<String, dynamic>? _lastReport;
-  Map<String, dynamic>? get lastReport => _lastReport;
-
-  List<Map<String, dynamic>> _redFlags = [];
-  List<Map<String, dynamic>> get redFlags => _redFlags;
-
-  bool _isEmergency = false;
-  bool get isEmergency => _isEmergency;
-
-  String _lastTranscript = '';
-  String get lastTranscript => _lastTranscript;
-
-  bool _isProcessing = false;
-  bool get isProcessing => _isProcessing;
-
-  // Stream controller for TTS audio (base64 audio bytes + sample rate)
-  final _ttsController = StreamController<Map<String, dynamic>>.broadcast();
-  Stream<Map<String, dynamic>> get ttsStream => _ttsController.stream;
-
-  /// Callback when a final speech transcript is received (e.g. from Jetson Whisper)
-  ValueChanged<String>? onTranscriptReceived;
-
-  // Public names are used by the connection settings and tests.
-  // ignore: prefer_initializing_formals
-  KioskClient({String host = '127.0.0.1', int port = 8000})
-    // ignore: prefer_initializing_formals
-    : _host = host,
-      // ignore: prefer_initializing_formals
-      _port = port;
-
+  Timer? _answerTimer;
   bool _disposed = false;
   int _generation = 0;
   String? _sessionId;
+  String? _token;
+  int _revision = 0;
+  String? _captureEpoch;
+  Map<String, dynamic>? _pending;
+  ConnectionStatus _status = ConnectionStatus.disconnected;
+  Map<String, dynamic> _screen = {'stage': 'language', 'headline': 'Connecting to local kiosk…'};
+  String? _questionId;
+  String? _answerUi;
   String? _error;
-  String? get error => _error;
+  String _language = 'en';
+  String _lastTranscript = '';
+  // The opening question collects a free description: speech is appended here instead of
+  // being dispatched, until the patient presses Proceed.
+  bool _accumulate = false;
+  String _narrative = '';
   bool _voiceAvailable = false;
+  bool _processing = false;
+  bool _playing = false;
+  Map<String, dynamic>? _lastReport;
+  List<Map<String, dynamic>> _redFlags = [];
+  final _ttsController = StreamController<Map<String, dynamic>>.broadcast();
+  final _deviceController = StreamController<Map<String, dynamic>>.broadcast();
+
+  // Public constructor names are part of the connection settings API.
+  // ignore: prefer_initializing_formals
+  KioskClient({String host = '127.0.0.1', int port = 8000}) : _host = host, _port = port;
+
+  String get host => _host;
+  set host(String value) {
+    if (value == _host) return;
+    _host = value;
+    _sessionId = _token = null;
+    _pending = null;
+    _clearPatient();
+    reconnect();
+  }
+  ConnectionStatus get status => _status;
+  String? get sessionId => _sessionId;
+  int get revision => _revision;
+  String get epoch => '$_sessionId:$_revision';
+  Map<String, dynamic> get screen => Map.unmodifiable(_screen);
+  KioskStage get currentStage => KioskStageExtension.fromString(_screen['stage'] as String? ?? 'unavailable');
+  String get headline => _screen['headline'] as String? ?? '';
+  String get language => _language;
+  String? get questionId => _questionId;
+  String? get answerUi => _answerUi;
+  String? get error => _error;
   bool get voiceAvailable => _voiceAvailable;
-  Timer? _answerTimer;
+  bool get isProcessing => _processing || _pending != null;
+  bool get isEmergency => currentStage == KioskStage.emergency;
+  String get lastTranscript => _lastTranscript;
+  bool get accumulate => _accumulate;
+  String get narrative => _narrative;
+  void setNarrative(String text) { _narrative = text; notifyListeners(); }
+  // Reads the getter, not the field, so a subclass presenting its own text (tests) sends it.
+  void submitNarrative() { if (narrative.trim().isNotEmpty) action('answer', narrative.trim()); }
+  Map<String, dynamic>? get lastReport => _lastReport;
+  List<Map<String, dynamic>> get redFlags => _redFlags;
+  List<Map<String, dynamic>> get options => List<Map<String, dynamic>>.from(_screen['options'] as List? ?? []);
+  List<int>? get progress => (_screen['progress'] as List?)?.map((v) => (v as num).toInt()).toList();
+  Stream<Map<String, dynamic>> get ttsStream => _ttsController.stream;
+  Stream<Map<String, dynamic>> get deviceStream => _deviceController.stream;
+  Map<String, String> get scanHeaders => {
+    'X-Kiosk-Session': ?_sessionId,
+    'X-Kiosk-Token': ?_token,
+    'X-Kiosk-Revision': '$_revision',
+  };
 
   void connect() {
-    if (_disposed ||
-        _status == ConnectionStatus.connected ||
-        _status == ConnectionStatus.connecting) {
-      return;
-    }
-
-    _setStatus(ConnectionStatus.connecting);
+    if (_disposed || _status == ConnectionStatus.connected || _status == ConnectionStatus.connecting) return;
     _reconnectTimer?.cancel();
+    _setStatus(ConnectionStatus.connecting);
     final generation = ++_generation;
-    final uri = Uri(
-      scheme: 'ws',
-      host: _host,
-      port: _port,
-      path: '/ws/session',
-      queryParameters: _sessionId == null ? null : {'resume': _sessionId!},
-    );
-
+    final uri = Uri(scheme: 'ws', host: _host, port: _port, path: '/ws/session');
     try {
-      final channel = WebSocketChannel.connect(uri);
+      final channel = WebSocketChannel.connect(uri, protocols: ['medikiosk.v2', if (_token != null) 'resume.$_token']);
       _channel = channel;
-      _subscription = channel.stream.listen(
-        (msg) {
-          if (!_disposed && generation == _generation) _handleMessage(msg);
-        },
-        onDone: () {
-          if (!_disposed && generation == _generation) _handleDone();
-        },
-        onError: (err) {
-          if (!_disposed && generation == _generation) _handleError(err);
-        },
-        cancelOnError: true,
-      );
-
-      channel.ready
-          .timeout(const Duration(seconds: 8))
-          .then((_) {
-            if (_disposed || generation != _generation) return;
-            _setStatus(ConnectionStatus.connected);
-            _startPing();
-            sendLog('Flutter kiosk connected from client');
-          })
-          .catchError((err) {
-            if (!_disposed && generation == _generation) _handleError(err);
-          });
-    } catch (e) {
-      _handleError(e);
+      _subscription = channel.stream.listen((message) {
+        if (!_disposed && generation == _generation && message is String) {
+          try {
+            _process(jsonDecode(message) as Map<String, dynamic>);
+          } catch (_) {
+            _error = 'Invalid response from the local kiosk.';
+            notifyListeners();
+          }
+        }
+      }, onDone: () {
+        if (_disposed || generation != _generation) return;
+        final code = channel.closeCode;
+        _cleanup();
+        if (code == 4408) {
+          // Privacy timeout: the patient walked away. Forget their capability and start fresh.
+          _sessionId = _token = null;
+          _pending = null;
+          _clearPatient();
+          connect();
+          return;
+        }
+        if (code == 4404 || code == 4409) {
+          _error = code == 4409 ? 'This session is open on another connection.' : 'This session cannot be resumed. Ask staff for help.';
+          notifyListeners();
+          return;
+        }
+        _scheduleReconnect();
+      }, onError: (_) {
+        if (_disposed || generation != _generation) return;
+        _cleanup();
+        _scheduleReconnect();
+      });
+      channel.ready.timeout(const Duration(seconds: 8)).then((_) {
+        if (!_disposed && generation == _generation) _setStatus(ConnectionStatus.connected);
+      }).catchError((_) {
+        if (!_disposed && generation == _generation) {
+          _cleanup();
+          _scheduleReconnect();
+        }
+      });
+    } catch (_) {
+      _cleanup();
+      _scheduleReconnect();
     }
   }
 
-  void _startPing() {
-    _pingTimer?.cancel();
-    _pingTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (_status == ConnectionStatus.connected) {
-        // Send lightweight client heartbeat
-        send({
-          'type': 'client.heartbeat',
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        });
+  void _process(Map<String, dynamic> msg) {
+    final type = msg['type'];
+    final id = msg['session_id'] as String?;
+    if (type == 'session.id') {
+      if (id == null || msg['session_token'] is! String) return;
+      if (_sessionId != id) {
+        _clearPatient();
+        _pending = null;
       }
-    });
-  }
-
-  void _handleMessage(dynamic message) {
-    if (message is String) {
-      try {
-        final data = jsonDecode(message) as Map<String, dynamic>;
-        _processServerMessage(data);
-      } catch (e) {
-        if (kDebugMode) print('Failed to parse WS JSON: $e');
-      }
-    } else if (message is Uint8List) {
-      // Binary audio stream from server
+      _sessionId = id;
+      _token = msg['session_token'] as String;
+      _revision = (msg['revision'] as num).toInt();
+    } else {
+      if (id != _sessionId || _sessionId == null) return;
+      final revision = (msg['revision'] as num?)?.toInt();
+      if (revision == null || revision < _revision) return;
+      if (revision != _revision) _captureEpoch = null;
+      _revision = revision;
     }
-  }
-
-  void _processServerMessage(Map<String, dynamic> msg) {
-    final type = msg['type'] as String?;
-    if (kDebugMode) debugPrint('WS <- $type');
-
     switch (type) {
-      case 'session.id':
-      case 'session.ready':
-        _sessionId = msg['session_id'] as String?;
-        break;
       case 'configuration.required':
-        _voiceAvailable = (msg['missing'] as List? ?? const []).isEmpty;
-        notifyListeners();
+        _voiceAvailable = (msg['missing'] as List? ?? ['unknown']).isEmpty;
+        // A lost acknowledgment reuses the exact action id and body, never a new action.
+        if (_pending != null) send(_pending!);
+        break;
+      case 'flow.ack':
+        if (_pending?['action_id'] == msg['action_id']) {
+          _pending = null;
+          _processing = false;
+          _answerTimer?.cancel();
+          _error = null;
+        }
         break;
       case 'error':
-        _error =
-            msg['message'] as String? ??
-            'The kiosk could not complete this action';
-        _isProcessing = false;
-        _answerTimer?.cancel();
-        notifyListeners();
+        _error = msg['message'] as String? ?? 'Action failed. Please ask staff for help.';
+        if (msg['action_id'] == _pending?['action_id']) {
+          _pending = null;
+          _processing = false;
+          _answerTimer?.cancel();
+        }
+        if (msg['stage'] == 'tts') _ttsController.add({...msg, 'type': 'tts.cancelled'});
         break;
       case 'flow.screen':
-        final screenData = msg['data'] as Map<String, dynamic>? ?? {};
-        final stageStr = screenData['stage'] as String? ?? 'language';
-        _currentStage = KioskStageExtension.fromString(stageStr);
-        if (_currentStage == KioskStage.language) _clearPatient();
+        _screen = Map<String, dynamic>.from(msg['data'] as Map);
+        if (currentStage == KioskStage.language) {
+          _lastReport = null;
+          _redFlags = [];
+          _lastTranscript = '';
+        }
+        _language = _screen['language'] as String? ?? _language;
+        _questionId = _screen['question_id'] as String?;
         _answerUi = null;
-        _error = null;
-        _answerTimer?.cancel();
-        if (screenData['report'] is Map<String, dynamic>) {
-          _lastReport = screenData['report'] as Map<String, dynamic>;
-        }
-        _headline = screenData['headline'] as String? ?? _headline;
-        _questionId = screenData['question_id'] as String?;
-        final rawProgress = screenData['progress'];
-        _progress = rawProgress is List
-            ? rawProgress.map((value) => (value as num).toInt()).toList()
-            : null;
-        if (screenData['options'] != null) {
-          _options = List<Map<String, dynamic>>.from(screenData['options']);
-        } else {
-          _options = [];
-        }
-        if (screenData['alert'] == true ||
-            _currentStage == KioskStage.emergency) {
-          _isEmergency = true;
-        }
-        _isProcessing = false;
-        notifyListeners();
+        _processing = false;
+        _captureEpoch = null;
         break;
-
       case 'clinical.question':
-        _answerTimer?.cancel();
-        _error = null;
-        _headline = msg['text'] as String? ?? _headline;
+        _screen = {..._screen, 'stage': 'interview', 'headline': msg['text'], 'input': 'text', 'options': [],
+          'allowed_actions': msg['allowed_actions'] is List ? List<String>.from(msg['allowed_actions']) :
+            ['answer', 'unknown', 'refuse', 'repeat', 'help', 'restart', 'slower', 'more_time', 'cancel']};
         _questionId = msg['id'] as String?;
-        // Which pictorial control the server wants drawn for this question.
         _answerUi = msg['answer_ui'] as String?;
-        // The clinical question IS the screen, as it is on the wired kiosk. Without this the
-        // question was painted onto whatever stage happened to be showing - a red flag question
-        // landed on the Ayurveda chooser, which had no options for it, so the patient saw a
-        // question with nothing to answer it with.
-        _currentStage = KioskStage.interview;
-        _isProcessing = false;
-        notifyListeners();
+        _accumulate = msg['accumulate'] == true;
+        if (!_accumulate) _narrative = '';
+        _processing = false;
         break;
-
-      case 'clinical.turn':
-        final turn = msg['data'] as Map<String, dynamic>? ?? {};
-        if (turn['next_question'] is String && !_isEmergency) {
-          _headline = turn['next_question'] as String;
-          _questionId = turn['next_question_id'] as String?;
-          _currentStage = KioskStage.interview;
-        }
-        _answerTimer?.cancel();
-        _isProcessing = false;
-        notifyListeners();
-        break;
-
       case 'clinical.processing':
-        _isProcessing = true;
-        notifyListeners();
+        _processing = true;
         break;
-
+      case 'clinical.turn':
+        _processing = false;
+        break;
+      case 'session.idle':
+        _error = 'Still there? Say "more time" or touch the screen to continue.';
+        break;
       case 'staff.alert':
-        _isEmergency = true;
-        _currentStage = KioskStage.emergency;
-        if (msg['alerts'] != null) {
-          _redFlags = List<Map<String, dynamic>>.from(msg['alerts']);
-        }
-        notifyListeners();
+        if (msg['alerts'] is List) _redFlags = List<Map<String, dynamic>>.from(msg['alerts']);
+        // A help request is not an emergency screen or staff acknowledgment.
+        _error = 'Help requested; not yet acknowledged. Please seek staff directly.';
         break;
-
       case 'flow.report':
-        _lastReport = msg['data'] as Map<String, dynamic>?;
-        _isProcessing = false;
-        notifyListeners();
+        final report = msg['data'];
+        if (report is Map<String, dynamic> && report['completion'] == 'saved_local') _lastReport = report;
         break;
-
       case 'transcript.final':
         _lastTranscript = msg['text'] as String? ?? '';
-        notifyListeners();
-        if (_lastTranscript.trim().isNotEmpty) {
-          onTranscriptReceived?.call(_lastTranscript);
+        if (msg['accumulate'] == true && _lastTranscript.isNotEmpty) {
+          // Fills the description box as the patient speaks; nothing is sent until Proceed.
+          _narrative = _narrative.isEmpty ? _lastTranscript : '$_narrative $_lastTranscript';
         }
+        // Otherwise informational only: the backend already dispatched this transcript.
         break;
-
+      case 'device.action':
+        _deviceController.add(msg);
+        break;
       case 'tts.start':
       case 'tts.audio':
-      case 'tts.cancelled':
       case 'tts.end':
+      case 'tts.cancelled':
+        _captureEpoch = null;
         _ttsController.add(msg);
         break;
     }
+    notifyListeners();
   }
 
-  void _handleDone() {
-    _setStatus(ConnectionStatus.reconnecting);
-    _cleanup();
-    _scheduleReconnect();
-  }
-
-  void _handleError(dynamic error) {
-    if (kDebugMode) print('WS Error: $error');
-    _setStatus(ConnectionStatus.reconnecting);
-    _cleanup();
-    _scheduleReconnect();
-  }
-
-  void _scheduleReconnect() {
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 3), () {
-      connect();
+  void action(String action, [dynamic value]) {
+    if (_status != ConnectionStatus.connected || _sessionId == null || _pending != null) return;
+    final random = Random.secure();
+    _pending = {'type': 'flow.action', 'session_id': _sessionId, 'revision': _revision,
+      'action_id': List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join(),
+      'action': action, 'value': value, 'question_id': _questionId};
+    _error = null;
+    _answerTimer?.cancel();
+    _answerTimer = Timer(const Duration(seconds: 30), () {
+      if (_disposed || _pending == null) return;
+      _error = 'Waiting for saved acknowledgment. Reconnect to retry safely.';
+      notifyListeners();
     });
+    send(_pending!);
+    notifyListeners();
   }
 
-  void reconnect() {
-    _cleanup();
-    connect();
+  void send(Map<String, dynamic> payload) {
+    if (_status == ConnectionStatus.connected) _channel?.sink.add(jsonEncode(payload));
   }
 
+  void playbackState(bool playing) {
+    _playing = playing;
+    _captureEpoch = null;
+    send({'type': 'playback.state', 'session_id': _sessionId, 'revision': _revision, 'playing': playing});
+  }
+
+  void sendAudio(Uint8List pcm) {
+    if (_status != ConnectionStatus.connected || !_voiceAvailable || _playing || isProcessing || _sessionId == null) return;
+    if (_captureEpoch != epoch) {
+      send({'type': 'audio.start', 'session_id': _sessionId, 'revision': _revision});
+      _captureEpoch = epoch;
+    }
+    _channel?.sink.add(pcm);
+  }
+
+  void selectLanguage(String code) => action('choose', code.replaceAll('_', '-').split('-').first);
+  void submitAbha(String value) => action(value.isEmpty ? 'skip' : 'answer', value);
+  void selectWho(String value) => action('choose', value);
+  void submitAyurvedaAnswer(String questionId, String value) => action('choose', value);
+  void submitPrakritiAnswer(String? questionId, String value) => action('choose', value);
+  void submitTranscript(String text) { if (text.trim().isNotEmpty) action('answer', text.trim()); }
+  void repeatQuestion() => action('repeat');
+  void nextStage() => action('done');
+  void backStage() => action('back');
+  void restartSession() => action('restart');
+
+  void _clearPatient() {
+    _screen = {'stage': 'language', 'headline': 'Connecting to local kiosk…'};
+    _lastReport = null;
+    _redFlags = [];
+    _lastTranscript = _narrative = '';
+    _accumulate = false;
+    _questionId = _answerUi = _error = null;
+    _processing = false;
+    _captureEpoch = null;
+  }
+  void _setStatus(ConnectionStatus status) {
+    _status = status;
+    if (!_disposed) notifyListeners();
+  }
+  void _scheduleReconnect() {
+    _setStatus(ConnectionStatus.reconnecting);
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 3), connect);
+  }
+  void reconnect() { _cleanup(); connect(); }
   void _cleanup() {
     ++_generation;
+    _voiceAvailable = false;
+    _captureEpoch = null;
+    _playing = false;
     _answerTimer?.cancel();
     _reconnectTimer?.cancel();
-    _pingTimer?.cancel();
     _subscription?.cancel();
     _channel?.sink.close();
     _subscription = null;
     _channel = null;
-    // Reset the status too. connect() refuses to run while the status says "connecting", so a
-    // teardown that left it set made reconnect() a no-op: the app dialled the unreachable default
-    // host once, stuck at "connecting", and then ignored the address discovery had just found.
-    if (_status != ConnectionStatus.disconnected) {
-      _setStatus(ConnectionStatus.disconnected);
-    }
+    _setStatus(ConnectionStatus.disconnected);
   }
-
-  void _setStatus(ConnectionStatus status) {
-    if (_disposed) return;
-    _status = status;
-    notifyListeners();
-  }
-
-  // Action methods
-  void send(Map<String, dynamic> payload) {
-    if (_channel != null && _status == ConnectionStatus.connected) {
-      _channel!.sink.add(jsonEncode(payload));
-    }
-  }
-
-  void sendAudio(Uint8List pcm) {
-    if (_channel != null && _status == ConnectionStatus.connected) {
-      _channel!.sink.add(pcm);
-    }
-  }
-
-  void _clearPatient() {
-    _isEmergency = false;
-    _redFlags = [];
-    _lastReport = null;
-    _lastTranscript = '';
-    _questionId = null;
-    _answerUi = null;
-    _isProcessing = false;
-    _progress = null;
-    _error = null;
-    _options = [];
-  }
-
-  void _action(Map<String, dynamic> payload) {
-    if (_status != ConnectionStatus.connected) {
-      _error = 'Disconnected. Reconnect before answering.';
-      notifyListeners();
-      return;
-    }
-    if (_isProcessing) return;
-    _error = null;
-    _isProcessing = true;
-    _answerTimer?.cancel();
-    _answerTimer = Timer(const Duration(seconds: 30), () {
-      if (_disposed) return;
-      _isProcessing = false;
-      _error =
-          'No response from the kiosk. Check the connection and try again.';
-      notifyListeners();
-    });
-    send(payload);
-    notifyListeners();
-  }
-
-  void selectLanguage(String code) {
-    _language = code.replaceAll('_', '-').split('-').first;
-    _action({'type': 'flow.language', 'value': _language});
-  }
-
-  void submitAbha(String value) =>
-      _action({'type': 'flow.abha', 'value': value});
-  void selectWho(String value) => _action({'type': 'flow.who', 'value': value});
-  void submitAyurvedaAnswer(String questionId, String value) => _action({
-    'type': 'flow.ayurveda',
-    'question_id': questionId,
-    'value': value,
-  });
-
-  /// One command for both halves of the Prakriti stage. The opening screen asks whether the
-  /// patient has ever filled the questionnaire and carries no question id; every screen after it
-  /// is a question. The server tells them apart the same way.
-  void submitPrakritiAnswer(String? questionId, String value) => _action({
-    'type': 'flow.prakriti',
-    'question_id': ?questionId,
-    'value': value,
-  });
-  void submitTranscript(String text) {
-    if (text.trim().isEmpty || _isProcessing) return;
-    _lastTranscript = text.trim();
-    _action({
-      'type': 'transcript.submit',
-      'text': text.trim(),
-      'language': _language,
-    });
-  }
-
-  void triggerBargeIn() => send({'type': 'barge_in'});
-  void repeatQuestion() => send({'type': 'flow.repeat'});
-  void nextStage() => _action({'type': 'flow.next'});
-  void backStage() => _action({'type': 'flow.back'});
-  void restartSession() {
-    _isProcessing = false;
-    _action({'type': 'flow.restart'});
-  }
-
-  void sendLog(String message) {
-    send({'type': 'client.log', 'message': message});
-  }
-
   @override
   void dispose() {
     _disposed = true;
     _cleanup();
-    _reconnectTimer?.cancel();
     _ttsController.close();
+    _deviceController.close();
     super.dispose();
   }
 }

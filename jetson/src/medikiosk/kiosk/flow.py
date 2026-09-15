@@ -19,10 +19,15 @@ app next) can render the right control without knowing anything about clinical l
 
 from __future__ import annotations
 
+import copy
 from enum import Enum
 
 from medikiosk.kiosk import ayurveda, prakriti
+from medikiosk.kiosk.abha import normalise
+from medikiosk.kiosk.consent import BOOTSTRAP, ConsentLedger, notice
+from medikiosk.kiosk.i18n import LANGUAGE_CODES, t
 from medikiosk.kiosk.provenance import Ledger, Source
+from medikiosk.kiosk.voice_actions import parse_age
 from medikiosk.languages import LANGUAGES
 from medikiosk.models import PatientState, RedFlagAlert, Urgency
 
@@ -31,6 +36,12 @@ class Stage(str, Enum):
     LANGUAGE = "language"
     ABHA = "abha"
     WHO = "who"
+    CONSENT = "consent"
+    REGISTRATION = "registration"
+    HUB = "hub"
+    REVIEW = "review"
+    FINALIZING = "finalizing"
+    DECLINED = "declined"
     INTERVIEW = "interview"
     AYURVEDA = "ayurveda"
     PRAKRITI = "prakriti"
@@ -250,17 +261,37 @@ SCREEN_TEXT: dict[str, dict[str, str]] = {
         "pa": "ਤੁਹਾਡੀ ਪ੍ਰਕ੍ਰਿਤੀ ਪਹਿਲਾਂ ਹੀ ਦਰਜ ਹੈ। ਇਹ ਸਵਾਲ ਦੁਬਾਰਾ ਨਹੀਂ ਪੁੱਛੇ ਜਾਣਗੇ।",
     },
     "skip": {
-        "en": "Skip", "hi": "छोड़ें", "bn": "এড়িয়ে যান", "mr": "वगळा", "te": "దాటవేయండి",
-        "ta": "தவிர்", "gu": "છોડો", "kn": "ಬಿಟ್ಟುಬಿಡಿ", "pa": "ਛੱਡੋ",
+        "en": "Skip",
+        "hi": "छोड़ें",
+        "bn": "এড়িয়ে যান",
+        "mr": "वगळा",
+        "te": "దాటవేయండి",
+        "ta": "தவிர்",
+        "gu": "છોડો",
+        "kn": "ಬಿಟ್ಟುಬಿಡಿ",
+        "pa": "ਛੱਡੋ",
     },
     "scan": {
-        "en": "Scan", "hi": "स्कैन करें", "bn": "স্ক্যান করুন", "mr": "स्कॅन करा",
-        "te": "స్కాన్ చేయండి", "ta": "ஸ்கேன் செய்", "gu": "સ્કૅન કરો",
-        "kn": "ಸ್ಕ್ಯಾನ್ ಮಾಡಿ", "pa": "ਸਕੈਨ ਕਰੋ",
+        "en": "Scan",
+        "hi": "स्कैन करें",
+        "bn": "স্ক্যান করুন",
+        "mr": "स्कॅन करा",
+        "te": "స్కాన్ చేయండి",
+        "ta": "ஸ்கேன் செய்",
+        "gu": "સ્કૅન કરો",
+        "kn": "ಸ್ಕ್ಯಾನ್ ಮಾಡಿ",
+        "pa": "ਸਕੈਨ ਕਰੋ",
     },
     "done": {
-        "en": "Done", "hi": "हो गया", "bn": "হয়ে গেছে", "mr": "झाले", "te": "పూర్తయింది",
-        "ta": "முடிந்தது", "gu": "થઈ ગયું", "kn": "ಆಯಿತು", "pa": "ਹੋ ਗਿਆ",
+        "en": "Done",
+        "hi": "हो गया",
+        "bn": "হয়ে গেছে",
+        "mr": "झाले",
+        "te": "పూర్తయింది",
+        "ta": "முடிந்தது",
+        "gu": "થઈ ગયું",
+        "kn": "ಆಯಿತು",
+        "pa": "ਹੋ ਗਿਆ",
     },
 }
 
@@ -287,6 +318,7 @@ class KioskFlow:
         self.prakriti_answers: dict[str, str] = {}
         self.prakriti_record: dict | None = None
         self.prakriti_previously_filled: bool | None = None
+        self.prakriti_previous_status: str | None = None
         self.documents: list[dict] = []
         # ayush_track runs the Dashavidha questionnaire; prefers_ayush is the patient asking to be
         # seen by a vaidya. The first must not imply the second - see report.route.
@@ -297,6 +329,385 @@ class KioskFlow:
         # moment of capture.
         self.ledger = Ledger()
         self.report: dict | None = None
+        self.consent = ConsentLedger()
+        self.registration: dict = {}
+        self.answers: list[dict] = []
+        self.edit_target: str | None = None
+        self.consent_purpose = "local_intake"
+        self.restart_confirm = False
+        self.registration_index = 0
+        self.prakriti_outcomes: dict[str, str] = {}
+        self.ayurveda_outcomes: dict[str, str] = {}
+        self.edit_return: dict | None = None
+        self.document_preview: dict | None = None
+        self.withdraw_confirm = False
+
+    def snapshot(self) -> dict:
+        data = copy.deepcopy(vars(self))
+        data["stage"] = self.stage.value
+        data["ledger"] = self.ledger.model_dump(mode="json")
+        data["consent"] = self.consent.model_dump(mode="json")
+        return data
+
+    @classmethod
+    def from_snapshot(cls, data: dict) -> KioskFlow:
+        flow = cls()
+        allowed = set(vars(flow))
+        if set(data) - allowed:
+            raise ValueError("Unknown workflow fields")
+        for key, value in copy.deepcopy(data).items():
+            setattr(flow, key, value)
+        flow.stage = Stage(data["stage"])
+        flow.ledger = Ledger.model_validate(data["ledger"])
+        flow.consent = ConsentLedger.model_validate(data["consent"])
+        return flow
+
+    def record_answer(
+        self,
+        id: str,
+        question: str,
+        answer: str,
+        status: str = "answered",
+        field: str | None = None,
+        value=None,
+        method: str = "touch",
+    ) -> None:
+        if status not in {"answered", "unresolved", "refused", "not_asked", "not_applicable"}:
+            raise ValueError("Invalid answer outcome")
+        for previous in self.answers:
+            if previous["id"] == id and not previous.get("superseded"):
+                previous["superseded"] = True
+        self.answers.append(
+            {
+                "id": id,
+                "question": question,
+                "answer": answer,
+                "status": status,
+                "field": field,
+                "value": value if status == "answered" else None,
+                "method": method,
+                "language": self.language,
+                "turn": len(self.answers) + 1,
+            }
+        )
+
+    def complete_interview(self) -> None:
+        if self.stage is not Stage.INTERVIEW:
+            raise ValueError("Not in interview")
+        self.stage = Stage.AYURVEDA if self.ayush_track else Stage.PRAKRITI
+
+    @property
+    def _previous_question_pending(self) -> bool:
+        return self.edit_target == "prakriti.previous" or (
+            self.prakriti_previous_status is None and self.prakriti_previously_filled is None
+        )
+
+    def registration_prompt(self, key: str) -> str:
+        return t(f"registration_{key}", self.language)
+
+    def _documents_permission(self) -> None:
+        self.consent_purpose = "local_documents"
+        self.stage = Stage.CONSENT
+
+    def ask_transfer_permission(self) -> None:
+        """Ask, at the end, whether the finished record may go to the hospital's system.
+
+        Asked here rather than at the start because this is the only point at which the answer
+        is about something that exists: the patient has seen the record on the review screen,
+        so "may the hospital receive this" names a thing they have actually read.
+        """
+
+        self.consent_purpose = "cloud_intake"
+        self.stage = Stage.CONSENT
+
+    @property
+    def transfer_decided(self) -> bool:
+        return any(d.purpose == "cloud_intake" for d in self.consent.decisions)
+
+    def action(
+        self, action: str, value=None, question_id: str | None = None, method: str = "touch"
+    ) -> str | None:
+        if action == "help":
+            return "help"
+        if action == "restart":
+            self.restart_confirm = True
+            return None
+        if self.restart_confirm:
+            if action == "confirm" or (action == "choose" and value == "yes"):
+                return "restart"
+            if action in {"cancel", "back"} or value == "no":
+                self.restart_confirm = False
+                return None
+            raise ValueError("Confirm restart first")
+        if self.withdraw_confirm:
+            if action == "confirm" or (action == "choose" and value == "yes"):
+                self.consent.withdraw("local_intake")
+                self.stage = Stage.DECLINED
+                self.document_preview = None
+                self.withdraw_confirm = False
+                return None
+            if action in {"cancel", "back"} or (action == "choose" and value == "no"):
+                self.withdraw_confirm = False
+                return None
+            raise ValueError("Confirm withdrawal first")
+        if action == "withdraw" and self.consent.allows("local_intake"):
+            self.withdraw_confirm = True
+            return None
+        if self.stage in {Stage.REPORT, Stage.EMERGENCY, Stage.DECLINED}:
+            raise ValueError("This encounter is closed")
+        if self.edit_target is not None and action in {"cancel", "back"}:
+            self.edit_target = None
+            self.stage = Stage.REVIEW
+            return None
+        if action == "back" and self.edit_target is None:
+            if self.stage is Stage.WHO:
+                self.stage = Stage.LANGUAGE
+            elif self.stage is Stage.CONSENT and self.consent_purpose == "local_intake":
+                self.stage = Stage.WHO
+            elif self.stage is Stage.HUB:
+                self.stage = Stage.ABHA
+            elif self.stage is Stage.ABHA:
+                self.registration_index = 2
+                self.stage = Stage.REGISTRATION
+            else:
+                raise ValueError("Use review to change accepted answers")
+            return None
+        current = self.screen(PatientState())
+        if question_id is not None and question_id != current.get("question_id"):
+            raise ValueError("Question changed")
+        if self.stage is Stage.LANGUAGE:
+            if action != "choose" or value not in {"en", "hi"}:
+                raise ValueError(
+                    "Complete offline consent/content currently available in English and Hindi"
+                )
+            self.language, self.stage = value, Stage.WHO
+        elif self.stage is Stage.WHO:
+            if action != "choose" or value not in {
+                "self",
+                "parent_guardian",
+                "family_attendant",
+                "caregiver",
+            }:
+                raise ValueError("Choose who is answering")
+            self.on_behalf_of = None if value == "self" else value
+            self.stage = Stage.CONSENT
+        elif self.stage is Stage.CONSENT:
+            # One explicit yes or no against the notice. A second "are you sure" step was
+            # dropped: it doubled every permission screen and a patient who has just said yes
+            # to a read-aloud notice has answered the question.
+            if action != "choose" or value not in {"yes", "no"}:
+                raise ValueError("Choose permission explicitly")
+            self.consent.record(
+                self.consent_purpose,
+                "granted" if value == "yes" else "refused",
+                self.language,
+                self.on_behalf_of or "self",
+                method,
+            )
+            if self.consent_purpose == "local_intake":
+                self.stage = Stage.REGISTRATION if value == "yes" else Stage.DECLINED
+            elif self.consent_purpose == "cloud_intake":
+                # Either answer finishes the encounter. A refusal is a complete intake that
+                # stays on this Jetson, not an abandoned one.
+                self.stage = Stage.REVIEW
+                return "finalize"
+            else:
+                self.stage = Stage.DOCUMENTS if value == "yes" else Stage.REVIEW
+        elif not self.consent.allows("local_intake"):
+            raise ValueError("Intake permission required")
+        elif self.stage is Stage.REGISTRATION:
+            fields = ("name", "age", "gender")
+            key = fields[self.registration_index]
+            if action in {"unknown", "refuse", "skip"}:
+                self.registration[key] = None
+                self.record_answer(
+                    f"registration.{key}",
+                    current["headline"],
+                    "",
+                    "refused" if action == "refuse" else "unresolved",
+                    method=method,
+                )
+            elif action in {"answer", "choose"}:
+                raw = str(value).strip()
+                if not raw or len(raw) > 160:
+                    raise ValueError("Invalid registration value")
+                if key == "age":
+                    bound: object = parse_age(raw, self.language)
+                    if bound is None:
+                        raise ValueError("Enter age in years or say unknown")
+                else:
+                    bound = raw
+                self.registration[key] = bound
+                # The review screen at the end is where a mishearing gets fixed; asking
+                # "is this correct?" after every field made a three-field form six steps.
+                self.record_answer(
+                    f"registration.{key}",
+                    self.registration_prompt(key),
+                    str(bound),
+                    field=key,
+                    value=bound,
+                    method=method,
+                )
+            else:
+                raise ValueError("Answer the registration question")
+            if self.edit_target is not None:
+                self.edit_target = None
+                self.stage = Stage.REVIEW
+                return None
+            self.registration_index += 1
+            if self.registration_index == len(fields):
+                self.stage = Stage.ABHA
+        elif self.stage is Stage.ABHA:
+            if action == "scan":
+                return "scan"
+            if action in {"unknown", "skip", "refuse"}:
+                self.abha_number = None
+            elif action == "answer":
+                number = normalise(str(value))
+                if number is None:
+                    raise ValueError("A valid ABHA number or skip is required")
+                self.abha_number = number
+            else:
+                raise ValueError("Enter or skip identity")
+            self.stage = Stage.HUB
+        elif self.stage is Stage.HUB:
+            if action != "choose" or value not in {"clinical", "prakriti"}:
+                raise ValueError("Choose a service")
+            self.prefers_ayush = value == "prakriti"
+            self.stage = Stage.INTERVIEW if value == "clinical" else Stage.PRAKRITI
+        elif self.stage in {Stage.AYURVEDA, Stage.PRAKRITI}:
+            if self.stage is Stage.PRAKRITI and self._previous_question_pending:
+                if action == "choose" and value in {"yes", "no"}:
+                    status = "answered"
+                    self.prakriti_previously_filled = value == "yes"
+                elif action in {"unknown", "skip", "refuse"}:
+                    status = "refused" if action == "refuse" else "unresolved"
+                    self.prakriti_previously_filled = None
+                else:
+                    raise ValueError("Answer previous-completion question")
+                self.prakriti_previous_status = status
+                self.record_answer(
+                    "prakriti.previous",
+                    current["headline"],
+                    str(value) if status == "answered" else "",
+                    status,
+                    value=self.prakriti_previously_filled,
+                    method=method,
+                )
+                editing = self.edit_target == "prakriti.previous"
+                self.edit_target = None
+                if editing and (
+                    self.prakriti_previously_filled is True
+                    or len(self.prakriti_outcomes) == len(prakriti.ITEMS)
+                ):
+                    self.stage = Stage.REVIEW
+                elif self.prakriti_previously_filled is True:
+                    self._documents_permission()
+                # Unknown history is not a negative answer or a verified assessment.
+                # Offer the full instrument, with unknown/refused outcomes available.
+                return None
+            is_prakriti = self.stage is Stage.PRAKRITI
+            outcomes = self.prakriti_outcomes if is_prakriti else self.ayurveda_outcomes
+            items = prakriti.ITEMS if is_prakriti else ayurveda.QUESTIONS
+            item = (
+                next((i for i in items if i.id == self.edit_target), None)
+                if self.edit_target
+                else next((i for i in items if i.id not in outcomes), None)
+            )
+            if item is None:
+                raise ValueError("Questionnaire is complete")
+            status = "answered"
+            if action in {"skip", "unknown", "refuse"}:
+                status = "refused" if action == "refuse" else "unresolved"
+            elif action != "choose" or value not in {
+                o["value"] for o in current.get("options", [])
+            }:
+                raise ValueError("Choose a current option")
+            outcomes[item.id] = status
+            answers = self.prakriti_answers if is_prakriti else self.ayurveda_answers
+            for entry in self.ledger.entries:
+                if entry.key == item.id and entry.superseded_by is None:
+                    entry.superseded_by = f"answer:{len(self.answers) + 1}"
+            if status == "answered":
+                answers[item.id] = value
+                self.ledger.record(
+                    item.id, value, Source.QUESTIONNAIRE, evidence=current["headline"]
+                )
+            else:
+                answers.pop(item.id, None)
+            self.record_answer(
+                item.id,
+                current["headline"],
+                str(value) if status == "answered" else "",
+                status,
+                value=value,
+                method=method,
+            )
+            editing = self.edit_target is not None
+            if len(outcomes) == len(items):
+                if is_prakriti:
+                    if all(s == "answered" for s in outcomes.values()):
+                        self.prakriti_record = {
+                            **prakriti.summarize(self.prakriti_answers),
+                            "complete": True,
+                        }
+                    else:
+                        self.prakriti_record = {"complete": False, "prakriti": None}
+                    self.prakriti_record.update(
+                        {
+                            "answers": self.prakriti_answers.copy(),
+                            "outcomes": outcomes.copy(),
+                            "instrument_version": "58-entry-68-screen",
+                            "scoring_reviewed": False,
+                            "reported_by": self.on_behalf_of or "self",
+                        }
+                    )
+                    self._documents_permission()
+                else:
+                    self.stage = Stage.PRAKRITI
+            if editing:
+                self.edit_target = None
+                self.stage = Stage.REVIEW
+        elif self.stage is Stage.DOCUMENTS:
+            if self.document_preview is not None:
+                raise ValueError("Keep, discard, or retake the current preview first")
+            if action in {"scan", "retake", "discard"}:
+                return action
+            if action in {"done", "next", "skip"}:
+                self.stage = Stage.REVIEW
+            else:
+                raise ValueError("Scan or finish documents")
+        elif self.stage is Stage.REVIEW:
+            if action in {"confirm", "done"}:
+                return "finalize"
+            if action == "edit":
+                live = [a for a in self.answers if not a.get("superseded")]
+                target = next((a for a in live if a["id"] == value), None)
+                if target is None:
+                    raise ValueError("Choose a review answer")
+                self.edit_target = target["id"]
+                if self.edit_target.startswith("registration."):
+                    self.registration_index = ("name", "age", "gender").index(
+                        self.edit_target.split(".", 1)[1]
+                    )
+                    self.stage = Stage.REGISTRATION
+                    return None
+                if self.edit_target in {i.id for i in prakriti.ITEMS}:
+                    self.stage = Stage.PRAKRITI
+                    return None
+                if self.edit_target in ayurveda.BY_ID:
+                    self.stage = Stage.AYURVEDA
+                    return None
+                if self.edit_target == "prakriti.previous":
+                    self.stage = Stage.PRAKRITI
+                    return None
+                return "edit"
+            raise ValueError("Review before saving")
+        elif self.stage is Stage.FINALIZING and action in {"confirm", "next"}:
+            return "finalize"
+        else:
+            raise ValueError("Action unavailable in this stage")
+        return None
 
     # ------------------------------------------------------------------ stage transitions
 
@@ -353,18 +764,146 @@ class KioskFlow:
     # ------------------------------------------------------------------ stage payloads
 
     def screen(self, state: PatientState) -> dict:
+        screen = self._screen(state)
+        actions = ["repeat", "slower", "more_time", "help", "restart"]
+        if self.restart_confirm or self.withdraw_confirm:
+            actions += ["cancel"]
+        else:
+            actions += {
+                Stage.REGISTRATION: ["answer", "unknown", "refuse"],
+                Stage.ABHA: ["answer", "scan", "skip"],
+                Stage.INTERVIEW: ["answer", "unknown", "refuse", "cancel"],
+                Stage.AYURVEDA: ["unknown", "refuse"],
+                Stage.PRAKRITI: ["unknown", "refuse"],
+                Stage.DOCUMENTS: ["keep", "retake", "discard"]
+                if self.document_preview
+                else ["scan", "done"],
+                Stage.REVIEW: ["edit", "confirm"],
+                Stage.FINALIZING: ["confirm"],
+            }.get(self.stage, [])
+            if self.stage in {Stage.WHO, Stage.ABHA, Stage.HUB} or (
+                self.stage is Stage.CONSENT and self.consent_purpose == "local_intake"
+            ):
+                actions.append("back")
+            if self.edit_target is not None and "cancel" not in actions:
+                actions.append("cancel")
+            if self.consent.allows("local_intake") and self.stage not in {
+                Stage.REPORT,
+                Stage.EMERGENCY,
+            }:
+                actions.append("withdraw")
+        screen.update(language=self.language, allowed_actions=actions)
+        return screen
+
+    def _screen(self, state: PatientState) -> dict:
         """What the client should show now, and what input it should accept."""
 
+        def options():
+            return [
+                {"value": "yes", "label": t("yes", self.language)},
+                {"value": "no", "label": t("no", self.language)},
+            ]
+
+        base = {
+            "stage": self.stage.value,
+            "input": "touch",
+            "allowed_actions": ["repeat", "slower", "more_time", "help", "restart"],
+        }
+        if self.restart_confirm:
+            return {
+                **base,
+                "headline": t("restart_confirm", self.language),
+                "options": options(),
+            }
+        if self.withdraw_confirm:
+            return {
+                **base,
+                "headline": t("withdraw_confirm", self.language),
+                "options": options(),
+            }
+        if self.stage is Stage.WHO:
+            return {
+                **base,
+                "headline": text("who", self.language),
+                "options": [
+                    {"value": "self", "label": t("who_self", self.language), "icon": "person_one"},
+                    {
+                        "value": "parent_guardian",
+                        "label": t("who_parent", self.language),
+                        "icon": "person_two",
+                    },
+                    {
+                        "value": "family_attendant",
+                        "label": t("who_family", self.language),
+                        "icon": "person_two",
+                    },
+                    {
+                        "value": "caregiver",
+                        "label": t("who_caregiver", self.language),
+                        "icon": "person_two",
+                    },
+                ],
+            }
+        if self.stage is Stage.CONSENT:
+            wording = notice(self.consent_purpose, self.language)
+            return {
+                **base,
+                "headline": wording,
+                "options": options(),
+                "question_id": f"consent.{self.consent_purpose}",
+                "notice_version": "kiosk-1-draft",
+            }
+        if self.stage is Stage.REGISTRATION:
+            key = ("name", "age", "gender")[self.registration_index]
+            return {
+                **base,
+                "headline": self.registration_prompt(key),
+                "input": "number" if key == "age" else "text",
+                "question_id": f"registration.{key}",
+                "allowed_actions": base["allowed_actions"] + ["answer", "unknown", "refuse"],
+            }
+        if self.stage is Stage.HUB:
+            return {
+                **base,
+                "headline": t("hub", self.language),
+                "options": [
+                    {"value": "clinical", "label": t("hub_clinical", self.language)},
+                    {"value": "prakriti", "label": t("hub_prakriti", self.language)},
+                ],
+            }
+        if self.stage is Stage.REVIEW:
+            live = [a for a in self.answers if not a.get("superseded")]
+            return {
+                **base,
+                "headline": t("review", self.language),
+                "review": live,
+                "options": [],
+                "allowed_actions": base["allowed_actions"] + ["edit", "confirm"],
+            }
+        if self.stage is Stage.FINALIZING:
+            return {
+                **base,
+                "headline": t("finalizing", self.language),
+                "allowed_actions": base["allowed_actions"] + ["confirm"],
+            }
+        if self.stage is Stage.DECLINED:
+            return {
+                **base,
+                "headline": t("declined", self.language),
+            }
         if self.stage is Stage.LANGUAGE:
             return {
-                "stage": self.stage.value,
-                "input": "touch",
-                "headline": text("language", self.language),
+                **base,
+                "headline": text("language", self.language)
+                + ". "
+                + BOOTSTRAP["en"]
+                + " / "
+                + BOOTSTRAP["hi"],
                 # Each language is written in its own script, which is the icon: a patient who
                 # cannot read English still recognises their own writing.
                 "options": [
                     {"value": code, "label": LANGUAGES[code].native_name, "icon": f"lang_{code}"}
-                    for code in sorted(LANGUAGES)
+                    for code in LANGUAGE_CODES
                 ],
             }
 
@@ -382,9 +921,16 @@ class KioskFlow:
                 "input": "touch",
                 "headline": text("who", self.language),
                 "options": [
-                    {"value": "self", "label": text("who_self", self.language), "icon": "person_one"},
-                    {"value": "other", "label": text("who_other", self.language),
-                     "icon": "person_two"},
+                    {
+                        "value": "self",
+                        "label": text("who_self", self.language),
+                        "icon": "person_one",
+                    },
+                    {
+                        "value": "other",
+                        "label": text("who_other", self.language),
+                        "icon": "person_two",
+                    },
                 ],
             }
 
@@ -394,7 +940,13 @@ class KioskFlow:
             return {"stage": self.stage.value, "input": "voice"}
 
         if self.stage is Stage.AYURVEDA:
-            question = ayurveda.next_question(self.ayurveda_answers)
+            question = (
+                ayurveda.BY_ID.get(self.edit_target)
+                if self.edit_target
+                else next(
+                    (q for q in ayurveda.QUESTIONS if q.id not in self.ayurveda_outcomes), None
+                )
+            )
             if question is None:
                 return {"stage": self.stage.value, "input": "touch", "complete": True}
             return {
@@ -404,7 +956,10 @@ class KioskFlow:
                 "parameter": question.parameter,
                 "headline": question.text_for(self.language),
                 "options": question.options_for(self.language),
-                "progress": [len(self.ayurveda_answers) + 1, len(ayurveda.QUESTIONS)],
+                "progress": [
+                    next(i for i, q in enumerate(ayurveda.QUESTIONS, 1) if q.id == question.id),
+                    len(ayurveda.QUESTIONS),
+                ],
             }
 
         if self.stage is Stage.PRAKRITI:
@@ -412,20 +967,30 @@ class KioskFlow:
             # ask the questions), and finished. A patient who says they have filled it before is
             # believed - the record is somewhere the kiosk cannot reach, and making them answer
             # 46 questions to prove otherwise is worse than a vaidya asking them.
-            if self.prakriti_previously_filled is None:
+            if self._previous_question_pending:
                 return {
                     "stage": self.stage.value,
                     "input": "touch",
                     "gate": True,
                     "headline": text("prakriti_ask", self.language),
                     "options": [
-                        {"value": "yes", "label": text("prakriti_yes", self.language),
-                         "icon": "check"},
-                        {"value": "no", "label": text("prakriti_no", self.language),
-                         "icon": "cross"},
+                        {
+                            "value": "yes",
+                            "label": text("prakriti_yes", self.language),
+                            "icon": "check",
+                        },
+                        {
+                            "value": "no",
+                            "label": text("prakriti_no", self.language),
+                            "icon": "cross",
+                        },
                     ],
                 }
-            item = prakriti.next_item(self.prakriti_answers)
+            item = (
+                next((q for q in prakriti.ITEMS if q.id == self.edit_target), None)
+                if self.edit_target
+                else next((q for q in prakriti.ITEMS if q.id not in self.prakriti_outcomes), None)
+            )
             if item is None:
                 return {"stage": self.stage.value, "input": "touch", "complete": True}
             return {
@@ -436,10 +1001,19 @@ class KioskFlow:
                 "intro": text("prakriti_intro", self.language),
                 "headline": item.text_for(self.language),
                 "options": item.options_for(self.language),
-                "progress": [len(self.prakriti_answers) + 1, len(prakriti.ITEMS)],
+                "progress": [
+                    next(i for i, q in enumerate(prakriti.ITEMS, 1) if q.id == item.id),
+                    len(prakriti.ITEMS),
+                ],
             }
 
         if self.stage is Stage.DOCUMENTS:
+            if self.document_preview is not None:
+                return {
+                    **base,
+                    "headline": t("document_preview", self.language),
+                    "capture_preview": self.document_preview,
+                }
             return {
                 "stage": self.stage.value,
                 "input": "camera",
@@ -495,11 +1069,7 @@ class KioskFlow:
     def spoken_source(self) -> Source:
         """A relative answering for a patient is reporting second-hand, and the sheet says so."""
 
-        return (
-            Source.REPRESENTATIVE_REPORTED
-            if self.on_behalf_of
-            else Source.PATIENT_REPORTED
-        )
+        return Source.REPRESENTATIVE_REPORTED if self.on_behalf_of else Source.PATIENT_REPORTED
 
     def answer_ayurveda(self, question_id: str, value: str) -> bool:
         """Record one questionnaire answer. Returns True when the questionnaire is finished."""
@@ -647,5 +1217,23 @@ class KioskFlow:
             past_visits=self.past_visits,
             prefers_ayush=self.prefers_ayush,
             ledger=self.ledger,
+        )
+        self.report.update(
+            {
+                "registration": copy.deepcopy(self.registration),
+                "accepted_answers": copy.deepcopy(
+                    [a for a in self.answers if not a.get("superseded")]
+                ),
+                "answer_history": copy.deepcopy(self.answers),
+                "questionnaire_outcomes": {
+                    "ayurveda": self.ayurveda_outcomes.copy(),
+                    "prakriti": self.prakriti_outcomes.copy(),
+                },
+                "previous_prakriti": {
+                    "self_reported": self.prakriti_previously_filled,
+                    "status": self.prakriti_previous_status or "not_asked",
+                    "record_verified": False,
+                },
+            }
         )
         return self.report
