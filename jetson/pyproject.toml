@@ -38,6 +38,7 @@ medikiosk = ["static/*"]
 
 [tool.pytest.ini_options]
 addopts = "-q --basetemp=.pytest-tmp"
+pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 
