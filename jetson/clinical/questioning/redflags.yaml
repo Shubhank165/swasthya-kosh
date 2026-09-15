@@ -1,0 +1,98 @@
+# Red flags — §28.
+#
+# **Not part of the scoring.** A rule that fires stops the questionnaire; it
+# does not merely outrank the other questions. Putting emergencies in the same
+# arithmetic as everything else would make "does this patient need to be seen
+# now" a matter of coefficients, and it is not.
+#
+# **These do not diagnose.** Every `label` is the same fixed wording: a human
+# must look now. It does not name a condition, it is never shown to the patient
+# as a finding, and the presentation layer has its own bounded wording.
+#
+# Tuned for recall. Over-alerting is a nuisance that gets tuned down with
+# clinicians once there is OPD data to tune against; a missed emergency is not
+# recoverable, and the asymmetry is the whole reason these are written loosely.
+#
+# clinical_source: engineer-authored from standard triage criteria; pending
+# AIIA mentor review. On CLINICAL_REVIEW_QUEUE.md, and this file is the one on
+# it that most needs a clinician's eye.
+
+version: 1
+
+rules:
+  - id: breathing_difficulty_at_rest
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {slot: respiratory.present, equals: true}
+        - {slot: respiratory.breathlessness, any_of: [at_rest, lying_flat]}
+
+  - id: chest_pain_sudden_onset
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {slot: pain.present, equals: true}
+        - {slot: pain.site, equals: chest}
+        - {slot: pain.onset, equals: sudden}
+
+  - id: bleeding_ongoing_large
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {slot: bleeding.present, equals: true}
+        - {slot: bleeding.ongoing, equals: true}
+        - {slot: bleeding.amount, any_of: [moderate, large]}
+
+  - id: blood_in_vomit_or_cough
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {slot: bleeding.present, equals: true}
+        - {slot: bleeding.site, any_of: [vomit, cough]}
+
+  - id: headache_sudden_with_vision_change
+    severity: critical
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {slot: headache.present, equals: true}
+        - {slot: headache.onset, equals: sudden}
+        - {slot: headache.vision_change, equals: true}
+
+  - id: blood_in_stool
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {slot: bowel.present, equals: true}
+        - {slot: bowel.blood_in_stool, equals: true}
+
+  - id: blood_in_urine
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {slot: urinary.present, equals: true}
+        - {slot: urinary.blood_in_urine, equals: true}
+
+  - id: high_fever_prolonged
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {slot: fever.present, equals: true}
+        - {slot: fever.severity, at_least: 8}
+
+  # Severe pain anywhere. Deliberately blunt: a patient rating their pain 9 or
+  # 10 is telling the desk something, whatever the site turns out to mean.
+  - id: severe_pain
+    severity: high
+    label: "Urgent clinical review criterion triggered"
+    criteria:
+      all:
+        - {slot: pain.present, equals: true}
+        - {slot: pain.severity, at_least: 9}

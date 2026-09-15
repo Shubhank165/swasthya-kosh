@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medikiosk-voice"
+version = "0.1.0"
+description = "Multilingual, safety-first clinical intake voice prototype"
+requires-python = ">=3.10"
+dependencies = [
+  "cryptography>=43,<47",
+  "python-multipart>=0.0.18",
+  "Pillow>=10",
+  "fastapi>=0.115,<1",
+  "openai>=1.100",
+  "pydantic>=2.8,<3",
+  "pydantic-settings>=2.4,<3",
+  "sarvamai>=0.1",
+  "uvicorn[standard]>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.27",
+  "pytest>=8.2",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+medikiosk = "medikiosk.app:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+medikiosk = ["static/*"]
+
+[tool.pytest.ini_options]
+addopts = "-q --basetemp=.pytest-tmp"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+# Vendored third-party clinical engine. Its logic is unchanged from the original except for
+# import paths, and restyling someone else's code makes the diff against upstream unreadable.
+extend-exclude = ["src/medikiosk/engine"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]

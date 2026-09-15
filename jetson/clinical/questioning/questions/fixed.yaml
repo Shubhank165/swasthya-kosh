@@ -1,0 +1,80 @@
+# The three fixed questions — §6.
+#
+# Routing, and the only part of the interview that is not adaptive. There is
+# nothing to adapt to before them: the selector's whole job is choosing what to
+# ask given what is already known, and at the start nothing is.
+#
+# **There is no text in this file, in any language.** A question's identity and
+# a question's wording are different things (§26), so everything a patient reads
+# lives in `localization/questions_<lang>.json` — English included, so that
+# English is not quietly the real content with the other eight as translations
+# of it.
+#
+# clinical_source: engineer-authored; pending AIIA mentor review.
+
+version: 1
+
+questions:
+  # 1. What is troubling you? Sets the active domains, which every adaptive
+  #    question afterwards hangs off. Multi-select because people arrive with
+  #    more than one thing wrong and being made to pick one loses the rest.
+  - id: fixed.complaints
+    answer_type: multi_select
+    extracts: [routing.complaints]
+    fixed_order: 1
+    priority: 10
+    burden: 3
+    options:
+      - fever
+      - pain
+      - headache
+      - respiratory
+      - digestive
+      - bowel
+      - urinary
+      - skin
+      - fatigue
+      - sleep
+      - joint
+      - menstrual
+      - mental
+      - bleeding
+      - other
+
+  # 2. Which of those is worst? The chief complaint, which weights everything
+  #    the selector does after it.
+  #
+  #    Its options are filled in at runtime from the answer to question 1 —
+  #    offering all fifteen again would be asking somebody to re-read a list
+  #    they just finished reading.
+  - id: fixed.chief_complaint
+    answer_type: single_select
+    extracts: [routing.chief_complaint]
+    fixed_order: 2
+    priority: 10
+    burden: 1
+    options_from: routing.complaints
+    requires:
+      slot: routing.complaints
+      known: true
+
+  # 3. When did it start and how has it gone since. One structured answer
+  #    covering onset, duration and progression for the episode as a whole,
+  #    rather than three questions per active domain.
+  #
+  #    Free text on purpose: "since about Tuesday, worse since last night" is
+  #    the sentence people actually produce, it carries all three facts, and the
+  #    interpreter is built to take it apart. A patient who prefers to tap gets
+  #    the follow-ups instead, which is what the clarification path is for.
+  - id: fixed.timeline
+    answer_type: structured_text
+    extracts:
+      - "*.onset"
+      - "*.duration"
+      - "*.progression"
+    fixed_order: 3
+    priority: 10
+    burden: 2
+    requires:
+      slot: routing.chief_complaint
+      known: true

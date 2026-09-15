@@ -1,0 +1,24 @@
+[Unit]
+Description=MediKiosk offline voice intake (Jetson)
+# A systemd *user* unit: PulseAudio's echo-cancelled devices live in the ubuntu user session, so a
+# system-scope service cannot reach them. Install with:
+#   loginctl enable-linger ubuntu
+#   systemctl --user enable --now medikiosk-edge
+After=pulseaudio.service medikiosk-whisper.service
+Wants=pulseaudio.service medikiosk-whisper.service
+
+[Service]
+WorkingDirectory=/home/ubuntu/medikiosk
+Environment=PYTHONPATH=/home/ubuntu/medikiosk/src
+EnvironmentFile=-/home/ubuntu/medikiosk/.env
+# Recreate the AEC endpoints; they do not survive a PulseAudio restart.
+ExecStartPre=/bin/bash /home/ubuntu/medikiosk/scripts/setup_jetson_audio.sh
+# Set MEDIKIOSK_EDGE_ARGS in .env, e.g. "--loop --touch-pin 16" once the TTP223 pad is wired.
+# Without a touch pin the loop starts the next intake as soon as the previous one ends.
+Environment=MEDIKIOSK_EDGE_ARGS=--loop
+ExecStart=/home/ubuntu/medikiosk/offline/jetson/audio-venv/bin/python -m medikiosk.edge.runtime $MEDIKIOSK_EDGE_ARGS
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

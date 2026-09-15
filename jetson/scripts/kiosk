@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Run any kiosk edge tool from any directory, without remembering PYTHONPATH or the repo path.
+#
+#   scripts/kiosk camera                       # live MJPEG preview over the tailnet
+#   scripts/kiosk display --demo /tmp/screens  # render kiosk screens as PNGs
+#   scripts/kiosk panel --probe                # read the SPI panel controller id
+#   scripts/kiosk runtime                      # the offline intake loop
+#   scripts/kiosk web                          # browser UI: phone/tablet mic + camera, tailnet only
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+export PYTHONPATH="$ROOT/src:$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+
+# The audio venv has onnxruntime and pydantic for the intake loop; system python has PIL, spidev
+# and Jetson.GPIO for the screen and panel. Pick whichever can import what the tool needs.
+TOOL="${1:-}"
+if [[ -z "$TOOL" ]]; then
+  echo "usage: scripts/kiosk {camera|display|panel|runtime|capture|live_ocr|web} [options]" >&2
+  exit 2
+fi
+shift
+
+VENV="$ROOT/offline/jetson/audio-venv/bin/python"
+case "$TOOL" in
+  runtime|capture|live_ocr|web) PYTHON="$VENV" ;;
+  *)       PYTHON="${MEDIKIOSK_PYTHON:-python3}" ;;
+esac
+
+if [[ "$TOOL" == "web" ]]; then
+  # getUserMedia (mic/camera) requires a secure context, so this binds loopback only and relies
+  # on `tailscale serve --bg --https=443 http://127.0.0.1:8000` to be the one thing exposed on the
+  # tailnet - it terminates real HTTPS with a MagicDNS cert and proxies to this port. Binding this
+  # process to the tailnet IP directly would skip that HTTPS layer and getUserMedia would still be
+  # blocked; run `tailscale serve status` to confirm the proxy is pointed at 127.0.0.1:8000.
+  HOST="${MEDIKIOSK_HOST:-127.0.0.1}"
+  echo "web UI (plain http, no camera/mic): http://$HOST:${MEDIKIOSK_PORT:-8000}/" >&2
+  echo "for camera/mic: tailscale serve --bg --https=443 http://127.0.0.1:${MEDIKIOSK_PORT:-8000}" >&2
+  exec "$PYTHON" -m uvicorn medikiosk.app:app --host "$HOST" --port "${MEDIKIOSK_PORT:-8000}" "$@"
+fi
+
+# The echo-cancelled PulseAudio devices are created per session and vanish when the shell that
+# made them exits, so a fresh login starts with no microphone. Create them here rather than
+# letting the intake loop die on its first prompt.
+if [[ "$TOOL" == "runtime" ]]; then
+  if ! pactl list short sources 2>/dev/null | grep -q medikiosk_mic; then
+    echo "audio endpoints missing; creating them..." >&2
+    bash "$ROOT/scripts/setup_jetson_audio.sh" >/dev/null 2>&1 || {
+      echo "could not create the audio endpoints; run scripts/setup_jetson_audio.sh by hand" >&2
+      exit 1
+    }
+    sleep 2
+  fi
+fi
+
+exec "$PYTHON" -m "medikiosk.edge.$TOOL" "$@"

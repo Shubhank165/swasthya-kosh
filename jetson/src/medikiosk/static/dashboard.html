@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MediKiosk — OPD Dashboard</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        --bg: #0a1016; --card: #111a22; --line: #21323f; --ink: #e6eef4;
+        --muted: #8ba3b4; --accent: #38b2a0;
+        --review: #ff6b6b; --urgent: #f0a500; --routine: #4a9e7f;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); }
+      header {
+        padding: 18px 28px; border-bottom: 1px solid var(--line);
+        display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+      }
+      h1 { font-size: 1.25rem; margin: 0; letter-spacing: -.01em; }
+      .sub { color: var(--muted); font-size: .85rem; }
+      .live { margin-left: auto; color: var(--muted); font-size: .8rem; }
+      main { display: grid; grid-template-columns: 1.05fr 1.35fr; gap: 0; height: calc(100vh - 62px); }
+      .list { overflow-y: auto; border-right: 1px solid var(--line); }
+      .detail { overflow-y: auto; padding: 22px 26px; }
+      .band-head {
+        padding: 12px 24px 8px; font-size: .72rem; letter-spacing: .12em;
+        text-transform: uppercase; color: var(--muted);
+      }
+      .row {
+        display: grid; grid-template-columns: 5px 54px 1fr auto; gap: 14px;
+        align-items: center; padding: 13px 22px 13px 0; cursor: pointer;
+        border-bottom: 1px solid var(--line); background: none; border-left: none;
+        border-right: none; border-top: none; width: 100%; text-align: left; color: inherit;
+        font: inherit;
+      }
+      .row:hover, .row:focus-visible { background: #16222c; outline: none; }
+      .row.active { background: #17272f; }
+      .row .stripe { align-self: stretch; }
+      .row.review .stripe { background: var(--review); }
+      .row.urgent .stripe { background: var(--urgent); }
+      .row.routine .stripe { background: var(--routine); }
+      .num { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; }
+      .who { font-size: .95rem; }
+      .spec { color: var(--muted); font-size: .8rem; margin-top: 2px; }
+      .pill {
+        font-size: .68rem; letter-spacing: .09em; text-transform: uppercase;
+        padding: 3px 8px; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap;
+      }
+      .review .pill { color: var(--review); }
+      .urgent .pill { color: var(--urgent); }
+      .routine .pill { color: var(--routine); }
+      h2 { font-size: 1.05rem; margin: 0 0 4px; }
+      h3 {
+        font-size: .74rem; letter-spacing: .12em; text-transform: uppercase;
+        color: var(--muted); margin: 26px 0 10px;
+      }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+      .kv { display: grid; grid-template-columns: 148px 1fr; gap: 7px 14px; font-size: .9rem; }
+      .kv dt { color: var(--muted); }
+      .kv dd { margin: 0; }
+      .flag {
+        background: #3a1518; border: 1px solid var(--review); border-radius: 8px;
+        padding: 13px 16px; margin-bottom: 10px;
+      }
+      .src {
+        font-size: .66rem; letter-spacing: .07em; padding: 2px 6px; border-radius: 3px;
+        background: #1c2b36; color: var(--muted); margin-left: 8px; white-space: nowrap;
+      }
+      .src.machine { background: #3a2f14; color: #f0c060; }
+      table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+      th, td { text-align: left; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-weight: 500; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
+      button.act {
+        background: var(--accent); border: none; color: #06211c; font-weight: 700;
+        padding: 10px 16px; border-radius: 7px; cursor: pointer; font-size: .88rem;
+      }
+      button.act.ghost { background: none; border: 1px solid var(--line); color: var(--ink); font-weight: 500; }
+      .actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+      .empty { color: var(--muted); padding: 40px 26px; }
+      .warn { color: var(--urgent); font-size: .82rem; margin-top: 8px; }
+      @media (max-width: 900px) { main { grid-template-columns: 1fr; height: auto; } .list { border-right: none; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>OPD Dashboard</h1>
+      <span class="sub">MediKiosk intake &middot; review cases are not queued, they are escalated</span>
+      <span class="live" id="live">connecting…</span>
+    </header>
+    <main>
+      <div class="list" id="list"><div class="empty">Loading queue…</div></div>
+      <div class="detail" id="detail"><div class="empty">Select a patient to see their intake.</div></div>
+    </main>
+
+    <script type="module">
+      const listEl = document.querySelector("#list");
+      const detailEl = document.querySelector("#detail");
+      const liveEl = document.querySelector("#live");
+      let selected = null;
+
+      const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+      async function refresh() {
+        try {
+          const data = await (await fetch("/api/queue")).json();
+          liveEl.textContent = `${data.review.length} for review · ${data.waiting.length} waiting`;
+          renderList(data);
+        } catch (error) {
+          liveEl.textContent = "disconnected";
+        }
+      }
+
+      function renderList(data) {
+        const parts = [];
+        if (data.review.length) {
+          parts.push(`<div class="band-head" style="color:var(--review)">Needs clinical review</div>`);
+          parts.push(...data.review.map(rowHtml));
+        }
+        parts.push(`<div class="band-head">Waiting</div>`);
+        parts.push(data.waiting.length
+          ? data.waiting.map(rowHtml).join("")
+          : `<div class="empty">No one waiting.</div>`);
+        listEl.innerHTML = parts.join("");
+        for (const button of listEl.querySelectorAll(".row")) {
+          button.addEventListener("click", () => open(button.dataset.id));
+        }
+      }
+
+      function rowHtml(entry) {
+        const active = entry.encounter_id === selected ? " active" : "";
+        return `<button class="row ${esc(entry.band)}${active}" data-id="${esc(entry.encounter_id)}">
+          <span class="stripe"></span>
+          <span class="num">${esc(entry.number)}</span>
+          <span>
+            <div class="who">${esc(entry.complaint || "Complaint not established")}</div>
+            <div class="spec">${esc(entry.specialty)}</div>
+          </span>
+          <span class="pill">${esc(entry.band)}</span>
+        </button>`;
+      }
+
+      async function open(id) {
+        selected = id;
+        const data = await (await fetch(`/api/encounters/${id}`)).json();
+        if (data.error) { detailEl.innerHTML = `<div class="empty">${esc(data.error)}</div>`; return; }
+        detailEl.innerHTML = renderReport(id, data.report, data.queue);
+        detailEl.querySelector("#seen")?.addEventListener("click", () => setState(id, "IN_CONSULTATION"));
+        detailEl.querySelector("#done")?.addEventListener("click", () => setState(id, "COMPLETED"));
+        refresh();
+      }
+
+      async function setState(id, state) {
+        await fetch(`/api/encounters/${id}/state`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ state }),
+        });
+        refresh();
+      }
+
+      function sourceTag(source) {
+        const machine = source === "OCR" || source === "SYSTEM_INFERENCE";
+        return `<span class="src${machine ? " machine" : ""}">${esc(source)}</span>`;
+      }
+
+      function renderReport(id, report, queue) {
+        const clinical = report.clinical || {};
+        const routing = report.routing || {};
+        const prov = report.provenance;
+        const flags = report.red_flags || [];
+        const diff = report.differential;
+
+        const findings = Object.entries(clinical.findings || {})
+          .map(([k, v]) => `<dt>${esc(k.replace(/_/g, " "))}</dt><dd>${v ? "yes" : "no"}</dd>`)
+          .join("");
+
+        // Every value carries where it came from. A spoken answer and an OCR guess must not
+        // look identical to the doctor reading this.
+        const provRows = (prov?.entries || [])
+          .filter((e) => !e.superseded_by)
+          .map((e) => `<tr>
+              <td>${esc(e.key.replace(/_/g, " "))}</td>
+              <td>${esc(e.value)}</td>
+              <td>${sourceTag(e.source)}${e.confidence != null ? ` ${(e.confidence * 100).toFixed(0)}%` : ""}</td>
+            </tr>`).join("");
+
+        return `
+          <h2>${esc(clinical.complaint || "Complaint not established")}</h2>
+          <div class="sub">${esc(routing.queue || "")} · ${esc(routing.priority || "")} ·
+            queue ${esc(queue?.number ?? "—")} · ${esc(queue?.state ?? "")}</div>
+
+          ${flags.length ? `<h3>Red flags</h3>` + flags.map((f) => `
+            <div class="flag"><strong>${esc(f.rule_id)}</strong><br>${esc(f.message)}</div>`).join("") : ""}
+
+          <h3>Clinical</h3>
+          <div class="card"><dl class="kv">
+            <dt>Complaint</dt><dd>${esc(clinical.complaint || "—")}</dd>
+            <dt>Duration</dt><dd>${esc(clinical.duration || "—")}</dd>
+            <dt>Severity</dt><dd>${esc(clinical.severity ?? "—")}</dd>
+            ${findings}
+            <dt>Not established</dt><dd>${esc((clinical.not_established || []).join(", ") || "—")}</dd>
+          </dl></div>
+
+          ${diff?.ranked?.length ? `<h3>Differential — ${esc(diff.confidence)} confidence,
+            ${esc(diff.findings_count)} findings</h3>
+            <div class="card"><table><thead><tr><th>ICD-10</th><th>Condition</th><th>Weight</th></tr></thead>
+            <tbody>${diff.ranked.slice(0, 5).map((d) => `<tr><td>${esc(d.icd10)}</td>
+              <td>${esc(d.name)}</td><td>${esc(d.probability)}</td></tr>`).join("")}</tbody></table>
+            <div class="warn">${esc(diff.disclaimer)}</div></div>` : ""}
+
+          ${provRows ? `<h3>Where this came from${prov.needs_review
+            ? ` — ${prov.needs_review} to check` : ""}</h3>
+            <div class="card"><table><thead><tr><th>Value</th><th></th><th>Source</th></tr></thead>
+            <tbody>${provRows}</tbody></table></div>` : ""}
+
+          <div class="actions">
+            <button class="act" id="seen">Start consultation</button>
+            <button class="act ghost" id="done">Mark completed</button>
+          </div>`;
+      }
+
+      refresh();
+      setInterval(refresh, 4000);
+    </script>
+  </body>
+</html>

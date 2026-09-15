@@ -1,0 +1,186 @@
+# Questions that are not tied to one problem.
+#
+# Two kinds, and the difference matters:
+#
+# **Cross-domain questions** carry `*.slot` and fill that slot for every active
+# domain at once. This is §12 — a patient with fever, headache and body ache
+# should be asked once how bad things are, not three times. The selector prefers
+# them automatically because coverage is part of the score; there is no special
+# case for merging anywhere in the engine.
+#
+# **General history** is the floor. `required: true` on the slot means the
+# selector reaches it whatever the patient came in with, because a case with no
+# medication list and no allergy history is not a case a practitioner can act
+# on.
+#
+# clinical_source: engineer-authored, structured from standard OPD case-taking
+# order; pending AIIA mentor review.
+
+version: 1
+
+questions:
+  # --- cross-domain -----------------------------------------------------------
+
+  - id: general.severity
+    answer_type: scale
+    extracts: ["*.severity"]
+    priority: 8
+    burden: 1
+    minimum: 0
+    maximum: 10
+
+  - id: general.progression
+    answer_type: single_select
+    extracts: ["*.progression"]
+    priority: 8
+    burden: 1
+    options: [improving, worsening, unchanged, fluctuating]
+
+  - id: general.pattern
+    answer_type: single_select
+    extracts: ["*.pattern"]
+    priority: 6
+    burden: 1
+    options: [constant, intermittent, worse_at_night, worse_in_morning]
+
+  - id: general.aggravating
+    answer_type: free_text
+    extracts: ["*.aggravating"]
+    priority: 7
+    burden: 2
+
+  - id: general.relieving
+    answer_type: free_text
+    extracts: ["*.relieving"]
+    priority: 7
+    burden: 2
+
+  - id: general.treatment_tried
+    answer_type: free_text
+    extracts: ["*.treatment_tried"]
+    priority: 7
+    burden: 2
+
+  - id: general.previous_episodes
+    answer_type: boolean
+    extracts: ["*.previous_episodes"]
+    priority: 6
+    burden: 1
+
+  # Duration on its own, for the patient whose answer to the timeline question
+  # gave onset but no length — which is most of them, because "it started on
+  # Tuesday" is a date and not a duration until somebody does the arithmetic.
+  - id: general.duration
+    answer_type: duration
+    extracts: ["*.duration"]
+    priority: 9
+    burden: 1
+    units: [hour, day, week, month, year]
+
+  - id: general.onset
+    answer_type: single_select
+    extracts: ["*.onset"]
+    priority: 8
+    burden: 1
+    options: [sudden, gradual, unknown]
+
+  # --- general history --------------------------------------------------------
+
+  - id: history.age
+    answer_type: numeric
+    extracts: [general.age]
+    priority: 10
+    burden: 1
+    minimum: 0
+    maximum: 120
+    unit: year
+
+  - id: history.sex
+    answer_type: single_select
+    extracts: [general.sex]
+    priority: 9
+    burden: 1
+    options: [female, male, other, prefer_not_to_say]
+
+  - id: history.reporter
+    answer_type: single_select
+    extracts: [general.reporter]
+    priority: 8
+    burden: 1
+    options: [self, parent_guardian, family_attendant, caregiver]
+
+  # One multi-select instead of six separate yes/no questions. Six "do you have
+  # X?" questions cost six screens and collect the same information as one list
+  # somebody scans in a few seconds — and a patient who has none of them says so
+  # once rather than saying no six times.
+  - id: history.known_conditions
+    answer_type: multi_select
+    extracts: [general.known_conditions]
+    priority: 9
+    burden: 2
+    options:
+      - diabetes
+      - hypertension
+      - asthma
+      - thyroid
+      - heart_disease
+      - tuberculosis
+      - kidney_disease
+      - liver_disease
+      - epilepsy
+      - arthritis
+      - none
+      - other
+
+  - id: history.current_medications
+    answer_type: free_text
+    extracts: [general.current_medications]
+    priority: 10
+    burden: 2
+
+  - id: history.allergies
+    answer_type: free_text
+    extracts: [general.allergies]
+    priority: 10
+    burden: 2
+
+  - id: history.past_surgery
+    answer_type: free_text
+    extracts: [general.past_surgery]
+    priority: 6
+    burden: 2
+
+  - id: history.family_history
+    answer_type: multi_select
+    extracts: [general.family_history]
+    priority: 5
+    burden: 2
+    options: [diabetes, hypertension, heart_disease, cancer, asthma, thyroid, none, unsure]
+
+  # Asked only where it applies, and the precondition is on the question rather
+  # than on the domain list: deciding what to offer from a sex recorded three
+  # questions ago is a decision about the patient, and it belongs somewhere a
+  # reviewer can see it.
+  - id: history.pregnancy
+    answer_type: single_select
+    extracts: [general.pregnancy]
+    priority: 9
+    burden: 1
+    options: ["yes", "no", unsure, not_applicable]
+    requires:
+      slot: general.sex
+      equals: female
+
+  - id: history.tobacco
+    answer_type: single_select
+    extracts: [general.tobacco]
+    priority: 6
+    burden: 1
+    options: [never, past, occasional, daily]
+
+  - id: history.alcohol
+    answer_type: single_select
+    extracts: [general.alcohol]
+    priority: 5
+    burden: 1
+    options: [never, occasional, weekly, daily]
