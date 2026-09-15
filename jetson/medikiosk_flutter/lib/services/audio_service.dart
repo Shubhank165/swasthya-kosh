@@ -289,14 +289,17 @@ class AudioService extends ChangeNotifier {
             audioFocus: AndroidAudioFocus.none,
           ),
         ));
+        // Only a patient who asked to be spoken to slowly goes through Android's time-stretch;
+        // at 1.0 it colours every language for nothing. Set before play, not over it.
+        final speed = playbackRate.clamp(0.5, 1.5);
+        if (speed != 1.0) await _player.setPlaybackRate(speed);
         await _player.play(
           BytesSource(_wrapWav(pcm, rate)),
           mode: PlayerMode.mediaPlayer,
         );
-        await _player.setPlaybackRate(playbackRate.clamp(0.5, 1.5));
         // Include actual playback completion so chunks cannot overwrite each other.
         await completed.future.timeout(
-          Duration(milliseconds: (pcm.length * 500 / rate / playbackRate.clamp(0.5, 1.5)).ceil() + 2000),
+          Duration(milliseconds: (pcm.length * 500 / rate / speed).ceil() + 2000),
         );
       } catch (error) {
         if (!_disposed && generation == _playbackGeneration) {

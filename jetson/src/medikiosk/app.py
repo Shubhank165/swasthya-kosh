@@ -1139,6 +1139,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     return
                 await finish_session()
                 return
+            elif effect == "measure":
+                # Tell the patient to hold still before the camera opens, not after.
+                flow.vitals_busy = True
+                await send_screen()
+                try:
+                    from medikiosk.edge.vitals import measure as measure_vitals
+
+                    outcome = await asyncio.to_thread(measure_vitals)
+                except Exception as error:  # noqa: BLE001 - a camera fault is not a lost intake
+                    outcome = None
+                    reading = f"heart rate unavailable: {error}"
+                flow.vitals_busy = False
+                if outcome is not None:
+                    flow.record_vitals(outcome.bpm, outcome.confident, outcome.status)
+                else:
+                    flow.record_vitals(None, False, reading)
+                await send_screen()
+                return
             elif effect in {"scan", "retake", "discard"}:
                 await send({"type": "device.action", "action": effect})
                 return

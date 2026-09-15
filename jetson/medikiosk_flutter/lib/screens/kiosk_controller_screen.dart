@@ -394,6 +394,7 @@ class _WorkflowBodyState extends State<WorkflowBody> {
     'restart' => tr('restart', client.language),
     'back' => tr('back', client.language),
     'cancel' => tr('cancel', client.language),
+    'measure' => tr('measure', client.language),
     'scan' => tr('scan', client.language),
     'retake' => tr('retake', client.language),
     'keep' => tr('keep', client.language),
