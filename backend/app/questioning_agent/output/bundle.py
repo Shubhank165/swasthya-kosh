@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from app.questioning_agent.core.enums import AnswerType
@@ -250,22 +251,38 @@ def _condition(
     return {"field_id": field, "equals": raw.equals}
 
 
+def _labelled(codes: Iterable[str], localization: Localization) -> dict[str, dict[str, str]]:
+    """Option text for `codes`, keyed the way prompts are."""
+    return {
+        code: {
+            language: localization.option_text(code, language)
+            for language in localization.languages
+            if localization.has_option(code, language)
+        }
+        for code in codes
+    }
+
+
 def _question(
-    question: Question, localization: Localization, index: _FieldIndex
+    question: Question,
+    localization: Localization,
+    index: _FieldIndex,
+    options_by_slot: Mapping[str, tuple[str, ...]],
 ) -> dict[str, Any]:
     prompts = {
         language: localization.question_text(question.id, language)
         for language in localization.languages
         if localization.has_question(question.id, language)
     }
-    options = {
-        option: {
-            language: localization.option_text(option, language)
-            for language in localization.languages
-            if localization.has_option(option, language)
-        }
-        for option in question.options
-    }
+    # A question with `options_from` authors no options of its own — the app
+    # fills them at runtime from what was ticked earlier. It still needs the
+    # labels for them, because the app renders a code it has no label for by
+    # title-casing the code, and `pain` under a Hindi question then reads
+    # "Pain": an English word in front of a patient who chose Hindi, recorded
+    # as though they had understood it. So the labels for whatever that earlier
+    # question could yield travel with this one.
+    codes = question.options or options_by_slot.get(question.options_from or "", ())
+    options = _labelled(codes, localization)
 
     body: dict[str, Any] = {
         "question_id": question.id,
@@ -408,6 +425,14 @@ def compile_bundle(
         for rule in triage.rules
     ]
 
+    # slot -> the options the question filling it offers, so a question that
+    # takes its options from an earlier answer can carry that answer's labels.
+    options_by_slot: dict[str, tuple[str, ...]] = {
+        question.extracts[0]: tuple(question.options)
+        for question in questions
+        if question.options and question.extracts
+    }
+
     body: dict[str, Any] = {
         "bundle_format": BUNDLE_FORMAT_VERSION,
         "schema_version": schema_version,
@@ -423,7 +448,7 @@ def compile_bundle(
         "ayurveda_current_state": [
             qid for qid in ayurveda if bank.require(qid).current_state
         ],
-        "questions": [_question(q, localization, index) for q in questions],
+        "questions": [_question(q, localization, index, options_by_slot) for q in questions],
         "red_flag_rules": rules,
     }
     # Content-derived rather than a number somebody remembers to bump, and it

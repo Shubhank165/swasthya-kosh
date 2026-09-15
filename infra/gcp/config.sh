@@ -101,8 +101,15 @@ DEPLOY_ENVIRONMENT="${DEPLOY_ENVIRONMENT:-production}"
 # deployment change with a name on it rather than a commit.
 OCR_PROVIDER="${OCR_PROVIDER:-mock}"
 REPAIR_PROVIDER="${REPAIR_PROVIDER:-mock}"
+# Prefill's own default is `mock`, not `none` — with no provider every question
+# is simply asked, which is what happened before the feature existed. It is
+# named here anyway: it was omitted from the deploy string entirely, so every
+# revision served `prefill: mock` no matter what the operator intended, and a
+# setting that cannot be set is not a default, it is a bug.
+PREFILL_PROVIDER="${PREFILL_PROVIDER:-mock}"
 OCR_MODEL_ID="${OCR_MODEL_ID:-}"
 REPAIR_MODEL_ID="${REPAIR_MODEL_ID:-}"
+PREFILL_MODEL_ID="${PREFILL_MODEL_ID:-}"
 
 # Zero Data Retention. This is an assertion the operator makes about the
 # project; nothing here can verify it, and the adapters refuse to construct
@@ -111,11 +118,13 @@ REPAIR_MODEL_ID="${REPAIR_MODEL_ID:-}"
 VERTEX_ZDR_ENABLED="${VERTEX_ZDR_ENABLED:-false}"
 
 uses_cloud_models=false
-[[ "${OCR_PROVIDER}" == "gemini" || "${REPAIR_PROVIDER}" == "vertex" ]] && uses_cloud_models=true
+[[ "${OCR_PROVIDER}" == "gemini" || "${REPAIR_PROVIDER}" == "vertex" \
+  || "${PREFILL_PROVIDER}" == "vertex" ]] && uses_cloud_models=true
 
 if [[ "${uses_cloud_models}" == "true" ]]; then
   if [[ "${VERTEX_ZDR_ENABLED}" != "true" ]]; then
-    echo "OCR_PROVIDER=${OCR_PROVIDER} REPAIR_PROVIDER=${REPAIR_PROVIDER} sends" >&2
+    echo "OCR_PROVIDER=${OCR_PROVIDER} REPAIR_PROVIDER=${REPAIR_PROVIDER}" >&2
+    echo "PREFILL_PROVIDER=${PREFILL_PROVIDER} sends" >&2
     echo "patient documents and patient answers to a model, and" >&2
     echo "VERTEX_ZDR_ENABLED is not true. Confirm Zero Data Retention for" >&2
     echo "${PROJECT_ID} in ${REGION} first, then set it explicitly." >&2
@@ -128,6 +137,10 @@ if [[ "${uses_cloud_models}" == "true" ]]; then
   fi
   if [[ "${REPAIR_PROVIDER}" == "vertex" && -z "${REPAIR_MODEL_ID}" ]]; then
     echo "REPAIR_PROVIDER=vertex needs REPAIR_MODEL_ID." >&2
+    exit 1
+  fi
+  if [[ "${PREFILL_PROVIDER}" == "vertex" && -z "${PREFILL_MODEL_ID}" ]]; then
+    echo "PREFILL_PROVIDER=vertex needs PREFILL_MODEL_ID." >&2
     exit 1
   fi
 fi

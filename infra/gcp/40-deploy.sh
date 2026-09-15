@@ -57,18 +57,20 @@ ENV_SHARED="ENVIRONMENT=${DEPLOY_ENVIRONMENT};CLINICAL_CONTENT_DIR=/app/clinical
 # `config.sh` has already refused the deploy if a cloud provider was selected
 # without ZDR or without a model id, so by here these are either the mocks or a
 # combination somebody decided on.
-ENV_MODELS="OCR_PROVIDER=${OCR_PROVIDER};REPAIR_PROVIDER=${REPAIR_PROVIDER};VERTEX_ZDR_ENABLED=${VERTEX_ZDR_ENABLED}"
+ENV_MODELS="OCR_PROVIDER=${OCR_PROVIDER};REPAIR_PROVIDER=${REPAIR_PROVIDER};PREFILL_PROVIDER=${PREFILL_PROVIDER};VERTEX_ZDR_ENABLED=${VERTEX_ZDR_ENABLED}"
 [[ -n "${OCR_MODEL_ID}" ]] && ENV_MODELS="${ENV_MODELS};OCR_MODEL_ID=${OCR_MODEL_ID}"
 [[ -n "${REPAIR_MODEL_ID}" ]] && ENV_MODELS="${ENV_MODELS};REPAIR_MODEL_ID=${REPAIR_MODEL_ID}"
+[[ -n "${PREFILL_MODEL_ID}" ]] && ENV_MODELS="${ENV_MODELS};PREFILL_MODEL_ID=${PREFILL_MODEL_ID}"
 ENV_SHARED="${ENV_SHARED};${ENV_MODELS}"
 
-# Repair runs on the API, during ingest, not on the worker â€” a payload that
-# fails its contract has to be repaired before the response, and there is no
-# document involved. So the API needs Vertex access too, which the provisioning
-# script only grants the worker. Idempotent, and skipped entirely when repair is
-# a mock, so a mock-only deployment does not quietly acquire the permission.
-if [[ "${REPAIR_PROVIDER}" == "vertex" ]]; then
-  say "Granting ${API_SERVICE} access to Vertex (REPAIR_PROVIDER=vertex)"
+# Repair and prefill both run on the API, not on the worker: repair fixes a
+# payload that failed its contract before the ingest response, and prefill
+# answers a request the phone makes mid-interview. Neither involves a document.
+# So the API needs Vertex access too, which the provisioning script only grants
+# the worker. Idempotent, and skipped entirely when both are mocks, so a
+# mock-only deployment does not quietly acquire the permission.
+if [[ "${REPAIR_PROVIDER}" == "vertex" || "${PREFILL_PROVIDER}" == "vertex" ]]; then
+  say "Granting ${API_SERVICE} access to Vertex (repair=${REPAIR_PROVIDER} prefill=${PREFILL_PROVIDER})"
   gc projects add-iam-policy-binding "${PROJECT_ID}" \
     --member="serviceAccount:${API_SA}" \
     --role=roles/aiplatform.user --condition=None >/dev/null
@@ -208,6 +210,7 @@ say "Deployed ${TAG}"
 echo "  env    ${DEPLOY_ENVIRONMENT}"
 echo "  ocr    ${OCR_PROVIDER}"
 echo "  repair ${REPAIR_PROVIDER}"
+echo "  prefill ${PREFILL_PROVIDER}"
 if [[ "${uses_cloud_models}" == "true" ]]; then
   echo "  NOTE: this revision sends patient documents and patient answers to"
   echo "        Vertex in ${REGION}. VERTEX_ZDR_ENABLED=true is your assertion."
