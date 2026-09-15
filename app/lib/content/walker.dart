@@ -202,7 +202,12 @@ class IntakeWalker {
 
   /// Every question id this intake will walk, in order.
   ///
-  /// Core first, then the branch for the chosen complaint, then Ayurveda. The
+  /// Core first, then the branch for the chosen complaint. Ayurveda is
+  /// deliberately **not** appended here any more — SIH items 3/4: it used to
+  /// ride along on every visit as an unlabelled extra section, which made a
+  /// symptom intake longer than the symptom warranted. It now lives on its own
+  /// screen (`home/ayush_screen.dart`), answered once, whenever the patient
+  /// chooses, rather than folded into every visit's required questions. The
   /// branch only appears once a complaint has been chosen, which is why this is
   /// recomputed rather than fixed at the start.
   List<String> get plan {
@@ -210,20 +215,8 @@ class IntakeWalker {
     return [
       ...bundle.core,
       if (complaint != null) ...?bundle.branches[complaint],
-      ..._ayurveda,
     ];
   }
-
-  /// The full module, or the current-state subset on a return visit.
-  ///
-  /// Falls back to the full set when the bundle names no subset — an older
-  /// backend, or content where a clinician has not marked one. A returning
-  /// patient answering nine questions instead of three is slower; a returning
-  /// patient asked none of them arrives without today's Agni, Nidra or Koshtha.
-  List<String> get _ayurveda =>
-      returnVisit && bundle.ayurvedaCurrentState.isNotEmpty
-          ? bundle.ayurvedaCurrentState
-          : bundle.ayurveda;
 
   String? get _selectedComplaint {
     final answer = _byField['chief_complaint'];

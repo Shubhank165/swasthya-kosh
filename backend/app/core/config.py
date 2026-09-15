@@ -108,6 +108,14 @@ class Settings(BaseSettings):
     repair_model_id: str | None = None
     repair_max_attempts: int = 1
 
+    # --- prefill (suggests answers from a patient's own free-text words) ----
+    #: `mock`, `vertex`, or `none` to disable prefill entirely. Unlike repair,
+    #: prefill is never required for the interview to work: with no provider
+    #: every question is simply put to the patient, which is exactly what
+    #: happened before this feature existed.
+    prefill_provider: str = "mock"
+    prefill_model_id: str | None = None
+
     # --- Vertex --------------------------------------------------------------
     vertex_project: str | None = None
     vertex_region: str = "asia-south1"
@@ -211,6 +219,14 @@ class Settings(BaseSettings):
             raise ValueError(f"repair_provider must be one of {sorted(allowed)}")
         return value
 
+    @field_validator("prefill_provider")
+    @classmethod
+    def _validate_prefill_provider(cls, value: str) -> str:
+        allowed = {"mock", "vertex", "none"}
+        if value not in allowed:
+            raise ValueError(f"prefill_provider must be one of {sorted(allowed)}")
+        return value
+
     @field_validator("document_queue")
     @classmethod
     def _validate_document_queue(cls, value: str) -> str:
@@ -293,7 +309,11 @@ class Settings(BaseSettings):
     @property
     def uses_cloud_models(self) -> bool:
         """True when any call would leave the building."""
-        return self.ocr_provider == "gemini" or self.repair_provider == "vertex"
+        return (
+            self.ocr_provider == "gemini"
+            or self.repair_provider == "vertex"
+            or self.prefill_provider == "vertex"
+        )
 
 
 @lru_cache(maxsize=1)

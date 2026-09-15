@@ -7,11 +7,17 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.api.auth import RequireKioskOrStaff, RequirePatient, RequireStaff
-from app.api.deps import DocumentServiceDep, IdentityServiceDep
+from app.api.deps import (
+    AyushProfileServiceDep,
+    DocumentServiceDep,
+    IdentityServiceDep,
+)
 from app.core.errors import NotFoundError
 from app.domain.record import PatientRef, PatientRefType
 from app.schemas.api import (
     ABHALinkRequest,
+    AyushProfileRequest,
+    AyushProfileResponse,
     HistoryResponse,
     PatientDocumentOut,
     ResolveRequest,
@@ -202,6 +208,59 @@ async def my_documents(
             )
         )
     return out
+
+
+@router.post(
+    "/me/ayush-profile",
+    response_model=AyushProfileResponse,
+    summary="Store the signed-in patient's AYUSH/Prakriti self-report",
+)
+async def submit_ayush_profile(
+    principal: RequirePatient,
+    service: AyushProfileServiceDep,
+    request: AyushProfileRequest,
+) -> AyushProfileResponse:
+    """The module's answers, filed against the patient rather than a visit.
+
+    **Registered above `/{ref}/history` for the reason `my_history` gives.**
+    FastAPI matches in registration order, so a `/me/...` route declared after a
+    `/{ref}/...` one is a route that never runs — `me` binds as a patient
+    identifier instead, on a guard meant for staff.
+
+    **Neither the hospital nor the patient is in the body.** Both come from the
+    session: `principal.hospital_id` and `principal.patient_ref`, per decision
+    21. A profile can only be submitted for the holder of the credential
+    submitting it, so there is nothing here to tamper with.
+
+    **`phone`, because that is what the session is.** The token is issued
+    against a peppered HMAC of the number, never the number, and that is the
+    same reference an intake is filed under. A profile stored this way is still
+    found after the patient links an ABHA address, because
+    `PatientIdentifierLink` resolves one patient's identifiers to each other —
+    which is why this does not key on ABHA and does not need to.
+
+    Answering again supersedes the previous revision rather than editing it.
+    Nothing here is ever updated in place; decision 4.
+    """
+    if not principal.patient_ref:
+        # Unreachable through `RequirePatient`, which only issues for a session
+        # bound to a patient. Stated rather than assumed: a profile filed under
+        # an empty reference is one nobody can find and everybody shares.
+        raise NotFoundError("this session is not bound to a patient")
+
+    stored = await service.submit(
+        hospital_id=principal.hospital_id,
+        patient_ref_type=PatientRefType.PHONE.value,
+        patient_ref_value=principal.patient_ref,
+        language=request.language,
+        content_version=request.content_version,
+        answers=[answer.model_dump() for answer in request.answers],
+    )
+    return AyushProfileResponse(
+        profile_id=stored.profile_id,
+        superseded=stored.superseded,
+        answers_stored=stored.answers_stored,
+    )
 
 
 @router.get(

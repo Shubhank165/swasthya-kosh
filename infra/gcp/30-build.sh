@@ -11,7 +11,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 TAG="${TAG:-$(git rev-parse --short HEAD 2>/dev/null || date -u +%Y%m%d%H%M%S)}"
 if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
-  # Not fatal — the hackathon path builds from a dirty tree constantly — but the
+  # Not fatal â€” the hackathon path builds from a dirty tree constantly â€” but the
   # tag then names a commit whose content is not what was built, and that is
   # worth one line of noise.
   echo "WARNING: working tree is dirty; ${TAG} does not describe what is in this image" >&2

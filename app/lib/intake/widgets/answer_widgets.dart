@@ -40,6 +40,13 @@ Widget? buildAnswerWidget({
   required OnAnswered onAnswered,
   String language = 'en',
   VoidCallback? onDontKnow,
+  /// A value a prefill provider suggested for [question.fieldId], from
+  /// something the patient already said in an earlier free-text answer — or
+  /// `null`, the ordinary case. Never itself an answer: every renderer that
+  /// accepts one only ever uses it to pre-fill or pre-highlight what it shows,
+  /// and the patient still has to tap or press Continue for anything to be
+  /// recorded, exactly as they would with no suggestion at all.
+  AnswerValue? suggestion,
   Key? key,
 }) {
   // **Keyed by question, always.** Flutter keeps a `State` object when the same
@@ -62,37 +69,47 @@ Widget? buildAnswerWidget({
           question: question,
           language: language,
           onAnswered: onAnswered,
-          onDontKnow: onDontKnow),
+          onDontKnow: onDontKnow,
+          suggestion: suggestion),
       AnswerType.multiChoice => MultiChoiceAnswer(
           key: resolved,
           question: question,
           language: language,
           onAnswered: onAnswered,
-          onDontKnow: onDontKnow),
+          onDontKnow: onDontKnow,
+          suggestion: suggestion),
       AnswerType.yesNoUnknown => YesNoAnswer(
           key: resolved,
           question: question,
           language: language,
           onAnswered: onAnswered,
-          onDontKnow: onDontKnow),
+          onDontKnow: onDontKnow,
+          suggestion: suggestion),
       AnswerType.number => NumberAnswer(
           key: resolved,
           question: question,
           language: language,
           onAnswered: onAnswered,
-          onDontKnow: onDontKnow),
+          onDontKnow: onDontKnow,
+          suggestion: suggestion),
       AnswerType.scale => ScaleAnswer(
           key: resolved,
           question: question,
           language: language,
           onAnswered: onAnswered,
-          onDontKnow: onDontKnow),
+          onDontKnow: onDontKnow,
+          suggestion: suggestion),
       AnswerType.duration => DurationAnswer(
           key: resolved,
           question: question,
           language: language,
           onAnswered: onAnswered,
-          onDontKnow: onDontKnow),
+          onDontKnow: onDontKnow,
+          suggestion: suggestion),
+      // Excluded from prefill by design — see `app/services/prefill.py`'s
+      // `PENDING_TYPES`. A descriptive question is the source, not a target,
+      // and none of the dates this interview asks for are ones a wrong guess
+      // is safe to be wrong about.
       AnswerType.date => DateAnswer(
           key: resolved,
           question: question,
@@ -193,6 +210,41 @@ String optionLabel(String code) {
 String labelFor(Question question, String code, String language) =>
     question.labelForOption(code, language) ?? optionLabel(code);
 
+/// "Based on what you told us" — shown once, above whatever a suggestion
+/// pre-filled or pre-highlighted.
+///
+/// A label, not a claim: it says where the pre-filled value came from and
+/// nothing about whether it is right. The patient still has to tap an option
+/// or press Continue for anything under it to be recorded, the same as if
+/// this badge were not there at all.
+class SuggestionBadge extends StatelessWidget {
+  const SuggestionBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sizes.gap),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.auto_awesome, size: 16, color: scheme.primary),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              Strings.of(context).suggestedAnswer,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelMedium
+                  ?.copyWith(color: scheme.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class SingleChoiceAnswer extends StatelessWidget {
   const SingleChoiceAnswer({
     super.key,
@@ -200,6 +252,7 @@ class SingleChoiceAnswer extends StatelessWidget {
     required this.onAnswered,
     this.language = 'en',
     this.onDontKnow,
+    this.suggestion,
   });
 
   final Question question;
@@ -207,12 +260,21 @@ class SingleChoiceAnswer extends StatelessWidget {
   final OnAnswered onAnswered;
   final VoidCallback? onDontKnow;
 
+  /// A suggested option code, or `null`. Only ever a highlight here — tapping
+  /// is still what records an answer (§14's "tap *is* the bound value"), so a
+  /// suggestion for a tap-to-answer question is shown, never auto-applied.
+  final AnswerValue? suggestion;
+
   @override
   Widget build(BuildContext context) {
     final options = question.options ?? const [];
+    final suggested = suggestion;
+    final suggestedCode =
+        suggested is CodedValue && options.contains(suggested.code) ? suggested.code : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (suggestedCode != null) const SuggestionBadge(),
         _VoiceRow(
           language: language,
           matcher: (t) => matchOption(
@@ -229,6 +291,7 @@ class SingleChoiceAnswer extends StatelessWidget {
           OptionTile(
             key: Key('option.$option'),
             label: labelFor(question, option, language),
+            selected: option == suggestedCode,
             // The label recorded is the text the patient actually read (§9),
             // which is why it is the localised one and not the code.
             onTap: () => onAnswered(
@@ -282,12 +345,19 @@ class MultiChoiceAnswer extends StatefulWidget {
     required this.onAnswered,
     this.language = 'en',
     this.onDontKnow,
+    this.suggestion,
   });
 
   final Question question;
   final String language;
   final OnAnswered onAnswered;
   final VoidCallback? onDontKnow;
+
+  /// A suggested set of options, or `null`. Pre-checked, never pre-submitted —
+  /// the Continue button below is what records an answer, same as it always
+  /// was, so accepting a suggestion here takes exactly the action accepting
+  /// nothing would have.
+  final AnswerValue? suggestion;
 
   @override
   State<MultiChoiceAnswer> createState() => _MultiChoiceAnswerState();
@@ -296,6 +366,41 @@ class MultiChoiceAnswer extends StatefulWidget {
 class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
   final _chosen = <String>{};
 
+  /// True once the patient has touched a voice match or a tile. A suggestion
+  /// that arrives after that point must not silently rewrite their own
+  /// selection.
+  bool _touchedByPatient = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _applySuggestion(widget.suggestion);
+  }
+
+  @override
+  void didUpdateWidget(MultiChoiceAnswer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The ordinary timing for a suggestion to arrive: the request goes out the
+    // moment the prior free-text answer is recorded, and this screen may
+    // already be showing by the time it comes back.
+    if (!_touchedByPatient && oldWidget.suggestion != widget.suggestion) {
+      setState(() => _applySuggestion(widget.suggestion));
+    }
+  }
+
+  void _applySuggestion(AnswerValue? suggestion) {
+    final options = widget.question.options ?? const [];
+    final codes = switch (suggestion) {
+      CodedListValue(:final codes) => codes,
+      _ => const <String>[],
+    };
+    final valid = codes.where(options.contains).toSet();
+    if (valid.isEmpty) return;
+    _chosen
+      ..clear()
+      ..addAll(valid);
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = Strings.of(context);
@@ -303,6 +408,7 @@ class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_chosen.isNotEmpty && !_touchedByPatient) const SuggestionBadge(),
         _VoiceRow(
           language: widget.language,
           matcher: (t) => matchOption(
@@ -314,6 +420,7 @@ class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
           // Voice toggles one option at a time, exactly like a tap. The patient
           // still presses Continue when they have named everything.
           onMatch: (m) => setState(() {
+            _touchedByPatient = true;
             final code = m.optionCode ?? '';
             if (!_chosen.remove(code)) _chosen.add(code);
           }),
@@ -325,6 +432,7 @@ class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
             label: labelFor(widget.question, option, widget.language),
             selected: _chosen.contains(option),
             onTap: () => setState(() {
+              _touchedByPatient = true;
               if (!_chosen.remove(option)) _chosen.add(option);
             }),
           ),
@@ -361,6 +469,7 @@ class YesNoAnswer extends StatelessWidget {
     required this.onAnswered,
     this.language = 'en',
     this.onDontKnow,
+    this.suggestion,
   });
 
   final Question question;
@@ -368,9 +477,15 @@ class YesNoAnswer extends StatelessWidget {
   final OnAnswered onAnswered;
   final VoidCallback? onDontKnow;
 
+  /// A suggested yes/no, or `null`. A highlight only — tapping is still what
+  /// records an answer, same as [SingleChoiceAnswer].
+  final AnswerValue? suggestion;
+
   @override
   Widget build(BuildContext context) {
     final strings = Strings.of(context);
+    final suggested = suggestion;
+    final suggestedBool = suggested is BoolValue ? suggested.value : null;
     // Only yes and no. The third arm of `yes_no_unknown` is the shared
     // "I don't know" affordance, which every question carries anyway —
     // rendering it twice would offer two buttons that record the same status
@@ -378,6 +493,7 @@ class YesNoAnswer extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (suggestedBool != null) const SuggestionBadge(),
         _VoiceRow(
           language: language,
           matcher: (t) => matchYesNo(transcript: t, language: language),
@@ -390,11 +506,13 @@ class YesNoAnswer extends StatelessWidget {
         OptionTile(
           key: const Key('option.yes'),
           label: strings.optYes,
+          selected: suggestedBool == true,
           onTap: () => onAnswered(const BoolValue(true), strings.optYes),
         ),
         OptionTile(
           key: const Key('option.no'),
           label: strings.optNo,
+          selected: suggestedBool == false,
           onTap: () => onAnswered(const BoolValue(false), strings.optNo),
         ),
       ],
@@ -409,12 +527,18 @@ class NumberAnswer extends StatefulWidget {
     required this.onAnswered,
     this.language = 'en',
     this.onDontKnow,
+    this.suggestion,
   });
 
   final Question question;
   final OnAnswered onAnswered;
   final String language;
   final VoidCallback? onDontKnow;
+
+  /// A suggested figure, or `null`. Pre-fills the box; the patient still edits
+  /// or clears it like any other value and still presses Continue to record
+  /// anything — the same bargain a misheard voice figure already makes.
+  final AnswerValue? suggestion;
 
   @override
   State<NumberAnswer> createState() => _NumberAnswerState();
@@ -428,6 +552,10 @@ class _NumberAnswerState extends State<NumberAnswer> {
   /// records exactly what it would have before.
   late String? _unit = widget.question.unit;
 
+  /// True once the patient has changed the figure, the unit, or spoken one.
+  /// A suggestion that arrives after that point must not overwrite it.
+  bool _touchedByPatient = false;
+
   /// The alternatives, or empty when the question offers no choice.
   ///
   /// A single-entry list is not a choice and does not draw one — the toggle
@@ -435,6 +563,26 @@ class _NumberAnswerState extends State<NumberAnswer> {
   List<String> get _units {
     final units = widget.question.units ?? const [];
     return units.length > 1 ? units : const [];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _applySuggestion(widget.suggestion);
+  }
+
+  @override
+  void didUpdateWidget(NumberAnswer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_touchedByPatient && oldWidget.suggestion != widget.suggestion) {
+      setState(() => _applySuggestion(widget.suggestion));
+    }
+  }
+
+  void _applySuggestion(AnswerValue? suggestion) {
+    if (suggestion is! NumberValue) return;
+    final n = suggestion.value;
+    _controller.text = n == n.roundToDouble() ? n.round().toString() : n.toString();
   }
 
   @override
@@ -449,6 +597,8 @@ class _NumberAnswerState extends State<NumberAnswer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (widget.suggestion is NumberValue && !_touchedByPatient)
+          const SuggestionBadge(),
         // Voice fills the box; it does not answer the question. The patient
         // reads the figure back and presses Continue, which is what makes a
         // misheard vital sign recoverable — the same bargain free text makes.
@@ -462,6 +612,7 @@ class _NumberAnswerState extends State<NumberAnswer> {
             units: widget.question.units ?? const [],
           ),
           onMatch: (m) => setState(() {
+            _touchedByPatient = true;
             final n = m.number!;
             _controller.text = n == n.roundToDouble()
                 ? n.round().toString()
@@ -478,7 +629,7 @@ class _NumberAnswerState extends State<NumberAnswer> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           style: Theme.of(context).textTheme.bodyLarge,
           decoration: InputDecoration(suffixText: _unit),
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() => _touchedByPatient = true),
         ),
         if (_units.isNotEmpty) ...[
           const SizedBox(height: Sizes.gap),
@@ -491,7 +642,10 @@ class _NumberAnswerState extends State<NumberAnswer> {
               // exactly as typed and nothing is converted — 38.5 °C does not
               // silently become 101.3 °F, and the record carries whichever
               // unit was chosen alongside the figure.
-              onTap: () => setState(() => _unit = unit),
+              onTap: () => setState(() {
+                _touchedByPatient = true;
+                _unit = unit;
+              }),
             ),
         ],
         const SizedBox(height: Sizes.gap),
@@ -524,12 +678,17 @@ class ScaleAnswer extends StatefulWidget {
     required this.onAnswered,
     this.language = 'en',
     this.onDontKnow,
+    this.suggestion,
   });
 
   final Question question;
   final OnAnswered onAnswered;
   final String language;
   final VoidCallback? onDontKnow;
+
+  /// A suggested score, or `null`. A highlight only, like [SingleChoiceAnswer]
+  /// — one of these buttons is what records an answer, exactly as before.
+  final AnswerValue? suggestion;
 
   @override
   State<ScaleAnswer> createState() => _ScaleAnswerState();
@@ -540,12 +699,17 @@ class _ScaleAnswerState extends State<ScaleAnswer> {
   Widget build(BuildContext context) {
     final min = (widget.question.minimum ?? 0).round();
     final max = (widget.question.maximum ?? 10).round();
+    final suggested = widget.suggestion;
+    final suggestedValue = suggested is ScaleValue ? suggested.value.round() : null;
+    final scheme = Theme.of(context).colorScheme;
     // Numbered buttons rather than a slider. A slider requires a drag, reports
     // a value the patient did not deliberately choose if they nudge it, and is
     // near-unusable with a screen reader or a tremor.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (suggestedValue != null && suggestedValue >= min && suggestedValue <= max)
+          const SuggestionBadge(),
         // A spoken score answers outright, unlike the free-figure questions:
         // the scale is bounded and whole, so "six" either lands on a button
         // that is on screen or is not a match at all.
@@ -582,6 +746,10 @@ class _ScaleAnswerState extends State<ScaleAnswer> {
                     padding: EdgeInsets.zero,
                     minimumSize:
                         const Size(Sizes.minTouchTarget, Sizes.minTouchTarget),
+                    side: BorderSide(
+                      color: value == suggestedValue ? scheme.primary : scheme.outlineVariant,
+                      width: value == suggestedValue ? 2 : 1,
+                    ),
                   ),
                   child: Text('$value'),
                 ),
@@ -600,12 +768,18 @@ class DurationAnswer extends StatefulWidget {
     required this.onAnswered,
     this.language = 'en',
     this.onDontKnow,
+    this.suggestion,
   });
 
   final Question question;
   final OnAnswered onAnswered;
   final String language;
   final VoidCallback? onDontKnow;
+
+  /// A suggested figure and unit, or `null`. Pre-fills both; the patient still
+  /// edits either and still presses Continue, exactly as a voice match already
+  /// requires.
+  final AnswerValue? suggestion;
 
   @override
   State<DurationAnswer> createState() => _DurationAnswerState();
@@ -615,9 +789,32 @@ class _DurationAnswerState extends State<DurationAnswer> {
   final _controller = TextEditingController();
   String _unit = 'day';
 
+  /// True once the patient has changed the figure, the unit, or spoken one.
+  bool _touchedByPatient = false;
+
   /// The units the backend's `_duration_unit` recognises. Anything else would
   /// coerce to a plain quantity and lose the fact that it is a duration.
   static const _units = ['hour', 'day', 'week', 'month', 'year'];
+
+  @override
+  void initState() {
+    super.initState();
+    _applySuggestion(widget.suggestion);
+  }
+
+  @override
+  void didUpdateWidget(DurationAnswer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_touchedByPatient && oldWidget.suggestion != widget.suggestion) {
+      setState(() => _applySuggestion(widget.suggestion));
+    }
+  }
+
+  void _applySuggestion(AnswerValue? suggestion) {
+    if (suggestion is! DurationValue || !_units.contains(suggestion.unit)) return;
+    _controller.text = suggestion.n.round().toString();
+    _unit = suggestion.unit;
+  }
 
   @override
   void dispose() {
@@ -632,6 +829,8 @@ class _DurationAnswerState extends State<DurationAnswer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (widget.suggestion is DurationValue && !_touchedByPatient)
+          const SuggestionBadge(),
         // "three days" sets both halves. A number with no unit is not a
         // duration, so `matchDuration` returns nothing rather than filling the
         // figure and leaving whichever unit happened to be selected standing
@@ -644,6 +843,7 @@ class _DurationAnswerState extends State<DurationAnswer> {
             units: _units,
           ),
           onMatch: (m) => setState(() {
+            _touchedByPatient = true;
             _controller.text = m.number!.round().toString();
             _unit = m.unit!;
           }),
@@ -654,7 +854,7 @@ class _DurationAnswerState extends State<DurationAnswer> {
           controller: _controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: false),
           style: Theme.of(context).textTheme.bodyLarge,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() => _touchedByPatient = true),
         ),
         const SizedBox(height: Sizes.gap),
         for (final unit in _units)
@@ -662,7 +862,10 @@ class _DurationAnswerState extends State<DurationAnswer> {
             key: Key('duration.$unit'),
             label: optionLabel(unit),
             selected: _unit == unit,
-            onTap: () => setState(() => _unit = unit),
+            onTap: () => setState(() {
+              _touchedByPatient = true;
+              _unit = unit;
+            }),
           ),
         const SizedBox(height: Sizes.gap),
         FilledButton(

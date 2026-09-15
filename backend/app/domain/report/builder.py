@@ -54,6 +54,7 @@ from app.domain.report.model import (
     TimelineEntry,
 )
 from app.domain.report.templates import TemplateSet
+from app.domain.ayush_profile import AyushProfileSnapshot
 from app.domain.timeline.model import TimelineSnapshot, TimelineStatus
 
 #: 1.1 adds the DOCUMENT TIMELINE section; 1.2 adds HISTORY TIMELINE.
@@ -165,6 +166,74 @@ def _effective_section(fact: Fact) -> Section:
     if fact.section is DEFAULT_SECTION:
         return section_for(field_id)
     return fact.section
+
+
+def _ayush_lines(
+    profile: AyushProfileSnapshot, labels: FieldLabels
+) -> tuple[ReportLine, ...]:
+    """The AYUSH/Prakriti self-report as lines of the Ayurveda section.
+
+    **Answered fields only**, and in field-id order so the section is
+    byte-stable across reads. A profile is answered in one sitting rather than
+    accumulated across an interview, so the unsettled ones carry none of the
+    meaning they carry for a visit: "not asked" on question 40 of a module the
+    patient closed halfway is not a gap a physician has to finish, and putting
+    sixty such lines under UNRESOLVED would bury the ones that are.
+
+    No `fact_ids` and no `sources`: these are not facts in this intake's
+    record. They come from the patient's profile, which is a different thing
+    with a different lifetime, and claiming a fact id would invite the evidence
+    endpoint to look for a row that does not exist.
+    """
+    lines: list[ReportLine] = []
+    for answer in sorted(profile.answers, key=lambda a: a.field_id):
+        if answer.status != FieldStatus.ANSWERED.value or answer.value is None:
+            continue
+        label = labels(answer.field_id)
+        rendered = _ayush_value(answer.value)
+        if rendered is None:
+            continue
+        text = f"{label}: {rendered}"
+        if answer.original_text:
+            text += " (" + answer.original_text + ")"
+        lines.append(
+            ReportLine(
+                text=text,
+                label=label,
+                value=rendered,
+                field_ids=(answer.field_id,),
+                original_text=answer.original_text,
+                original_language=profile.language,
+            )
+        )
+    return tuple(lines)
+
+
+def _ayush_value(value: object) -> str | None:
+    """A stored answer as display text.
+
+    Deliberately literal. A coded answer prints its code where no label was
+    found rather than a prettified guess, for the reason the rest of this
+    module gives: a report that improves on what it was given is a report that
+    says something nobody said.
+    """
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, (int, float, str)):
+        return str(value)
+    if isinstance(value, list):
+        parts = [_ayush_value(item) for item in value]
+        kept = [p for p in parts if p]
+        return ", ".join(kept) if kept else None
+    if isinstance(value, dict):
+        # `{"n": 3, "unit": "day"}` and friends — the shapes `AnswerValue`
+        # produces. Rendered as the pair they are, not flattened to a number.
+        n, unit = value.get("n"), value.get("unit")
+        if n is not None and unit:
+            return f"{n} {unit}"
+        code = value.get("value")
+        return str(code) if code is not None else None
+    return None
 
 
 def _line_for(fact: Fact, templates: TemplateSet, labels: FieldLabels) -> ReportLine:
@@ -469,6 +538,7 @@ def build(
     extractions: Sequence[DocumentExtraction] = (),
     interactions: Sequence[InteractionFinding] = (),
     timeline: TimelineSnapshot | None = None,
+    ayush_profile: AyushProfileSnapshot | None = None,
     labels: FieldLabels = DEFAULT_LABELS,
     demo: bool = False,
 ) -> PhysicianReport:
@@ -495,6 +565,13 @@ def build(
         ]
         lines = [_line_for(f, templates, labels) for f in _sort_facts(answered)]
         lines.extend(document_lines.get(section, ()))
+        # The patient-level module, which has no facts in this intake's record
+        # and so cannot arrive through `voice`. Appended rather than given a
+        # section of its own: a Vaidya reading AYURVEDA wants the constitution
+        # and today's answers in one place, and two adjacent sections with
+        # similar titles is how a reader learns to skip one.
+        if section is Section.AYURVEDA and ayush_profile is not None:
+            lines.extend(_ayush_lines(ayush_profile, labels))
         sections.append(
             ReportSection(
                 section=section, title=templates.title(section), lines=tuple(lines)

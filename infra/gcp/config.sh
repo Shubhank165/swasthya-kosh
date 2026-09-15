@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared settings and helpers for the deployment scripts. Sourced, not run.
 #
-# Everything is `asia-south1`. Not as a default — as a constraint. Patient data
+# Everything is `asia-south1`. Not as a default â€” as a constraint. Patient data
 # for an Indian hospital stays in India, which means the database, the bucket,
 # the queue, both Cloud Run services and the model endpoint are all in region,
 # and there is no variable here that lets one of them quietly not be.
@@ -42,7 +42,7 @@ SQL_USER="${SQL_USER:-medikiosk}"
 #
 # `db-g1-small` is a shared-core tier at roughly a third the price of the
 # dedicated-core `db-custom-1-3840` this used to default to, and it is ample for
-# an OPD's intake volume — the workload is a few hundred small writes a day, not
+# an OPD's intake volume â€” the workload is a few hundred small writes a day, not
 # a transaction system. Raise it for a real deployment; the knob is here so that
 # is a decision somebody makes rather than a default nobody read.
 SQL_TIER="${SQL_TIER:-db-g1-small}"
@@ -71,8 +71,8 @@ PUBSUB_SA="medikiosk-pubsub@${PROJECT_ID}.iam.gserviceaccount.com"
 SECRET_DATABASE_URL="${SECRET_DATABASE_URL:-medikiosk-database-url}"
 SECRET_KIOSK_TOKENS="${SECRET_KIOSK_TOKENS:-medikiosk-kiosk-tokens}"
 SECRET_PUSH_TOKEN="${SECRET_PUSH_TOKEN:-medikiosk-pubsub-push-token}"
-# The pepper for patient phone references (2/3 §7.1). Without it the backend
-# refuses to issue a patient session at all — a stored HMAC with no pepper is a
+# The pepper for patient phone references (2/3 Â§7.1). Without it the backend
+# refuses to issue a patient session at all â€” a stored HMAC with no pepper is a
 # plain digest of a ten-digit number, and a ten-digit space is a rainbow table.
 # Generated at provision time and never printed, unlike the kiosk tokens, which
 # have to be typed into devices.
@@ -96,7 +96,7 @@ DEPLOY_ENVIRONMENT="${DEPLOY_ENVIRONMENT:-production}"
 # default is a deployment nobody decided to make.
 #
 # There is no model id here. `OCR_MODEL_ID` and `REPAIR_MODEL_ID` are supplied
-# at deploy time and refused if missing — the same rule as everywhere else in
+# at deploy time and refused if missing â€” the same rule as everywhere else in
 # this repository: a model is configuration, not a literal, so changing one is a
 # deployment change with a name on it rather than a commit.
 OCR_PROVIDER="${OCR_PROVIDER:-mock}"
@@ -142,7 +142,7 @@ say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 skip() { printf '    (exists) %s\n' "$*"; }
 made() { printf '    created  %s\n' "$*"; }
 
-# `exists <describe command...>` — true when the resource is already there.
+# `exists <describe command...>` â€” true when the resource is already there.
 # Every create in these scripts is wrapped in one, which is what makes running
 # any script twice safe. A half-finished provision is the normal case, not the
 # exceptional one: quotas, org policies and permissions all fail partway.

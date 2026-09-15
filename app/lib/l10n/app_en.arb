@@ -145,6 +145,10 @@
   "@somethingElse": {
     "description": ""
   },
+  "suggestedAnswer": "Based on what you told us",
+  "@suggestedAnswer": {
+    "description": "Shown above a question's answer options when a value is pre-filled from something the patient said in an earlier free-text answer. The suggestion is never recorded until the patient confirms it themselves."
+  },
   "sectionProgress": "Section {done} of {total}",
   "@sectionProgress": {
     "description": "",
@@ -159,6 +163,34 @@
   },
   "ayurvedaTitle": "A few questions about your daily routine",
   "@ayurvedaTitle": {
+    "description": ""
+  },
+  "ayushIntro": "A few optional questions about your daily habits and how you generally feel — not about today's problem. Your Vaidya reviews your answers; the app does not diagnose anything from them.",
+  "@ayushIntro": {
+    "description": "Explanation shown before the standalone, optional Ayurveda self-report reachable from the home screen."
+  },
+  "ayushProgress": "Question {done} of {total}",
+  "@ayushProgress": {
+    "description": "Progress counter on the standalone Ayurveda self-report screen.",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "ayushCompletedTitle": "Already shared",
+  "@ayushCompletedTitle": {
+    "description": ""
+  },
+  "ayushCompletedBody": "You've already answered these. Your Vaidya can see them — you can update them any time.",
+  "@ayushCompletedBody": {
+    "description": ""
+  },
+  "ayushRedo": "Update my answers",
+  "@ayushRedo": {
     "description": ""
   },
   "documentsTitle": "Old prescriptions and reports",

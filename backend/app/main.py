@@ -27,6 +27,7 @@ from app.api.v1 import (
     kiosk,
     patient_auth,
     patients,
+    prefill,
     realtime,
     terminology,
     worker,
@@ -181,6 +182,7 @@ def create_app() -> FastAPI:
     app.include_router(intakes.router, prefix=prefix)
     app.include_router(documents.router, prefix=prefix)
     app.include_router(documents.content_router, prefix=prefix)
+    app.include_router(prefill.router, prefix=prefix)
     app.include_router(patients.router, prefix=prefix)
     app.include_router(worklist_api.router, prefix=prefix)
     app.include_router(consent.router, prefix=prefix)

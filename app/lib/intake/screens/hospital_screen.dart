@@ -10,6 +10,7 @@ import '../../l10n/strings.dart';
 import '../../identity/abha_screen.dart';
 import '../begin.dart';
 import '../widgets/answer_widgets.dart';
+import '../../voice/read_aloud_button.dart';
 
 class HospitalScreen extends ConsumerWidget {
   const HospitalScreen({super.key});
@@ -20,6 +21,7 @@ class HospitalScreen extends ConsumerWidget {
     final hospitals = ref.watch(hospitalsProvider);
     final chosen = ref.watch(selectedHospitalProvider);
     final department = ref.watch(selectedDepartmentProvider);
+    final language = ref.watch(languageProvider);
 
     return Scaffold(
       // Continue appears only once both are picked, and leads to consent —
@@ -66,7 +68,29 @@ class HospitalScreen extends ConsumerWidget {
           ),
           data: (list) => ListView(
             padding: const EdgeInsets.all(Sizes.gutter),
-            children: chosen == null
+            children: [
+              // The hardest words in the app to read are on this screen, and it
+              // was the only question screen without a voice. A patient who
+              // chose a script they cannot read reached the one page that
+              // routes them to a doctor and got no help with it.
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: ReadAloudButton(
+                  utteranceKey: chosen == null ? 'screen.hospital' : 'screen.department',
+                  text: [
+                    chosen == null
+                        ? strings.chooseHospital
+                        : strings.chooseDepartment,
+                    if (chosen == null)
+                      for (final hospital in list) hospital.displayName
+                    else
+                      for (final department in chosen.departments) department.display,
+                  ].join('. '),
+                  language: language,
+                ),
+              ),
+              const SizedBox(height: Sizes.gap),
+              ...chosen == null
                 ? [
                     for (final hospital in list)
                       OptionTile(
@@ -101,6 +125,7 @@ class HospitalScreen extends ConsumerWidget {
                             .state = department.code,
                       ),
                   ],
+            ],
           ),
         ),
       ),

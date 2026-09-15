@@ -39,6 +39,7 @@ from app.domain.report.builder import FieldLabels
 from app.domain.report.model import PhysicianReport, ReportBundle
 from app.domain.report.templates import TemplateRegistry
 from app.domain.timeline.fallback import deterministic_timeline
+from app.domain.ayush_profile import AyushProfileSnapshot
 from app.domain.timeline.model import TimelineSnapshot
 from app.events.bus import EventBus
 from app.events.schemas import Event, EventName
@@ -46,6 +47,7 @@ from app.repositories.consent import AuditRepository, ReportRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.intakes import IntakeRepository
 from app.repositories.patients import PatientLinkRepository
+from app.repositories.ayush_profiles import AyushProfileRepository, snapshot_of
 from app.services.timeline import TimelineService
 
 logger = get_logger(__name__)
@@ -70,6 +72,7 @@ class ReportService:
         ids: IdFactory,
         links: PatientLinkRepository | None = None,
         timeline: TimelineService | None = None,
+        ayush_profiles: AyushProfileRepository | None = None,
         max_prior_intakes: int = 5,
         facility_timezone: str = "Asia/Kolkata",
         demo: bool = False,
@@ -87,6 +90,7 @@ class ReportService:
         self._ids = ids
         self._links = links
         self._timeline = timeline
+        self._ayush_profiles = ayush_profiles
         self._max_prior_intakes = max_prior_intakes
         self._timezone = facility_timezone
         self._demo = demo
@@ -141,6 +145,49 @@ class ReportService:
             record, prior=prior, extractions=extractions, language=language
         )
 
+    async def _ayush_profile_for(
+        self, record: CanonicalRecord
+    ) -> AyushProfileSnapshot | None:
+        """The patient's AYUSH module answers, if they have filled it.
+
+        **This is where the reading happens, and it happens here on purpose.**
+        The builder is pure and byte-deterministic — that is what lets the
+        golden files hold it true — so it is handed a finished value and never
+        a repository, exactly as `_timeline_for` hands it a `TimelineSnapshot`.
+
+        `None` on three paths that mean different things to nobody downstream:
+        no repository configured, a guest with no patient reference, or a
+        patient who has not filled the module. All three render as an Ayurveda
+        section without profile lines, which is what "we do not have this" looks
+        like.
+
+        A guest is excluded rather than looked up. `guest` is not an identity —
+        it is the absence of one — so expanding it through the link table would
+        match every other guest at this hospital and hand one patient's
+        constitution to another.
+        """
+        if self._ayush_profiles is None:
+            return None
+        ref = record.patient_ref
+        if ref is None or not ref.value or ref.type is PatientRefType.GUEST:
+            return None
+        # Expanded through the link table, exactly as `_prior_records` does.
+        # The profile is filed under whichever reference the patient's session
+        # carried — `phone`, today — and this visit may be filed under another.
+        # Matching on the visit's reference alone would leave a profile that
+        # exists, belongs to this patient, and is invisible on their report.
+        refs: tuple[tuple[str, str], ...] = ((ref.type.value, ref.value),)
+        if self._links is not None:
+            refs = await self._links.aliases_for(
+                hospital_id=record.hospital_id,
+                ref_type=ref.type.value,
+                ref_value=ref.value,
+            )
+        row = await self._ayush_profiles.current_for_refs(
+            hospital_id=record.hospital_id, refs=refs
+        )
+        return snapshot_of(row)
+
     async def _prior_records(self, record: CanonicalRecord) -> list[CanonicalRecord]:
         ref = record.patient_ref
         if self._links is None or ref.value is None or ref.type is PatientRefType.GUEST:
@@ -177,6 +224,7 @@ class ReportService:
         )
         interactions = self._interactions_for(record, extractions)
         timeline = await self._timeline_for(record, extractions, templates.language)
+        ayush_profile = await self._ayush_profile_for(record)
 
         report = builder.build(
             record,
@@ -184,6 +232,7 @@ class ReportService:
             extractions=extractions,
             interactions=interactions,
             timeline=timeline,
+            ayush_profile=ayush_profile,
             labels=self._labels,
             demo=self._demo,
         )

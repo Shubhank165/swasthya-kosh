@@ -39,126 +39,420 @@
 version: 1
 
 questions:
-  - id: ayush.appetite
+  - id: ayush.marital_status
     answer_type: single_select
-    # Agni — asked again on a return visit. See `current_state` above.
-    current_state: true
-    extracts: [ayush.appetite]
-    priority: 8
-    burden: 1
-    options: [poor, variable, normal, excessive]
-
-  # The evidence a practitioner assesses agni from. Multi-select because these
-  # co-occur and because making somebody pick the single worst of them throws
-  # away the pattern.
-  - id: ayush.after_eating
-    answer_type: multi_select
-    extracts: [ayush.after_eating]
-    priority: 8
-    burden: 2
-    options: [comfortable, heaviness, bloating, burning, sleepiness, pain, nausea]
-
-  - id: ayush.bowel_habit
-    answer_type: single_select
-    # Koshtha — asked again on a return visit. See `current_state` above.
-    current_state: true
-    extracts: [ayush.bowel_habit]
-    priority: 8
-    burden: 1
-    options: [once_daily, twice_daily, alternate_days, irregular, constipated, loose]
-
-  - id: ayush.urine_pattern
-    answer_type: single_select
-    extracts: [ayush.urine_pattern]
-    priority: 6
-    burden: 1
-    options: [normal, frequent, scanty, burning, night_only]
-
-  - id: ayush.sleep_quality
-    answer_type: single_select
-    # Nidra — asked again on a return visit. See `current_state` above.
-    current_state: true
-    extracts: [ayush.sleep_quality]
-    priority: 8
-    burden: 1
-    options: [sound, disturbed, difficulty_falling_asleep, wakes_early, excessive]
-
-  - id: ayush.diet_type
-    answer_type: single_select
-    extracts: [ayush.diet_type]
-    priority: 6
-    burden: 1
-    options: [vegetarian, eggetarian, non_vegetarian, vegan, mixed]
-
-  - id: ayush.meal_regularity
-    answer_type: single_select
-    extracts: [ayush.meal_regularity]
-    priority: 7
-    burden: 1
-    options: [regular, mostly_regular, irregular, often_skipped]
-
-  # Tastes, in ordinary words. The six rasas are named here as flavours a
-  # patient recognises on their plate, which is what they are — not as a
-  # framework the patient is asked to place themselves in.
-  - id: ayush.food_preferences
-    answer_type: multi_select
-    extracts: [ayush.food_preferences]
-    priority: 6
-    burden: 2
-    options:
-      - sweet
-      - sour
-      - salty
-      - pungent
-      - bitter
-      - astringent
-      - prefers_hot
-      - prefers_cold
-      - no_preference
-
-  - id: ayush.thirst
-    answer_type: single_select
-    extracts: [ayush.thirst]
-    priority: 6
-    burden: 1
-    options: [little, normal, excessive]
-
-  - id: ayush.sweating
-    answer_type: single_select
-    extracts: [ayush.sweating]
-    priority: 6
-    burden: 1
-    options: [little, normal, profuse, night_sweats]
-
-  - id: ayush.daily_routine
-    answer_type: free_text
-    extracts: [ayush.daily_routine]
-    priority: 6
-    burden: 3
-
-  - id: ayush.physical_activity
-    answer_type: single_select
-    extracts: [ayush.physical_activity]
-    priority: 6
-    burden: 1
-    options: [sedentary, light, moderate, heavy_labour, regular_exercise]
-
-  - id: ayush.stress
-    answer_type: single_select
-    extracts: [ayush.stress]
-    priority: 7
-    burden: 1
-    options: [none, mild, moderate, severe]
-
-  - id: ayush.environment
-    answer_type: free_text
-    extracts: [ayush.environment]
-    priority: 5
-    burden: 2
-
-  - id: ayush.energy_through_day
-    answer_type: single_select
-    extracts: [ayush.energy_through_day]
+    extracts: [ayush.marital_status]
     priority: 5
     burden: 1
-    options: [morning_best, afternoon_best, evening_best, no_pattern]
+    options: [married, unmarried, divorcee, widowed]
+
+  - id: ayush.occupation
+    answer_type: single_select
+    extracts: [ayush.occupation]
+    priority: 5
+    burden: 1
+    options: [desk_work, field_work, homemaker, student, other]
+
+  - id: ayush.religion
+    answer_type: single_select
+    extracts: [ayush.religion]
+    priority: 5
+    burden: 1
+    options: [hindu, muslim, christian, sikh, buddhist, jain, other]
+
+  - id: ayush.diet
+    answer_type: single_select
+    extracts: [ayush.diet]
+    priority: 5
+    burden: 1
+    options: [vegetarian_diet, mixed_diet]
+
+  - id: ayush.addictions
+    answer_type: multi_select
+    extracts: [ayush.addictions]
+    priority: 5
+    burden: 2
+    options: [alcohol, tea_or_coffee, chewing_pan, smoking, tobacco, none]
+
+  - id: ayush.family_type
+    answer_type: single_select
+    extracts: [ayush.family_type]
+    priority: 5
+    burden: 1
+    options: [nuclear_family, joint_family]
+
+  - id: ayush.family_members_count
+    answer_type: numeric
+    extracts: [ayush.family_members_count]
+    priority: 5
+    burden: 1
+    unit: members
+
+  - id: ayush.family_income
+    answer_type: single_select
+    extracts: [ayush.family_income]
+    priority: 5
+    burden: 1
+    options: [income_below_1l, income_1l_to_3l, income_3l_to_5l, income_5l_to_10l, income_above_10l]
+
+  - id: ayush.weight_confounder
+    answer_type: boolean
+    extracts: [ayush.weight_confounder]
+    priority: 5
+    burden: 1
+
+  - id: ayush.prominent_tendons_veins
+    answer_type: single_select
+    extracts: [ayush.prominent_tendons_veins]
+    priority: 5
+    burden: 1
+    options: [veins_present, veins_absent]
+
+  - id: ayush.broad_forehead
+    answer_type: single_select
+    extracts: [ayush.broad_forehead]
+    priority: 5
+    burden: 1
+    options: [forehead_gt_4_angula, forehead_le_4_angula]
+
+  - id: ayush.skin_colour
+    answer_type: single_select
+    extracts: [ayush.skin_colour]
+    priority: 5
+    burden: 1
+    options: [skin_gaur_fair, skin_krishna_dark, skin_dhusara_dusky, skin_gaur_pitanga]
+
+  - id: ayush.skin_texture
+    answer_type: multi_select
+    extracts: [ayush.skin_texture]
+    priority: 5
+    burden: 2
+    options: [skin_rukshanga_dry, skin_sphutitanga_cracking, skin_prasanna_snigdhanga_smooth, none]
+
+  - id: ayush.moles_freckles
+    answer_type: single_select
+    extracts: [ayush.moles_freckles]
+    priority: 5
+    burden: 1
+    options: [marks_present, marks_absent]
+
+  - id: ayush.early_wrinkles
+    answer_type: boolean
+    extracts: [ayush.early_wrinkles]
+    priority: 5
+    burden: 1
+
+  - id: ayush.skin_temperature
+    answer_type: single_select
+    extracts: [ayush.skin_temperature]
+    priority: 5
+    burden: 1
+    options: [skin_warmer, skin_colder, skin_temp_normal]
+
+  - id: ayush.joint_sounds
+    answer_type: boolean
+    extracts: [ayush.joint_sounds]
+    priority: 5
+    burden: 1
+
+  - id: ayush.eye_roughness_dryness
+    answer_type: boolean
+    extracts: [ayush.eye_roughness_dryness]
+    priority: 5
+    burden: 1
+
+  - id: ayush.eye_irritation
+    answer_type: boolean
+    extracts: [ayush.eye_irritation]
+    priority: 5
+    burden: 1
+
+  - id: ayush.eye_fatigue
+    answer_type: boolean
+    extracts: [ayush.eye_fatigue]
+    priority: 5
+    burden: 1
+
+  - id: ayush.eye_blinking
+    answer_type: boolean
+    extracts: [ayush.eye_blinking]
+    priority: 5
+    burden: 1
+
+  - id: ayush.eyelashes
+    answer_type: single_select
+    extracts: [ayush.eyelashes]
+    priority: 5
+    burden: 1
+    options: [lashes_thin_few, lashes_thick_dense, lashes_medium]
+
+  - id: ayush.eyes_redden
+    answer_type: boolean
+    extracts: [ayush.eyes_redden]
+    priority: 5
+    burden: 1
+
+  - id: ayush.body_hair_texture
+    answer_type: multi_select
+    extracts: [ayush.body_hair_texture]
+    priority: 5
+    burden: 2
+    options: [hair_rough, hair_dry, hair_split_ends, hair_oily, hair_soft]
+
+  - id: ayush.hair_curly
+    answer_type: boolean
+    extracts: [ayush.hair_curly]
+    priority: 5
+    burden: 1
+
+  - id: ayush.hair_density
+    answer_type: single_select
+    extracts: [ayush.hair_density]
+    priority: 5
+    burden: 1
+    options: [hair_scanty, hair_dense, hair_medium]
+
+  - id: ayush.hair_colour
+    answer_type: single_select
+    extracts: [ayush.hair_colour]
+    priority: 5
+    burden: 1
+    options: [hair_dhusar_dusky, hair_kapil_reddish_brown, hair_shyam_black]
+
+  - id: ayush.premature_greying
+    answer_type: boolean
+    extracts: [ayush.premature_greying]
+    priority: 5
+    burden: 1
+
+  - id: ayush.early_hair_loss
+    answer_type: boolean
+    extracts: [ayush.early_hair_loss]
+    priority: 5
+    burden: 1
+
+  - id: ayush.meal_frequency
+    answer_type: single_select
+    extracts: [ayush.meal_frequency]
+    priority: 5
+    burden: 1
+    options: [meals_2main_3snacks, meals_3main_2snacks, none]
+
+  - id: ayush.food_quantity
+    answer_type: single_select
+    extracts: [ayush.food_quantity]
+    priority: 5
+    burden: 1
+    options: [food_qty_less, food_qty_average, food_qty_more]
+
+  - id: ayush.skip_meal_tolerance
+    answer_type: single_select
+    extracts: [ayush.skip_meal_tolerance]
+    priority: 5
+    burden: 1
+    options: [tolerate_can, tolerate_cannot, tolerate_varies]
+
+  - id: ayush.eating_order_with_others
+    answer_type: single_select
+    extracts: [ayush.eating_order_with_others]
+    priority: 5
+    burden: 1
+    options: [eat_before_others, eat_at_par, eat_last]
+
+  - id: ayush.thirst_response
+    answer_type: single_select
+    extracts: [ayush.thirst_response]
+    priority: 5
+    burden: 1
+    options: [thirst_search_now, thirst_wait]
+
+  - id: ayush.water_quantity_per_day
+    answer_type: single_select
+    extracts: [ayush.water_quantity_per_day]
+    priority: 5
+    burden: 1
+    options: [water_lt_1l, water_1_2l, water_gt_2l]
+
+  - id: ayush.water_frequency_per_day
+    answer_type: single_select
+    extracts: [ayush.water_frequency_per_day]
+    priority: 5
+    burden: 1
+    options: [water_freq_le4, water_freq_5_7, water_freq_gt7]
+
+  - id: ayush.stool_quantity
+    answer_type: single_select
+    extracts: [ayush.stool_quantity]
+    priority: 5
+    burden: 1
+    options: [stool_adequate, stool_less]
+
+  - id: ayush.easy_bowel_movement
+    answer_type: single_select
+    extracts: [ayush.easy_bowel_movement]
+    priority: 5
+    burden: 1
+    options: [rarely, sometimes, often]
+
+  - id: ayush.sweating_on_exertion
+    answer_type: single_select
+    extracts: [ayush.sweating_on_exertion]
+    priority: 5
+    burden: 1
+    options: [sweat_profuse2, sweat_medium, sweat_scanty2]
+
+  - id: ayush.body_odour
+    answer_type: single_select
+    extracts: [ayush.body_odour]
+    priority: 5
+    burden: 1
+    options: [odour_strong, odour_mild]
+
+  - id: ayush.told_about_body_odour
+    answer_type: boolean
+    extracts: [ayush.told_about_body_odour]
+    priority: 5
+    burden: 1
+
+  - id: ayush.light_sleeper
+    answer_type: single_select
+    extracts: [ayush.light_sleeper]
+    priority: 5
+    burden: 1
+    options: [rarely, sometimes, often]
+
+  - id: ayush.sleep_hours
+    answer_type: single_select
+    extracts: [ayush.sleep_hours]
+    priority: 5
+    burden: 1
+    options: [sleep_lt6h, sleep_6_8h, sleep_gt8h]
+
+  - id: ayush.dreams_recalled
+    answer_type: boolean
+    extracts: [ayush.dreams_recalled]
+    priority: 5
+    burden: 1
+
+  - id: ayush.decision_reversal
+    answer_type: single_select
+    extracts: [ayush.decision_reversal]
+    priority: 5
+    burden: 1
+    options: [rarely, sometimes, often]
+
+  - id: ayush.comprehension_test_variant
+    answer_type: single_select
+    extracts: [ayush.comprehension_test_variant]
+    priority: 5
+    burden: 1
+    options: [booklet_a, booklet_b]
+
+  - id: ayush.recall_test_variant
+    answer_type: single_select
+    extracts: [ayush.recall_test_variant]
+    priority: 5
+    burden: 1
+    options: [recite_a, recite_b]
+
+  - id: ayush.relationships_last_long
+    answer_type: single_select
+    extracts: [ayush.relationships_last_long]
+    priority: 5
+    burden: 1
+    options: [rarely, sometimes, often]
+
+  - id: ayush.pictures_test_variant
+    answer_type: single_select
+    extracts: [ayush.pictures_test_variant]
+    priority: 5
+    burden: 1
+    options: [pictures_a, pictures_b]
+
+  - id: ayush.problem_figures_test_variant
+    answer_type: single_select
+    extracts: [ayush.problem_figures_test_variant]
+    priority: 5
+    burden: 1
+    options: [problem_figures_a, problem_figures_b]
+
+  - id: ayush.shapes_test_variant
+    answer_type: single_select
+    extracts: [ayush.shapes_test_variant]
+    priority: 5
+    burden: 1
+    options: [shapes_a, shapes_b]
+
+  - id: ayush.reaction_to_queue_jumping
+    answer_type: single_select
+    extracts: [ayush.reaction_to_queue_jumping]
+    priority: 5
+    burden: 1
+    options: [queue_ignore_calm, queue_argue_shout, queue_angry_then_calm]
+
+  - id: ayush.family_opinion_temperament
+    answer_type: single_select
+    extracts: [ayush.family_opinion_temperament]
+    priority: 5
+    burden: 1
+    options: [temper_usually_calm, temper_short_tempered, temper_angry_then_calm]
+
+  - id: ayush.talkative
+    answer_type: boolean
+    extracts: [ayush.talkative]
+    priority: 5
+    burden: 1
+
+  - id: ayush.soft_spoken
+    answer_type: boolean
+    extracts: [ayush.soft_spoken]
+    priority: 5
+    burden: 1
+
+  - id: ayush.profound_orator
+    answer_type: single_select
+    extracts: [ayush.profound_orator]
+    priority: 5
+    burden: 1
+    options: [rarely, sometimes, often]
+
+  - id: ayush.dominant_in_discussion
+    answer_type: single_select
+    extracts: [ayush.dominant_in_discussion]
+    priority: 5
+    burden: 1
+    options: [rarely, sometimes, often]
+
+  - id: ayush.stands_by_values
+    answer_type: single_select
+    extracts: [ayush.stands_by_values]
+    priority: 5
+    burden: 1
+    options: [rarely, sometimes, often]
+
+  - id: ayush.adversity_response
+    answer_type: single_select
+    extracts: [ayush.adversity_response]
+    priority: 5
+    burden: 1
+    options: [adversity_run_away, adversity_panic, adversity_face_bravely]
+
+  - id: ayush.food_temperature_preference
+    answer_type: single_select
+    extracts: [ayush.food_temperature_preference]
+    priority: 5
+    burden: 1
+    options: [food_cold_over_hot, food_hot_over_cold, food_temp_no_preference]
+
+  - id: ayush.unresolved_grudges
+    answer_type: boolean
+    extracts: [ayush.unresolved_grudges]
+    priority: 5
+    burden: 1
+
+  - id: ayush.polite_under_stress
+    answer_type: single_select
+    extracts: [ayush.polite_under_stress]
+    priority: 5
+    burden: 1
+    options: [rarely, sometimes, often]

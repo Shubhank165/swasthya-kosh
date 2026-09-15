@@ -85,7 +85,7 @@ ThemeData buildTheme() {
       border: OutlineInputBorder(),
       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),

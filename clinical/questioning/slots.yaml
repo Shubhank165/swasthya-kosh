@@ -442,97 +442,362 @@ general:
 # patient to classify anything.
 
 ayush:
-  - id: ayush.appetite
-    description: Appetite as the patient experiences it
+  - id: ayush.marital_status
+    description: "Marital status"
     data_type: code
-    allowed_values: [poor, variable, normal, excessive]
-    priority: 8
-    required: true
-
-  - id: ayush.after_eating
-    description: What the patient usually feels after a full meal
-    data_type: code_set
-    allowed_values: [comfortable, heaviness, bloating, burning, sleepiness, pain, nausea]
-    priority: 8
-    required: true
-
-  - id: ayush.bowel_habit
-    description: Usual bowel pattern, on a normal day
-    data_type: code
-    allowed_values: [once_daily, twice_daily, alternate_days, irregular, constipated, loose]
-    priority: 8
-    required: true
-
-  - id: ayush.urine_pattern
-    description: Usual urination on a normal day
-    data_type: code
-    allowed_values: [normal, frequent, scanty, burning, night_only]
-    priority: 6
-
-  - id: ayush.sleep_quality
-    description: Usual sleep, on a normal night
-    data_type: code
-    allowed_values: [sound, disturbed, difficulty_falling_asleep, wakes_early, excessive]
-    priority: 8
-    required: true
-
-  - id: ayush.diet_type
-    description: Usual diet
-    data_type: code
-    allowed_values: [vegetarian, eggetarian, non_vegetarian, vegan, mixed]
-    priority: 6
-
-  - id: ayush.meal_regularity
-    description: Whether meals are at regular times
-    data_type: code
-    allowed_values: [regular, mostly_regular, irregular, often_skipped]
-    priority: 7
-
-  - id: ayush.food_preferences
-    description: Tastes and temperatures the patient is drawn to or avoids
-    data_type: code_set
-    allowed_values:
-      [sweet, sour, salty, pungent, bitter, astringent, prefers_hot, prefers_cold, no_preference]
-    priority: 6
-
-  - id: ayush.thirst
-    description: How much the patient drinks, and whether they feel thirsty
-    data_type: code
-    allowed_values: [little, normal, excessive]
-    priority: 6
-
-  - id: ayush.sweating
-    description: How much the patient sweats compared with usual
-    data_type: code
-    allowed_values: [little, normal, profuse, night_sweats]
-    priority: 6
-
-  - id: ayush.daily_routine
-    description: Shape of a usual day — work, waking and sleeping times
-    data_type: text
-    priority: 6
-
-  - id: ayush.physical_activity
-    description: How much the patient moves in a usual day
-    data_type: code
-    allowed_values: [sedentary, light, moderate, heavy_labour, regular_exercise]
-    priority: 6
-
-  - id: ayush.stress
-    description: How much strain the patient feels day to day
-    data_type: code
-    allowed_values: [none, mild, moderate, severe]
-    priority: 7
-
-  - id: ayush.environment
-    description: Anything in surroundings or work that seems to affect it
-    data_type: text
+    allowed_values: [married, unmarried, divorcee, widowed]
     priority: 5
 
-  - id: ayush.energy_through_day
-    description: When during the day the patient feels most and least well
+  - id: ayush.occupation
+    description: "Occupation"
     data_type: code
-    allowed_values: [morning_best, afternoon_best, evening_best, no_pattern]
+    allowed_values: [desk_work, field_work, homemaker, student, other]
+    priority: 5
+
+  - id: ayush.religion
+    description: "Religion (option list not visible in the source form — best-guess standard census\
+  \ categories, pending confirmation)"
+    data_type: code
+    allowed_values: [hindu, muslim, christian, sikh, buddhist, jain, other]
+    priority: 5
+
+  - id: ayush.diet
+    description: "Diet"
+    data_type: code
+    allowed_values: [vegetarian_diet, mixed_diet]
+    priority: 5
+
+  - id: ayush.addictions
+    description: "Addictions/habits (multi-select)"
+    data_type: code_set
+    allowed_values: [alcohol, tea_or_coffee, chewing_pan, smoking, tobacco, none]
+    priority: 5
+
+  - id: ayush.family_type
+    description: "Type of family"
+    data_type: code
+    allowed_values: [nuclear_family, joint_family]
+    priority: 5
+
+  - id: ayush.family_members_count
+    description: "Total number of family members"
+    data_type: number
+    priority: 5
+
+  - id: ayush.family_income
+    description: "Total income of the family per annum (option list not visible in the source form\
+  \ — best-guess standard slabs, pending confirmation)"
+    data_type: code
+    allowed_values: [income_below_1l, income_1l_to_3l, income_3l_to_5l, income_5l_to_10l, income_above_10l]
+    priority: 5
+
+  - id: ayush.weight_confounder
+    description: "Whether any confounder affecting the participant's weight is present"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.prominent_tendons_veins
+    description: "Prominent tendons and veins"
+    data_type: code
+    allowed_values: [veins_present, veins_absent]
+    priority: 5
+
+  - id: ayush.broad_forehead
+    description: "Broad forehead"
+    data_type: code
+    allowed_values: [forehead_gt_4_angula, forehead_le_4_angula]
+    priority: 5
+
+  - id: ayush.skin_colour
+    description: "Skin colour"
+    data_type: code
+    allowed_values: [skin_gaur_fair, skin_krishna_dark, skin_dhusara_dusky, skin_gaur_pitanga]
+    priority: 5
+
+  - id: ayush.skin_texture
+    description: "Skin texture (multi-select)"
+    data_type: code_set
+    allowed_values: [skin_rukshanga_dry, skin_sphutitanga_cracking, skin_prasanna_snigdhanga_smooth, none]
+    priority: 5
+
+  - id: ayush.moles_freckles
+    description: "Moles, chloasma, freckles"
+    data_type: code
+    allowed_values: [marks_present, marks_absent]
+    priority: 5
+
+  - id: ayush.early_wrinkles
+    description: "Early appearance of wrinkles"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.skin_temperature
+    description: "Skin temperature at dorsal hand/forehead"
+    data_type: code
+    allowed_values: [skin_warmer, skin_colder, skin_temp_normal]
+    priority: 5
+
+  - id: ayush.joint_sounds
+    description: "Sound in knee/ankle/toes/shoulder on normal movement"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.eye_roughness_dryness
+    description: "Eyes: roughness/dryness (18.1)"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.eye_irritation
+    description: "Eyes: irritation (18.2)"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.eye_fatigue
+    description: "Eyes: fatigue (18.3)"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.eye_blinking
+    description: "Eyes: frequent blinking (18.4)"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.eyelashes
+    description: "Eyelashes"
+    data_type: code
+    allowed_values: [lashes_thin_few, lashes_thick_dense, lashes_medium]
+    priority: 5
+
+  - id: ayush.eyes_redden
+    description: "Eyes redden with anger/alcohol/sunlight"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.body_hair_texture
+    description: "Quality/texture of body hair (multi-select; source form groups rough/dry/split-ends\
+  \ OR oily/soft)"
+    data_type: code_set
+    allowed_values: [hair_rough, hair_dry, hair_split_ends, hair_oily, hair_soft]
+    priority: 5
+
+  - id: ayush.hair_curly
+    description: "Hair appearance - curly hair"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.hair_density
+    description: "Hair density"
+    data_type: code
+    allowed_values: [hair_scanty, hair_dense, hair_medium]
+    priority: 5
+
+  - id: ayush.hair_colour
+    description: "Hair colour before greying, if dyed"
+    data_type: code
+    allowed_values: [hair_dhusar_dusky, hair_kapil_reddish_brown, hair_shyam_black]
+    priority: 5
+
+  - id: ayush.premature_greying
+    description: "Premature greying (25.1)"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.early_hair_loss
+    description: "Early hair loss/baldness (25.2)"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.meal_frequency
+    description: "Meals and refreshments per day"
+    data_type: code
+    allowed_values: [meals_2main_3snacks, meals_3main_2snacks, none]
+    priority: 5
+
+  - id: ayush.food_quantity
+    description: "Quantity of food per day"
+    data_type: code
+    allowed_values: [food_qty_less, food_qty_average, food_qty_more]
+    priority: 5
+
+  - id: ayush.skip_meal_tolerance
+    description: "Tolerance to skipping a meal"
+    data_type: code
+    allowed_values: [tolerate_can, tolerate_cannot, tolerate_varies]
+    priority: 5
+
+  - id: ayush.eating_order_with_others
+    description: "Order of finishing a meal with friends/family"
+    data_type: code
+    allowed_values: [eat_before_others, eat_at_par, eat_last]
+    priority: 5
+
+  - id: ayush.thirst_response
+    description: "Response when thirsty and water not immediately available"
+    data_type: code
+    allowed_values: [thirst_search_now, thirst_wait]
+    priority: 5
+
+  - id: ayush.water_quantity_per_day
+    description: "Water/fluid quantity per day"
+    data_type: code
+    allowed_values: [water_lt_1l, water_1_2l, water_gt_2l]
+    priority: 5
+
+  - id: ayush.water_frequency_per_day
+    description: "Frequency of drinking water/fluids per day"
+    data_type: code
+    allowed_values: [water_freq_le4, water_freq_5_7, water_freq_gt7]
+    priority: 5
+
+  - id: ayush.stool_quantity
+    description: "Quantity of stool relative to food intake"
+    data_type: code
+    allowed_values: [stool_adequate, stool_less]
+    priority: 5
+
+  - id: ayush.easy_bowel_movement
+    description: "Ease of bowel movement without constipation/laxatives"
+    data_type: code
+    allowed_values: [rarely, sometimes, often]
+    priority: 5
+
+  - id: ayush.sweating_on_exertion
+    description: "Sweating on sun exposure/exercise/exertion"
+    data_type: code
+    allowed_values: [sweat_profuse2, sweat_medium, sweat_scanty2]
+    priority: 5
+
+  - id: ayush.body_odour
+    description: "Body odour"
+    data_type: code
+    allowed_values: [odour_strong, odour_mild]
+    priority: 5
+
+  - id: ayush.told_about_body_odour
+    description: "Told by family/friends about body odour"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.light_sleeper
+    description: "Woken by little noise while sleeping"
+    data_type: code
+    allowed_values: [rarely, sometimes, often]
+    priority: 5
+
+  - id: ayush.sleep_hours
+    description: "Hours slept in 24 hours"
+    data_type: code
+    allowed_values: [sleep_lt6h, sleep_6_8h, sleep_gt8h]
+    priority: 5
+
+  - id: ayush.dreams_recalled
+    description: "Sees and remembers dreams often"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.decision_reversal
+    description: "Need to change decision after taking it"
+    data_type: code
+    allowed_values: [rarely, sometimes, often]
+    priority: 5
+
+  - id: ayush.comprehension_test_variant
+    description: "Which comprehension-test booklet variant was used"
+    data_type: code
+    allowed_values: [booklet_a, booklet_b]
+    priority: 5
+
+  - id: ayush.recall_test_variant
+    description: "Which word/pair recall-test booklet variant was used"
+    data_type: code
+    allowed_values: [recite_a, recite_b]
+    priority: 5
+
+  - id: ayush.relationships_last_long
+    description: "Whether relations with friends/relatives/neighbours last a long time"
+    data_type: code
+    allowed_values: [rarely, sometimes, often]
+    priority: 5
+
+  - id: ayush.pictures_test_variant
+    description: "Which pictures-test booklet variant was used"
+    data_type: code
+    allowed_values: [pictures_a, pictures_b]
+    priority: 5
+
+  - id: ayush.problem_figures_test_variant
+    description: "Which problem-figures-test booklet variant was used"
+    data_type: code
+    allowed_values: [problem_figures_a, problem_figures_b]
+    priority: 5
+
+  - id: ayush.shapes_test_variant
+    description: "Which shapes-test booklet variant was used"
+    data_type: code
+    allowed_values: [shapes_a, shapes_b]
+    priority: 5
+
+  - id: ayush.reaction_to_queue_jumping
+    description: "Reaction if someone breaks a queue in front of them"
+    data_type: code
+    allowed_values: [queue_ignore_calm, queue_argue_shout, queue_angry_then_calm]
+    priority: 5
+
+  - id: ayush.family_opinion_temperament
+    description: "Family/friends' opinion of the patient's temperament"
+    data_type: code
+    allowed_values: [temper_usually_calm, temper_short_tempered, temper_angry_then_calm]
+    priority: 5
+
+  - id: ayush.talkative
+    description: "Talkative / makes irrelevant talk"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.soft_spoken
+    description: "Speaks limited / soft-spoken"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.profound_orator
+    description: "Can talk effectively at length on a chosen topic"
+    data_type: code
+    allowed_values: [rarely, sometimes, often]
+    priority: 5
+
+  - id: ayush.dominant_in_discussion
+    description: "Able to dominate and establish own view in a discussion/argument"
+    data_type: code
+    allowed_values: [rarely, sometimes, often]
+    priority: 5
+
+  - id: ayush.stands_by_values
+    description: "Strength to stand for own faith/values/morals despite others"
+    data_type: code
+    allowed_values: [rarely, sometimes, often]
+    priority: 5
+
+  - id: ayush.adversity_response
+    description: "Usual response when facing extreme adverse situations/challenges"
+    data_type: code
+    allowed_values: [adversity_run_away, adversity_panic, adversity_face_bravely]
+    priority: 5
+
+  - id: ayush.food_temperature_preference
+    description: "Preferred food temperature in moderate weather"
+    data_type: code
+    allowed_values: [food_cold_over_hot, food_hot_over_cold, food_temp_no_preference]
+    priority: 5
+
+  - id: ayush.unresolved_grudges
+    description: "Has a friend/relative/colleague with an unresolved falling-out"
+    data_type: boolean
+    priority: 5
+
+  - id: ayush.polite_under_stress
+    description: "Remains polite even under stress/unwanted/anxiety conditions"
+    data_type: code
+    allowed_values: [rarely, sometimes, often]
     priority: 5
 
 # --- clinician-assessed --------------------------------------------------------

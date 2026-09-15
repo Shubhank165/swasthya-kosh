@@ -39,7 +39,21 @@ from app.services.terminology import seed_terminology
 logger = get_logger(__name__)
 
 HOSPITAL_ID = "aiia-delhi"
-DEPARTMENTS: list[str] = ["kayachikitsa", "panchakarma", "shalya", "general"]
+#: A realistic AYUSH OPD rather than a sample of one. Four departments left a
+#: woman needing gynaecology and a parent with a sick child no destination but
+#: the escape hatch — which is a routing failure, not a cosmetic one. Display
+#: names for all eight already existed in `api/v1/hospitals.py`; only the seed
+#: was short.
+DEPARTMENTS: list[str] = [
+    "kayachikitsa",
+    "panchakarma",
+    "shalya",
+    "shalakya",
+    "prasuti",
+    "kaumarbhritya",
+    "swasthavritta",
+    "general",
+]
 
 #: The demo patient. Sign in to the app with this number and the visits below
 #: are already there. An invented number in the reserved-for-fiction range, and
@@ -345,7 +359,10 @@ async def seed(
 ) -> dict[str, Any]:
     """Create the hospital, the terminology tables and the sample intakes.
 
-    Idempotent: an existing hospital short-circuits everything.
+    Idempotent: an existing hospital short-circuits everything except its
+    department list, which is reconciled. Departments are configuration rather
+    than demo data — a row created once with four of them would otherwise keep
+    four forever while the code says eight.
 
     `patient_ref_pepper` is what makes the app half of the demo work. The phone
     reference an intake is filed under is `HMAC(pepper, number)`, so the value
@@ -358,7 +375,28 @@ async def seed(
     clock = clock or SystemClock()
     hospitals = HospitalRepository(session)
 
-    if await hospitals.get(HOSPITAL_ID) is not None:
+    existing = await hospitals.get(HOSPITAL_ID)
+    if existing is not None:
+        # Still a no-op for everything that is *demo data* — the sample
+        # intakes, the ABHA link, the terminology rows all stay exactly as they
+        # are, and re-running still cannot duplicate them.
+        #
+        # The department list is not demo data. It is configuration, and a
+        # seeder that can never correct it means a hospital row created once
+        # with four departments keeps four for the life of the database, while
+        # the code, the display names and every developer's expectation say
+        # eight. That gap is invisible until a patient needs the department
+        # that is missing, which is the worst moment to discover it.
+        if existing.departments != DEPARTMENTS:
+            before = list(existing.departments)
+            existing.departments = list(DEPARTMENTS)
+            await session.flush()
+            logger.info(
+                "seed_departments_reconciled",
+                hospital_id=HOSPITAL_ID,
+                before=len(before),
+                after=len(DEPARTMENTS),
+            )
         logger.info("seed_skipped_existing")
         return {"hospital_id": HOSPITAL_ID, "created": False}
 

@@ -209,6 +209,93 @@ class DocumentResultsRequest(ApiModel):
     kind: DocumentKind = DocumentKind.OTHER
 
 
+class PrefillQuestionIn(ApiModel):
+    """One upcoming question the kiosk has not yet put to the patient — the
+    minimal shape the prefill path needs, not a whole `Question`."""
+
+    field_id: str
+    answer_type: str
+    prompt: str = ""
+    options: list[str] | None = None
+    #: `code -> the label the patient is shown for it`, in their own language.
+    #: The model answers in codes, but it recognises the answer in labels.
+    option_labels: dict[str, str] | None = None
+    unit: str | None = None
+    min: float | None = None
+    max: float | None = None
+
+
+class PrefillRequest(ApiModel):
+    """What the patient has already said, and what is coming up.
+
+    `free_text` is never logged — see `app/services/prefill.py` — and this
+    request is the only place it travels beyond the device: the app already
+    holds it as the answer it just recorded locally, and sends a copy here only
+    long enough to ask what might come next.
+    """
+
+    free_text: str
+    questions: list[PrefillQuestionIn] = Field(default_factory=list)
+
+
+class PrefillSuggestionOut(ApiModel):
+    """One validated suggestion. `value` is in the same shape
+    `AnswerValue.toJson()` produces for its `kind` on the app side, so the
+    client can hand it straight to `answerValueFromDraft`."""
+
+    field_id: str
+    kind: str
+    value: Any
+
+
+class PrefillResponse(ApiModel):
+    #: True whenever a provider is configured and ran, even if it suggested
+    #: nothing — lets the app tell "no suggestion" from "not configured" if it
+    #: ever wants to, without treating either as an error.
+    enabled: bool
+    suggestions: list[PrefillSuggestionOut] = Field(default_factory=list)
+
+
+class AyushAnswerIn(ApiModel):
+    """One answered field of the AYUSH module, as the app sends it.
+
+    The vocabularies are the record's own — `FieldStatus` and `Certainty` —
+    and are validated in `services/ayush_profile.py` rather than narrowed to an
+    enum here, so the error a client gets names the field that was wrong rather
+    than failing the whole body with a schema message.
+    """
+
+    field_id: str
+    status: str
+    certainty: str = "reported"
+    value: Any | None = None
+    original_text: str | None = None
+
+
+class AyushProfileRequest(ApiModel):
+    """A patient's completed AYUSH/Prakriti module.
+
+    No patient and no hospital in the body: both come from the session token,
+    per decision 21. A profile can only ever be submitted for the holder of the
+    credential that submitted it.
+    """
+
+    language: str = "en"
+    #: The question-bundle version these were answered against, so a profile
+    #: collected before the module changed can be told apart from a current one.
+    content_version: str | None = None
+    answers: list[AyushAnswerIn] = Field(default_factory=list)
+
+
+class AyushProfileResponse(ApiModel):
+    profile_id: str
+    #: The revision this one replaced, or `None` for a first submission. Echoed
+    #: because an append-only table is only auditable if the client can see the
+    #: chain it just extended.
+    superseded: str | None = None
+    answers_stored: int
+
+
 class ResolveRequest(ApiModel):
     type: str = "guest"
     value: str | None = None

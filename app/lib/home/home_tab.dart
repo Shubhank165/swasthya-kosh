@@ -72,9 +72,11 @@ class HomeTab extends ConsumerWidget {
           buttonKey: const Key('home.ayush'),
           icon: Icons.spa_outlined,
           title: strings.ayushTitle,
-          // Says what it is before it is tapped. A card that looks live and
-          // then apologises has already wasted the tap.
-          subtitle: strings.notAvailableYet,
+          // Says what it is before it is tapped, same principle as when this
+          // read "Not available yet" — the card now says the thing itself is
+          // real and optional, rather than claiming a result it does not
+          // compute (SIH items 3/4; see `ayush_screen.dart`).
+          subtitle: strings.ayurvedaTitle,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const AyushScreen()),
           ),
@@ -137,6 +139,7 @@ class _ResumeCard extends ConsumerWidget {
       draft: draft,
       appVersion: ref.read(configProvider).appVersion,
       patientRef: patientRef,
+      prefill: ref.read(prefillRepositoryProvider),
     );
     // Null when the content moved under the draft. Starting fresh is the only
     // safe answer: answers to questions that have since changed are answers
