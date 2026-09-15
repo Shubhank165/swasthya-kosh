@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediKiosk — Technical Approach Flowchart</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #070a13;
+      --card-bg: #0f172a;
+      --border: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --blue: #38bdf8;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --purple: #c084fc;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+    }
+
+    .app-layout {
+      display: flex;
+      flex-direction: column;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Top Navigation / Controls Bar */
+    header {
+      flex: 0 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 28px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 10;
+    }
+
+    .title-group h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .title-group p {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: #334155;
+      border-color: var(--blue);
+      color: #fff;
+    }
+
+    /* Full Viewport Canvas */
+    .viewport-canvas {
+      flex: 1 1 auto;
+      position: relative;
+      width: 100%;
+      height: calc(100vh - 65px);
+      overflow: hidden;
+      cursor: grab;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-radial: radial-gradient(circle at 50% 50%, #0d1527 0%, #070a13 100%);
+    }
+
+    .viewport-canvas:active {
+      cursor: grabbing;
+    }
+
+    #flowchart-wrapper {
+      transform-origin: center center;
+      transition: transform 0.15s ease-out;
+      width: 95%;
+      height: 92%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .mermaid {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .mermaid svg {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+    }
+
+    /* Enlarge node text & padding */
+    .mermaid .node text {
+      font-size: 15px !important;
+      font-weight: 600 !important;
+    }
+
+    .mermaid .cluster-label span {
+      font-size: 16px !important;
+      font-weight: 700 !important;
+      color: var(--blue) !important;
+    }
+
+    /* Zoom Indicator Overlay */
+    .zoom-badge {
+      position: absolute;
+      bottom: 20px;
+      right: 24px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <header>
+      <div class="title-group">
+        <h1>🏥 MediKiosk — Technical Approach Flowchart</h1>
+        <p>Voice In → Noise Cancellation & VAD → STT → OCR → Fact Extraction / LLM → Safety Check → Doctor Report</p>
+      </div>
+      <div class="controls">
+        <button class="btn" onclick="zoomIn()">🔍 Zoom In (+)</button>
+        <button class="btn" onclick="zoomOut()">🔍 Zoom Out (-)</button>
+        <button class="btn" onclick="resetZoom()">↺ Reset</button>
+        <button class="btn" onclick="toggleFullScreen()">⛶ Fullscreen</button>
+      </div>
+    </header>
+
+    <div class="viewport-canvas" id="canvas">
+      <div id="flowchart-wrapper">
+        <pre class="mermaid">
+flowchart LR
+    subgraph INPUTS["1. Patient Inputs"]
+        direction TB
+        VOICE["🎙️ Spoken Voice<br/>(9 Indian Languages)"]
+        CAM["📷 Camera Device<br/>(Prescriptions & ABHA Card)"]
+        TOUCH["👆 Touch Screen<br/>(Language & Survey Choices)"]
+    end
+
+    subgraph PROCESSING["2. Signal & Vision Processing"]
+        direction TB
+        NOISE["Noise Suppression & Echo Cancellation<br/>(WebRTC AEC & PulseAudio)"]
+        VAD["Voice Activity Detection (VAD)<br/>(Detects active speech & barge-in)"]
+        STT["Speech-to-Text (STT)<br/>(whisper.cpp large-v3 on CUDA)"]
+        OCR["Document OCR & QR Engine<br/>(PaddleOCR & OpenCV QRCode)"]
+    end
+
+    subgraph INTELLIGENCE["3. Clinical Extraction & Safety"]
+        direction TB
+        LLM["Clinical Fact Extractor & LLM<br/>(Symptoms, duration, medications)"]
+        AYUSH["Ayurvedic Assessment<br/>(Prakriti & constitutional survey)"]
+        SAFETY{"⚠️ Red-Flag Safety Check<br/>(Zero-LLM Override)"}
+    end
+
+    subgraph OUTPUTS["4. Doctor Triage & Outputs"]
+        direction TB
+        EMERGENCY["🚨 IMMEDIATE EMERGENCY ALARM<br/>(Hospital staff dispatched instantly)"]
+        REPORT["📋 Doctor Intake Summary<br/>(Provisional ICD-10 & FHIR R4)"]
+        QUEUE["🏥 Specialist OPD Queue<br/>(Cardio, Ortho, Ayush, General Med)"]
+    end
+
+    %% Pipeline Connections
+    VOICE ==> NOISE ==> VAD ==> STT ==> LLM
+    CAM ==> OCR ==> LLM
+    TOUCH ==> LLM
+    TOUCH ==> AYUSH
+
+    LLM ==> SAFETY
+    AYUSH ==> REPORT
+
+    SAFETY ==>|Yes: Life Threat| EMERGENCY
+    SAFETY ==>|No: Stable Patient| REPORT ==> QUEUE
+
+    %% Visual Styling
+    classDef inputStyle fill:#0f172a,stroke:#38bdf8,stroke-width:2.5px,color:#f8fafc;
+    classDef procStyle fill:#0f172a,stroke:#a855f7,stroke-width:2.5px,color:#f8fafc;
+    classDef intelStyle fill:#0f172a,stroke:#eab308,stroke-width:2.5px,color:#f8fafc;
+    classDef alertStyle fill:#450a0a,stroke:#ef4444,stroke-width:3.5px,color:#fef2f2;
+    classDef outStyle fill:#052e16,stroke:#22c55e,stroke-width:2.5px,color:#f0fdf4;
+
+    class VOICE,CAM,TOUCH inputStyle;
+    class NOISE,VAD,STT,OCR procStyle;
+    class LLM,AYUSH,SAFETY intelStyle;
+    class EMERGENCY alertStyle;
+    class REPORT,QUEUE outStyle;
+        </pre>
+      </div>
+      <div class="zoom-badge" id="zoom-indicator">100%</div>
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#070a13',
+        primaryColor: '#0f172a',
+        primaryTextColor: '#f8fafc',
+        primaryBorderColor: '#38bdf8',
+        lineColor: '#60a5fa',
+        secondaryColor: '#052e16',
+        tertiaryColor: '#1e293b',
+        fontSize: '15px'
+      },
+      flowchart: {
+        curve: 'basis',
+        nodeSpacing: 45,
+        rankSpacing: 55,
+        htmlLabels: true
+      }
+    });
+
+    // Pan & Zoom Mechanics
+    let scale = 1;
+    let translateX = 0;
+    let translateY = 0;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    const wrapper = document.getElementById('flowchart-wrapper');
+    const canvas = document.getElementById('canvas');
+    const indicator = document.getElementById('zoom-indicator');
+
+    function updateTransform() {
+      wrapper.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+      indicator.textContent = `${Math.round(scale * 100)}%`;
+    }
+
+    function zoomIn() {
+      scale = Math.min(scale + 0.15, 2.5);
+      updateTransform();
+    }
+
+    function zoomOut() {
+      scale = Math.max(scale - 0.15, 0.4);
+      updateTransform();
+    }
+
+    function resetZoom() {
+      scale = 1;
+      translateX = 0;
+      translateY = 0;
+      updateTransform();
+    }
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        scale = Math.min(scale + 0.08, 2.5);
+      } else {
+        scale = Math.max(scale - 0.08, 0.4);
+      }
+      updateTransform();
+    }, { passive: false });
+
+    canvas.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX - translateX;
+      startY = e.clientY - translateY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      translateX = e.clientX - startX;
+      translateY = e.clientY - startY;
+      updateTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  </script>
+</body>
+</html>

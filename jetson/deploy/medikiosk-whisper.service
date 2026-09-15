@@ -1,0 +1,17 @@
+[Unit]
+Description=MediKiosk offline ASR (whisper.cpp, large-v3-turbo)
+# Install as a user unit alongside medikiosk-edge:
+#   cp deploy/medikiosk-whisper.service ~/.config/systemd/user/
+#   systemctl --user enable --now medikiosk-whisper
+After=network.target
+
+[Service]
+WorkingDirectory=/home/ubuntu/medikiosk
+ExecStart=/bin/bash /home/ubuntu/medikiosk/scripts/run_whisper_server.sh
+Restart=always
+RestartSec=5
+# The model takes a while to load; do not let systemd call that a failed start.
+TimeoutStartSec=180
+
+[Install]
+WantedBy=default.target

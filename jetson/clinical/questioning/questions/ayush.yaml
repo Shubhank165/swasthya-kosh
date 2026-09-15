@@ -1,0 +1,144 @@
+# AYUSH history — §4, §27.
+#
+# **Every question here asks the patient about something they experience.** None
+# of them asks for a classification. The distinction is the whole design: a
+# practitioner assesses agni, koshtha and prakriti from what the patient
+# describes, and a questionnaire that asked the patient to name their own agni
+# would be collecting the conclusion instead of the evidence for it — and
+# collecting it from the one person in the room least equipped to give it.
+#
+#     ask     "What do you usually feel after a full meal?"
+#     never   "Is your agni mandagni or tikshnagni?"
+#
+# Specialist terminology belongs in the case summary, where a practitioner reads
+# it, and in `assessment.*`, which the engine never asks.
+#
+# The five marked `required` on their slots are asked of every patient. The rest
+# come up when a domain makes them relevant — a patient with a skin complaint is
+# asked about their diet; one with a headache is not asked about their thirst
+# unless something else brings it up.
+#
+# clinical_source: engineer-authored, structured from AYUSH OPD case-taking
+# order; pending AIIA mentor review. The mapping of these to a practitioner's
+# own assessment is explicitly *not* claimed here.
+
+version: 1
+
+questions:
+  - id: ayush.appetite
+    answer_type: single_select
+    extracts: [ayush.appetite]
+    priority: 8
+    burden: 1
+    options: [poor, variable, normal, excessive]
+
+  # The evidence a practitioner assesses agni from. Multi-select because these
+  # co-occur and because making somebody pick the single worst of them throws
+  # away the pattern.
+  - id: ayush.after_eating
+    answer_type: multi_select
+    extracts: [ayush.after_eating]
+    priority: 8
+    burden: 2
+    options: [comfortable, heaviness, bloating, burning, sleepiness, pain, nausea]
+
+  - id: ayush.bowel_habit
+    answer_type: single_select
+    extracts: [ayush.bowel_habit]
+    priority: 8
+    burden: 1
+    options: [once_daily, twice_daily, alternate_days, irregular, constipated, loose]
+
+  - id: ayush.urine_pattern
+    answer_type: single_select
+    extracts: [ayush.urine_pattern]
+    priority: 6
+    burden: 1
+    options: [normal, frequent, scanty, burning, night_only]
+
+  - id: ayush.sleep_quality
+    answer_type: single_select
+    extracts: [ayush.sleep_quality]
+    priority: 8
+    burden: 1
+    options: [sound, disturbed, difficulty_falling_asleep, wakes_early, excessive]
+
+  - id: ayush.diet_type
+    answer_type: single_select
+    extracts: [ayush.diet_type]
+    priority: 6
+    burden: 1
+    options: [vegetarian, eggetarian, non_vegetarian, vegan, mixed]
+
+  - id: ayush.meal_regularity
+    answer_type: single_select
+    extracts: [ayush.meal_regularity]
+    priority: 7
+    burden: 1
+    options: [regular, mostly_regular, irregular, often_skipped]
+
+  # Tastes, in ordinary words. The six rasas are named here as flavours a
+  # patient recognises on their plate, which is what they are — not as a
+  # framework the patient is asked to place themselves in.
+  - id: ayush.food_preferences
+    answer_type: multi_select
+    extracts: [ayush.food_preferences]
+    priority: 6
+    burden: 2
+    options:
+      - sweet
+      - sour
+      - salty
+      - pungent
+      - bitter
+      - astringent
+      - prefers_hot
+      - prefers_cold
+      - no_preference
+
+  - id: ayush.thirst
+    answer_type: single_select
+    extracts: [ayush.thirst]
+    priority: 6
+    burden: 1
+    options: [little, normal, excessive]
+
+  - id: ayush.sweating
+    answer_type: single_select
+    extracts: [ayush.sweating]
+    priority: 6
+    burden: 1
+    options: [little, normal, profuse, night_sweats]
+
+  - id: ayush.daily_routine
+    answer_type: free_text
+    extracts: [ayush.daily_routine]
+    priority: 6
+    burden: 3
+
+  - id: ayush.physical_activity
+    answer_type: single_select
+    extracts: [ayush.physical_activity]
+    priority: 6
+    burden: 1
+    options: [sedentary, light, moderate, heavy_labour, regular_exercise]
+
+  - id: ayush.stress
+    answer_type: single_select
+    extracts: [ayush.stress]
+    priority: 7
+    burden: 1
+    options: [none, mild, moderate, severe]
+
+  - id: ayush.environment
+    answer_type: free_text
+    extracts: [ayush.environment]
+    priority: 5
+    burden: 2
+
+  - id: ayush.energy_through_day
+    answer_type: single_select
+    extracts: [ayush.energy_through_day]
+    priority: 5
+    burden: 1
+    options: [morning_best, afternoon_best, evening_best, no_pattern]

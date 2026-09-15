@@ -1,0 +1,576 @@
+# The information a practitioner needs, as slots.
+#
+# **A template, not a list.** Most symptoms want the same things known about
+# them — is it there, when did it start, how long, how bad, getting better or
+# worse, what brings it on, what settles it — so those are written once under
+# `symptom_template` and expanded across every domain at load time. Writing them
+# out per domain would be 14 copies of the same clinical judgement, drifting.
+#
+# `priority` is 1-10 and answers one question: how much does knowing this change
+# what the practitioner does? It is not how interesting the answer is. A slot at
+# 9 is one you would not want a case to arrive without.
+#
+# `patient_observable: false` marks a slot the patient is never asked. It is in
+# the schema because the case needs somewhere to put it and the practitioner
+# fills it in — see §4 of docs/QUESTIONING_AGENT.md. Asking a patient to report
+# their own agni is asking them to perform the assessment.
+#
+# clinical_source: engineer-authored, structured from standard OPD and AYUSH
+# case-taking order; pending AIIA mentor review.
+
+version: 1
+
+# --- the reusable symptom schema ---------------------------------------------
+# Expanded into `<domain>.<id>` for every domain in domains.yaml except the
+# handful listed in `skip_domains`, where the slot makes no sense.
+
+symptom_template:
+  - id: present
+    description: Whether the patient reports this problem
+    data_type: boolean
+    priority: 10
+
+  - id: onset
+    description: When it began, and how suddenly
+    data_type: code
+    allowed_values: [sudden, gradual, unknown]
+    priority: 8
+
+  - id: duration
+    description: How long it has been going on
+    data_type: duration
+    priority: 9
+
+  - id: severity
+    description: How bad it is, as the patient rates it
+    data_type: scale
+    priority: 8
+
+  - id: progression
+    description: Better, worse or unchanged since it started
+    data_type: code
+    allowed_values: [improving, worsening, unchanged, fluctuating]
+    priority: 8
+
+  - id: pattern
+    description: Constant, or coming and going
+    data_type: code
+    allowed_values: [constant, intermittent, worse_at_night, worse_in_morning]
+    priority: 6
+
+  - id: aggravating
+    description: What makes it worse
+    data_type: text
+    priority: 7
+
+  - id: relieving
+    description: What makes it better
+    data_type: text
+    priority: 7
+
+  - id: previous_episodes
+    description: Whether this has happened before
+    data_type: boolean
+    priority: 6
+
+  - id: treatment_tried
+    description: What the patient has already taken or done for it
+    data_type: text
+    priority: 7
+
+# Slots from the template that do not apply to particular domains.
+# `sleep.pattern` would be asking about the pattern of a pattern; `mental`
+# severity as a 0-10 scale is a number that reads as more precise than anything
+# a patient means by it.
+skip:
+  sleep: [pattern]
+  mental: [severity, pattern]
+  menstrual: [severity]
+  other: [pattern]
+
+# --- what individual domains add ---------------------------------------------
+
+domain_slots:
+  fever:
+    - id: maximum_temperature
+      description: The highest temperature measured, in the unit the patient used
+      data_type: number
+      priority: 8
+    - id: measured
+      description: Whether the patient actually measured it or is judging by feel
+      data_type: boolean
+      priority: 7
+    - id: chills
+      description: Shivering or rigors with the fever
+      data_type: boolean
+      priority: 7
+    - id: fever_pattern
+      description: Continuous, or spiking at particular times
+      data_type: code
+      allowed_values: [continuous, once_daily, twice_daily, alternate_days, irregular]
+      priority: 7
+
+  pain:
+    - id: site
+      description: Where the pain is
+      data_type: code
+      allowed_values:
+        [head, neck, chest, upper_abdomen, lower_abdomen, back, limb, joint, pelvis, other]
+      priority: 10
+    - id: character
+      description: What the pain feels like, in the patient's own terms
+      data_type: code
+      allowed_values: [burning, cramping, stabbing, dull_ache, throbbing, pressing, shooting, other]
+      priority: 8
+    - id: radiation
+      description: Whether it travels anywhere from where it starts
+      data_type: text
+      priority: 8
+
+  headache:
+    - id: site
+      description: Which part of the head
+      data_type: code
+      allowed_values: [frontal, temporal, occipital, one_sided, whole_head, around_eyes]
+      priority: 8
+    - id: character
+      description: What it feels like
+      data_type: code
+      allowed_values: [throbbing, pressing, band_like, stabbing, dull_ache, other]
+      priority: 7
+    - id: light_sound_sensitivity
+      description: Whether light or noise makes it worse
+      data_type: boolean
+      priority: 6
+    - id: vision_change
+      description: Any change in eyesight with it
+      data_type: boolean
+      priority: 8
+
+  respiratory:
+    - id: cough_type
+      description: Dry, or bringing something up
+      data_type: code
+      allowed_values: [dry, productive, both]
+      priority: 8
+    - id: sputum_colour
+      description: What is brought up, if anything
+      data_type: code
+      allowed_values: [clear, white, yellow, green, blood_stained]
+      priority: 7
+    - id: breathlessness
+      description: Difficulty breathing, and when it comes on
+      data_type: code
+      allowed_values: [none, on_exertion, at_rest, lying_flat]
+      priority: 9
+    - id: wheeze
+      description: A whistling sound when breathing
+      data_type: boolean
+      priority: 6
+
+  digestive:
+    - id: nausea
+      description: Feeling sick
+      data_type: boolean
+      priority: 7
+    - id: vomiting
+      description: Actually being sick
+      data_type: boolean
+      priority: 8
+    - id: relation_to_food
+      description: How eating affects it
+      data_type: code
+      allowed_values: [worse_after_eating, better_after_eating, worse_when_empty, no_relation]
+      priority: 8
+    - id: appetite_change
+      description: Whether appetite has changed
+      data_type: code
+      allowed_values: [reduced, increased, unchanged]
+      priority: 7
+    - id: acidity
+      description: Burning in the chest or throat, or sour regurgitation
+      data_type: boolean
+      priority: 7
+
+  bowel:
+    - id: stool_frequency
+      description: How many times a day, or how many days between
+      data_type: text
+      priority: 8
+    - id: consistency
+      description: What the stool is like
+      data_type: code
+      allowed_values: [hard, formed, loose, watery, mixed]
+      priority: 8
+    - id: blood_in_stool
+      description: Any blood seen
+      data_type: boolean
+      priority: 10
+    - id: incomplete_evacuation
+      description: Whether it feels finished afterwards
+      data_type: boolean
+      priority: 6
+
+  urinary:
+    - id: burning
+      description: Burning or pain passing urine
+      data_type: boolean
+      priority: 8
+    - id: frequency_change
+      description: Going more or less often than usual
+      data_type: code
+      allowed_values: [more_often, less_often, unchanged]
+      priority: 7
+    - id: blood_in_urine
+      description: Any blood seen
+      data_type: boolean
+      priority: 10
+    - id: urine_colour
+      description: Colour of the urine
+      data_type: code
+      allowed_values: [pale, normal, dark_yellow, reddish, cloudy]
+      priority: 6
+    - id: night_urination
+      description: Getting up at night to pass urine
+      data_type: boolean
+      priority: 6
+
+  skin:
+    - id: lesion_type
+      description: What the patient sees on the skin
+      data_type: code
+      allowed_values: [rash, patches, boils, blisters, dryness, discolouration, ulcer, other]
+      priority: 8
+    - id: itching
+      description: Whether it itches
+      data_type: boolean
+      priority: 7
+    - id: distribution
+      description: Where on the body
+      data_type: text
+      priority: 7
+    - id: spreading
+      description: Whether it is spreading
+      data_type: boolean
+      priority: 7
+
+  fatigue:
+    - id: effect_on_activity
+      description: What the patient can no longer do because of it
+      data_type: text
+      priority: 8
+    - id: weight_change
+      description: Any change in weight
+      data_type: code
+      allowed_values: [lost, gained, unchanged, unsure]
+      priority: 7
+
+  sleep:
+    - id: difficulty
+      description: Where the trouble is
+      data_type: code
+      allowed_values: [falling_asleep, staying_asleep, waking_early, too_much_sleep]
+      priority: 8
+    - id: hours
+      description: Roughly how many hours a night
+      data_type: number
+      priority: 7
+    - id: refreshed
+      description: Whether the patient wakes rested
+      data_type: boolean
+      priority: 6
+
+  joint:
+    - id: joints_affected
+      description: Which joints
+      data_type: text
+      priority: 9
+    - id: swelling
+      description: Whether the joint is swollen
+      data_type: boolean
+      priority: 8
+    - id: stiffness_timing
+      description: When stiffness is worst
+      data_type: code
+      allowed_values: [morning, evening, after_rest, after_activity, none]
+      priority: 8
+    - id: movement_limited
+      description: Whether movement is restricted
+      data_type: boolean
+      priority: 7
+
+  menstrual:
+    - id: cycle_regular
+      description: Whether periods come regularly
+      data_type: boolean
+      priority: 8
+    - id: cycle_length
+      description: Days between periods
+      data_type: number
+      priority: 6
+    - id: flow
+      description: How heavy
+      data_type: code
+      allowed_values: [light, normal, heavy, very_heavy]
+      priority: 7
+    - id: pain_with_periods
+      description: Period pain
+      data_type: boolean
+      priority: 7
+    - id: last_period
+      description: When the last period started
+      data_type: date
+      priority: 8
+
+  mental:
+    - id: mood
+      description: How the patient has been feeling in themselves
+      data_type: code
+      allowed_values: [low, anxious, irritable, restless, numb, mixed]
+      priority: 8
+    - id: effect_on_daily_life
+      description: What it is stopping them doing
+      data_type: text
+      priority: 8
+    - id: appetite_or_sleep_affected
+      description: Whether it has affected eating or sleeping
+      data_type: boolean
+      priority: 7
+
+  bleeding:
+    - id: site
+      description: Where the bleeding is from
+      data_type: code
+      allowed_values: [nose, gums, cough, vomit, stool, urine, vaginal, skin, wound, other]
+      priority: 10
+    - id: amount
+      description: How much, as the patient describes it
+      data_type: code
+      allowed_values: [spotting, small, moderate, large, unable_to_say]
+      priority: 9
+    - id: ongoing
+      description: Whether it is still bleeding now
+      data_type: boolean
+      priority: 10
+
+  other:
+    - id: description
+      description: The problem in the patient's own words
+      data_type: text
+      priority: 10
+
+# --- general history ----------------------------------------------------------
+# Asked of everyone. `required: true` means the selector will get to it even
+# when no domain makes it relevant — this is the floor a case cannot go below.
+
+general:
+  - id: general.age
+    description: Age in years
+    data_type: number
+    priority: 10
+    required: true
+
+  - id: general.sex
+    description: Sex, as it affects which questions apply
+    data_type: code
+    allowed_values: [female, male, other, prefer_not_to_say]
+    priority: 9
+    required: true
+
+  - id: general.reporter
+    description: Whether the patient is answering for themselves
+    data_type: code
+    allowed_values: [self, parent_guardian, family_attendant, caregiver]
+    priority: 8
+    required: true
+
+  - id: general.known_conditions
+    description: Conditions the patient has already been told they have
+    data_type: code_set
+    allowed_values:
+      [diabetes, hypertension, asthma, thyroid, heart_disease, tuberculosis, kidney_disease,
+       liver_disease, epilepsy, arthritis, none, other]
+    priority: 9
+    required: true
+
+  - id: general.current_medications
+    description: What the patient is taking now, including Ayurvedic preparations
+    data_type: text
+    priority: 10
+    required: true
+
+  - id: general.allergies
+    description: Known drug or food allergies, and what happens
+    data_type: text
+    priority: 10
+    required: true
+
+  - id: general.past_surgery
+    description: Operations or hospital admissions
+    data_type: text
+    priority: 6
+
+  - id: general.family_history
+    description: Conditions running in the immediate family
+    data_type: code_set
+    allowed_values: [diabetes, hypertension, heart_disease, cancer, asthma, thyroid, none, unsure]
+    priority: 5
+
+  - id: general.pregnancy
+    description: Whether the patient is or might be pregnant
+    data_type: code
+    # Quoted. Unquoted `yes`/`no` are booleans in YAML and the option ids
+    # would load as `True`/`False`.
+    allowed_values: ["yes", "no", unsure, not_applicable]
+    priority: 9
+
+  - id: general.tobacco
+    description: Tobacco use, smoked or chewed
+    data_type: code
+    allowed_values: [never, past, occasional, daily]
+    priority: 6
+
+  - id: general.alcohol
+    description: Alcohol use
+    data_type: code
+    allowed_values: [never, occasional, weekly, daily]
+    priority: 5
+
+# --- AYUSH history ------------------------------------------------------------
+# Patient-observable, in ordinary language. These are the answers a practitioner
+# performs their own assessment from — which is why none of them asks the
+# patient to classify anything.
+
+ayush:
+  - id: ayush.appetite
+    description: Appetite as the patient experiences it
+    data_type: code
+    allowed_values: [poor, variable, normal, excessive]
+    priority: 8
+    required: true
+
+  - id: ayush.after_eating
+    description: What the patient usually feels after a full meal
+    data_type: code_set
+    allowed_values: [comfortable, heaviness, bloating, burning, sleepiness, pain, nausea]
+    priority: 8
+    required: true
+
+  - id: ayush.bowel_habit
+    description: Usual bowel pattern, on a normal day
+    data_type: code
+    allowed_values: [once_daily, twice_daily, alternate_days, irregular, constipated, loose]
+    priority: 8
+    required: true
+
+  - id: ayush.urine_pattern
+    description: Usual urination on a normal day
+    data_type: code
+    allowed_values: [normal, frequent, scanty, burning, night_only]
+    priority: 6
+
+  - id: ayush.sleep_quality
+    description: Usual sleep, on a normal night
+    data_type: code
+    allowed_values: [sound, disturbed, difficulty_falling_asleep, wakes_early, excessive]
+    priority: 8
+    required: true
+
+  - id: ayush.diet_type
+    description: Usual diet
+    data_type: code
+    allowed_values: [vegetarian, eggetarian, non_vegetarian, vegan, mixed]
+    priority: 6
+
+  - id: ayush.meal_regularity
+    description: Whether meals are at regular times
+    data_type: code
+    allowed_values: [regular, mostly_regular, irregular, often_skipped]
+    priority: 7
+
+  - id: ayush.food_preferences
+    description: Tastes and temperatures the patient is drawn to or avoids
+    data_type: code_set
+    allowed_values:
+      [sweet, sour, salty, pungent, bitter, astringent, prefers_hot, prefers_cold, no_preference]
+    priority: 6
+
+  - id: ayush.thirst
+    description: How much the patient drinks, and whether they feel thirsty
+    data_type: code
+    allowed_values: [little, normal, excessive]
+    priority: 6
+
+  - id: ayush.sweating
+    description: How much the patient sweats compared with usual
+    data_type: code
+    allowed_values: [little, normal, profuse, night_sweats]
+    priority: 6
+
+  - id: ayush.daily_routine
+    description: Shape of a usual day — work, waking and sleeping times
+    data_type: text
+    priority: 6
+
+  - id: ayush.physical_activity
+    description: How much the patient moves in a usual day
+    data_type: code
+    allowed_values: [sedentary, light, moderate, heavy_labour, regular_exercise]
+    priority: 6
+
+  - id: ayush.stress
+    description: How much strain the patient feels day to day
+    data_type: code
+    allowed_values: [none, mild, moderate, severe]
+    priority: 7
+
+  - id: ayush.environment
+    description: Anything in surroundings or work that seems to affect it
+    data_type: text
+    priority: 5
+
+  - id: ayush.energy_through_day
+    description: When during the day the patient feels most and least well
+    data_type: code
+    allowed_values: [morning_best, afternoon_best, evening_best, no_pattern]
+    priority: 5
+
+# --- clinician-assessed --------------------------------------------------------
+# Never asked. Present so the case has a place for them and so the summary can
+# show the practitioner what is theirs to fill in.
+
+clinician_assessed:
+  - id: assessment.prakriti
+    description: Constitutional assessment
+    data_type: text
+    priority: 7
+
+  - id: assessment.vikriti
+    description: Current state assessment
+    data_type: text
+    priority: 8
+
+  - id: assessment.agni
+    description: Digestive capacity, as assessed
+    data_type: text
+    priority: 8
+
+  - id: assessment.koshtha
+    description: Bowel tendency, as assessed
+    data_type: text
+    priority: 7
+
+  - id: assessment.nadi
+    description: Pulse examination
+    data_type: text
+    priority: 7
+
+  - id: assessment.jihva
+    description: Tongue examination
+    data_type: text
+    priority: 6
+
+  - id: assessment.provisional
+    description: The practitioner's working impression
+    data_type: text
+    priority: 10
