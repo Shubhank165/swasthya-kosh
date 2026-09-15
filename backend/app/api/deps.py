@@ -47,6 +47,8 @@ from app.repositories.patients import (
 from app.repositories.terminology import TerminologyRepository
 from app.repositories.timelines import TimelineRepository
 from app.services.documents import DocumentService
+from app.repositories.ayush_profiles import AyushProfileRepository
+from app.services.ayush_profile import AyushProfileService
 from app.services.identity import IdentityService
 from app.services.ingest import IngestService
 from app.services.patient_auth import PatientAuthService
@@ -242,9 +244,27 @@ async def get_report_service(
             max_events=settings.timeline_max_events,
             min_relevance=settings.timeline_min_relevance,
         ),
+        ayush_profiles=AyushProfileRepository(session),
         max_prior_intakes=settings.timeline_max_prior_intakes,
         facility_timezone=settings.facility_timezone,
         demo=settings.demo_mode,
+    )
+
+
+async def get_ayush_profile_service(
+    session: SessionDep,
+    clock: ClockDep,
+    ids: IdsDep,
+    hospital_id: TenantDep,
+) -> AyushProfileService:
+    """`hospital_id` is depended on rather than used: resolving it is what puts
+    the tenant in the session context, and the repository's queries filter on
+    the value the caller passes from the principal. Dropping the dependency
+    would leave the guard unarmed for this request."""
+    return AyushProfileService(
+        profiles=AyushProfileRepository(session),
+        clock=clock,
+        ids=ids,
     )
 
 
@@ -314,6 +334,9 @@ WorkerDocumentServiceDep = Annotated[DocumentService, Depends(get_worker_documen
 
 ReportServiceDep = Annotated[ReportService, Depends(get_report_service)]
 IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
+AyushProfileServiceDep = Annotated[
+    AyushProfileService, Depends(get_ayush_profile_service)
+]
 WorklistServiceDep = Annotated[WorklistService, Depends(get_worklist_service)]
 TerminologyServiceDep = Annotated[TerminologyService, Depends(get_terminology_service)]
 ConsentRepoDep = Annotated[ConsentRepository, Depends(get_consent_repository)]

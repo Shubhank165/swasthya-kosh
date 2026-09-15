@@ -201,6 +201,78 @@ class ClinicalTimeline(Base, TimestampMixin):
     )
 
 
+class AyushProfileRecord(Base, TimestampMixin):
+    """A patient's AYUSH/Prakriti self-report, filed against the patient.
+
+    **Not an intake, and deliberately not modelled as one.** Every
+    `ClinicalFactRecord` belongs to a visit — `intake_id` is NOT NULL — because
+    every other fact in this system is something a patient said on a day. A
+    Prakriti profile is not: it is answered once, describes the person rather
+    than today's complaint, and outlives any single OPD attendance. Giving it a
+    synthetic intake to live in would make it a phantom visit in the worklist,
+    the metrics and the purge path, and the bugs would surface months later
+    somewhere nobody was looking.
+
+    **Filed under the same `PatientRef` an intake uses**, not under an ABHA
+    address. ABHA is optional here by design — `PatientRecord.abha_address` is
+    documented as never required, and the app works with a phone alone — so
+    keying on it would lock out every patient without one. A profile filed
+    under `phone` is still found after an ABHA is linked, because
+    `PatientIdentifierLink` exists to resolve exactly that.
+
+    **Hospital-scoped, like everything else.** A Prakriti arguably belongs to
+    the person rather than to the clinic that asked, but `TENANT_EXEMPT_TABLES`
+    is a short list with a written justification per entry, and "constitution
+    does not vary by hospital" is a clinical argument for sharing patient data
+    across tenants — which is not a trade this table gets to make on its own.
+
+    **Answers are one JSON document, not a row each.** `clinical_facts` needs a
+    row per fact because an interview appends them one at a time; a profile
+    arrives complete and is read complete. `ClinicalTimeline.events` already
+    stores a collection this way for the same reason. A correction is a whole
+    new revision pointing at the old one through `supersedes`, per decision 4 —
+    there is no UPDATE path here either.
+    """
+
+    __tablename__ = "ayush_profiles"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    hospital_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("hospitals.id"), nullable=False, index=True
+    )
+    #: A `PatientRefType` value — `phone`, `abha`, `hospital_id`. Mirrors
+    #: `IntakeRecord`, so one patient's profile and visits are found the same
+    #: way and by the same aliases.
+    patient_ref_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    patient_ref_value: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    #: The question-bundle version these answers were given against. A profile
+    #: answered before the module was rewritten is not the same questionnaire,
+    #: and the report must be able to tell.
+    content_version: Mapped[str | None] = mapped_column(String(64))
+    #: The language the patient answered in — their option labels, not English.
+    language: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: `[{field_id, status, certainty, value, original_text}]`, using the same
+    #: five-status vocabulary as `clinical_facts`. Not a second vocabulary:
+    #: decision 1 is violated by accident exactly this way.
+    answers: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, nullable=False, default=list
+    )
+    submitted_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    #: The revision this one replaces. NULL for a first submission.
+    supersedes: Mapped[str | None] = mapped_column(String(64), index=True)
+
+    __table_args__ = (
+        # The current profile for one patient at one hospital is the row nothing
+        # supersedes. Indexed on the lookup the report actually makes.
+        Index(
+            "ix_ayush_profiles_patient",
+            "hospital_id",
+            "patient_ref_type",
+            "patient_ref_value",
+        ),
+    )
+
+
 class IntakeRecord(Base, TimestampMixin):
     """One intake received from a kiosk."""
 

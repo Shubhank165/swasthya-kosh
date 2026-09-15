@@ -187,22 +187,12 @@ BUNDLE_FIELD_SECTIONS: Mapping[str, Section] = {
     "menstrual.flow": Section.PERSONAL_HISTORY,
     "menstrual.last_period": Section.PERSONAL_HISTORY,
     "menstrual.pain_with_periods": Section.PERSONAL_HISTORY,
-    # ayurveda
-    "ayush.after_eating": Section.AYURVEDA,
-    "ayush.appetite": Section.AYURVEDA,
-    "ayush.bowel_habit": Section.AYURVEDA,
-    "ayush.daily_routine": Section.AYURVEDA,
-    "ayush.diet_type": Section.AYURVEDA,
-    "ayush.energy_through_day": Section.AYURVEDA,
-    "ayush.environment": Section.AYURVEDA,
-    "ayush.food_preferences": Section.AYURVEDA,
-    "ayush.meal_regularity": Section.AYURVEDA,
-    "ayush.physical_activity": Section.AYURVEDA,
-    "ayush.sleep_quality": Section.AYURVEDA,
-    "ayush.stress": Section.AYURVEDA,
-    "ayush.sweating": Section.AYURVEDA,
-    "ayush.thirst": Section.AYURVEDA,
-    "ayush.urine_pattern": Section.AYURVEDA,
+    # ayurveda — no explicit entries. The module's 62 questions all carry the
+    # `ayush.` namespace and are routed by the prefix rule below, which is the
+    # rule that was already the safety net for them. Fifteen ids were listed
+    # here when the module had fifteen questions; none of those ids survived
+    # the module being rewritten, so listing ids individually was a promise
+    # this file could not keep across a content change.
     # red flag screen
     "bleeding.amount": Section.RED_FLAG_SCREEN,
     "bleeding.ongoing": Section.RED_FLAG_SCREEN,

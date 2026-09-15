@@ -217,6 +217,9 @@ class PrefillQuestionIn(ApiModel):
     answer_type: str
     prompt: str = ""
     options: list[str] | None = None
+    #: `code -> the label the patient is shown for it`, in their own language.
+    #: The model answers in codes, but it recognises the answer in labels.
+    option_labels: dict[str, str] | None = None
     unit: str | None = None
     min: float | None = None
     max: float | None = None
@@ -251,6 +254,46 @@ class PrefillResponse(ApiModel):
     #: ever wants to, without treating either as an error.
     enabled: bool
     suggestions: list[PrefillSuggestionOut] = Field(default_factory=list)
+
+
+class AyushAnswerIn(ApiModel):
+    """One answered field of the AYUSH module, as the app sends it.
+
+    The vocabularies are the record's own — `FieldStatus` and `Certainty` —
+    and are validated in `services/ayush_profile.py` rather than narrowed to an
+    enum here, so the error a client gets names the field that was wrong rather
+    than failing the whole body with a schema message.
+    """
+
+    field_id: str
+    status: str
+    certainty: str = "reported"
+    value: Any | None = None
+    original_text: str | None = None
+
+
+class AyushProfileRequest(ApiModel):
+    """A patient's completed AYUSH/Prakriti module.
+
+    No patient and no hospital in the body: both come from the session token,
+    per decision 21. A profile can only ever be submitted for the holder of the
+    credential that submitted it.
+    """
+
+    language: str = "en"
+    #: The question-bundle version these were answered against, so a profile
+    #: collected before the module changed can be told apart from a current one.
+    content_version: str | None = None
+    answers: list[AyushAnswerIn] = Field(default_factory=list)
+
+
+class AyushProfileResponse(ApiModel):
+    profile_id: str
+    #: The revision this one replaced, or `None` for a first submission. Echoed
+    #: because an append-only table is only auditable if the client can see the
+    #: chain it just extended.
+    superseded: str | None = None
+    answers_stored: int
 
 
 class ResolveRequest(ApiModel):

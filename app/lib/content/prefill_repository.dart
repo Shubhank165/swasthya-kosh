@@ -71,6 +71,15 @@ class PrefillRepository {
         'answer_type': _wireAnswerType(question.answerType),
         'prompt': question.promptFor(language) ?? '',
         if (question.options != null) 'options': question.options,
+        // The codes alone are what the model must answer *with*; the labels are
+        // how it recognises the answer in the first place. A patient saying
+        // "roz shaam ko" is matching `शाम को`, not `once_daily` — sending only
+        // the code asks the model to translate a language it was never shown.
+        if (question.options != null)
+          'option_labels': {
+            for (final code in question.options!)
+              code: question.labelForOption(code, language) ?? code,
+          },
         if (question.unit != null) 'unit': question.unit,
         if (question.minimum != null) 'min': question.minimum,
         if (question.maximum != null) 'max': question.maximum,

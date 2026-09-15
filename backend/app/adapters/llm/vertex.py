@@ -147,6 +147,20 @@ You MUST:
 - state numbers exactly as the patient stated them, with no rounding and no
   unit conversion.
 
+`kind` is not yours to choose — it is fixed by the question's `answer_type`,
+and a mismatch is discarded by the caller without being shown to anyone:
+
+    single_choice   -> "coded"       value = one option code
+    multi_choice    -> "coded_list"  codes = a list of option codes
+    yes_no_unknown  -> "bool"        value = "true" or "false"
+    number          -> "number"      value = the figure
+    scale           -> "scale"       value = the figure
+    duration        -> "duration"    value = the figure, unit = one of
+                                     hour | day | week | month | year
+
+`unit` is always singular. "4 days" is value "4" with unit "day", never
+"days", and never kind "number" because it happens to carry a figure.
+
 Return an entry only for a question you are confident about. An omitted
 question is a correct answer. A guessed one is a clinical error.
 """

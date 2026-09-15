@@ -519,7 +519,11 @@ class IntakeFlow extends ChangeNotifier {
   /// another question already settled its field — working that out in advance
   /// would duplicate the walker's own job. A suggestion for a question that is
   /// never put is simply never read.
-  List<Question> _upcomingStructuredQuestions({int limit = 8}) {
+  // 8 was less than one pathway: answering "fever" adds more questions than
+  // that, so everything past the eighth could never be suggested however well
+  // the patient described it. The call is fire-and-forget and the patient
+  // never waits on it, so the cost of a wider window is tokens, not latency.
+  List<Question> _upcomingStructuredQuestions({int limit = 20}) {
     const excluded = {AnswerType.freeText, AnswerType.date, AnswerType.unknown};
     final seenFields = <String>{};
     final upcoming = <Question>[];

@@ -92,7 +92,7 @@ def pending_payload(question: Mapping[str, Any]) -> dict[str, Any]:
         "answer_type": question["answer_type"],
         "prompt": question.get("prompt") or "",
     }
-    for key in ("options", "unit", "min", "max"):
+    for key in ("options", "option_labels", "unit", "min", "max"):
         value = question.get(key)
         if value is not None:
             body[key] = value
@@ -148,13 +148,60 @@ async def suggest(
         if value is not None:
             validated[field_id] = value
 
+    # The dropped ids matter more than the count: a model that answers every
+    # question and fails validation on all of them looks identical to one that
+    # answered nothing, and the two need opposite fixes. No values logged —
+    # `field_id` is content, not clinical text.
+    dropped = sorted(set(raw) - set(validated))
     logger.info(
         "prefill_suggested",
         provider=provider.name,
         requested=len(eligible),
+        returned=len(raw),
         suggested=len(validated),
+        dropped=dropped,
     )
     return PrefillOutcome(suggestions=validated, reason="ok")
+
+
+#: Plural spellings a model reaches for when the patient said "4 days". The
+#: value is unchanged by accepting them — "days" and "day" are the same unit,
+#: and rejecting one spelling threw away a correct answer silently.
+_UNIT_ALIASES: Mapping[str, str] = {
+    "hours": "hour",
+    "days": "day",
+    "weeks": "week",
+    "months": "month",
+    "years": "year",
+}
+
+
+def _normalise(question: Mapping[str, Any], body: Mapping[str, Any]) -> dict[str, Any]:
+    """Spelling and shape only — never a value the model did not supply.
+
+    Two things a model gets wrong about *form* while being right about the
+    *answer*, both of which used to be discarded without a trace:
+
+    - a duration returned as `kind: "number"` because it carries a figure. A
+      magnitude plus one of this app's units **is** a duration; the figure and
+      the unit are the model's, and only the label on them changes here.
+    - a plural unit. "days" is "day".
+
+    Anything beyond that is left exactly as it came, for `_validate_one` to
+    accept or reject on its merits.
+    """
+    out = dict(body)
+    unit = out.get("unit")
+    if isinstance(unit, str):
+        lowered = unit.strip().lower()
+        out["unit"] = _UNIT_ALIASES.get(lowered, lowered)
+    if (
+        question.get("answer_type") == "duration"
+        and out.get("kind") == "number"
+        and out.get("unit") in _DURATION_UNITS
+    ):
+        out["kind"] = "duration"
+    return out
 
 
 def _validate_one(
@@ -167,6 +214,7 @@ def _validate_one(
     value is a value the patient did not say and the model did not (correctly)
     suggest either.
     """
+    body = _normalise(question, body)
     answer_type = question["answer_type"]
     expected_kind = _EXPECTED_KIND.get(answer_type)
     if body.get("kind") != expected_kind:

@@ -93,6 +93,10 @@ loses nothing and makes the failure visible to a person.
 
 ## 6. Repair is the only place a model touches clinical input, and it is optional
 
+**Superseded in part by decision 75.** Prefill is a second path on which a model
+reads what a patient wrote. The rest of this decision stands, and 75 is written
+to inherit its reasoning rather than set it aside.
+
 `REPAIR_PROVIDER=none` is a supported production configuration.
 
 **Why.** A hospital that will not have a model touch patient input at all still
@@ -1392,3 +1396,59 @@ The Vertex provider refuses to construct outside an Indian region or without ZDR
 asserted. Those guards are copied from `adapters/ocr/gemini.py` rather than
 shared, because a guard that lives in one place and is imported is a guard
 somebody can forget to import.
+
+## 75. Prefill suggests; only the patient answers
+
+A second model path reads a patient's free text: `services/prefill.py` sends
+what they wrote, plus the questions the interview has not yet reached, and gets
+back proposed values for those questions. Decision 6 said repair was the only
+place a model touched clinical input. That is why this entry exists rather than
+a quiet amendment — a claim that stopped being true should be visibly retired,
+not edited into vagueness.
+
+**What keeps it inside 6's reasoning rather than outside it.**
+
+*Nothing it returns is an answer.* A suggestion arrives as a pre-filled value on
+a screen the patient has not seen, and becomes a fact only when they tap
+Continue on it themselves. At that point it is indistinguishable in the record
+from one they typed unprompted, because that is what it is — their answer,
+which they gave having read it. This is the opposite of `repaired = True`, and
+deliberately so: a repaired field is stamped forever because a machine
+restructured it and nobody confirmed; a suggestion needs no stamp because a
+person did.
+
+*The instruction is not the control.* Every suggestion is re-validated against
+the very question it claims to answer before it leaves the backend — a choice
+must name a real option code, a number must fall inside that question's range,
+a duration must carry a unit this app renders. A suggestion that fails any of
+that is dropped whole, with no clamping and no partial credit, for the reason
+decision 2 gives: a clamped value is a value the patient did not say. This is
+the same argument `services/repair.py` makes for re-validating regardless of
+what a model claims.
+
+*It is optional, and off by default.* `PREFILL_PROVIDER` defaults to `mock`,
+which makes no network call. `none` disables the path outright, and both are
+supported production configurations. With no provider the interview simply asks
+every question, which is exactly what it did before the feature existed — so a
+hospital that will not have a model read a patient's words loses nothing but
+keystrokes. A failed call, a misconfigured provider and a model that suggests
+nothing are one outcome here, not three, and that outcome is the ordinary one.
+
+*Residency and retention are the same guards.* The Vertex prefill provider
+refuses to construct outside an Indian region or without ZDR asserted, copied
+from the OCR provider for the reason decision 74 gives — a guard that is
+imported is a guard somebody can forget to import.
+
+**What is sent.** The patient's own sentence, and for each upcoming question its
+id, type, prompt, option codes and the option labels in the patient's language.
+The labels are sent because the model must answer in codes but recognise the
+answer in language: a patient saying "roz shaam ko" is matching a Hindi label,
+not the string `once_daily`, and asking a model to bridge that from the code
+alone is asking it to guess.
+
+**The limit worth stating.** This path sends a patient's own words, which the
+timeline path (decision 74) deliberately does not. The justification is that the
+words travel only to answer questions the patient is about to be asked anyway,
+are not stored by this call, and are already on the report verbatim under
+decision 3. That is a narrower claim than "no PHI leaves", and it is the honest
+one.
