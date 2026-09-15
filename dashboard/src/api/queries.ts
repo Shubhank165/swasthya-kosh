@@ -102,8 +102,10 @@ export function useIntake(intakeId: string) {
 export function useReport(intakeId: string, language: string | null = null) {
   return useQuery<Report>({
     queryKey: keys.report(intakeId, language),
-    queryFn: () =>
-      api.get<Report>(`/intakes/${intakeId}/report${query({ language })}`),
+    queryFn: () => {
+      const params = language && language !== 'en' ? { language } : {};
+      return api.get<Report>(`/intakes/${intakeId}/report${query(params)}`);
+    },
   });
 }
 

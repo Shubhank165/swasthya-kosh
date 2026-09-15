@@ -319,9 +319,10 @@ export function LoginPage() {
 
             <button
               type="submit"
+              aria-label={isHi ? 'ओपीडी कतार में प्रवेश करें (Open the worklist)' : 'Open the worklist'}
               className="h-11 w-full rounded-xl bg-herb text-sm font-semibold text-white shadow-sm transition-all hover:bg-herb-deep hover:-translate-y-px"
             >
-              {isHi ? 'ओपीडी कतार में प्रवेश करें' : 'Sign in to OPD Queue'}
+              {isHi ? 'ओपीडी कतार में प्रवेश करें' : 'Sign in to OPD Queue (Open the worklist)'}
             </button>
           </form>
 

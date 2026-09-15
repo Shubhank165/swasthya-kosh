@@ -236,7 +236,7 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
       </div>
 
       {/* Queue List Table */}
-      <div className="surface-card overflow-hidden">
+      <div role="table" aria-label="Live Queue" className="surface-card overflow-hidden">
         <div className="flex items-center justify-between border-b border-line bg-[#f8faf9] px-6 py-3.5">
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wider uppercase text-ink-muted">
             <Clock className="size-4 text-herb" />

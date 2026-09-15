@@ -52,7 +52,7 @@ export function ReportPage() {
   const documents = useDocuments(intakeId);
   const [selectedFactId, setSelectedFactId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<ReportTab>('complaint');
+  const [activeTab, setActiveTab] = useState<ReportTab>('all');
 
   const evidence = useEvidence(intakeId, selectedFactId);
   const verifyFact = useVerifyFact(intakeId);
@@ -119,17 +119,22 @@ export function ReportPage() {
   const body = report.data.report as unknown as PhysicianReport;
   const isVerified = Boolean(report.data.physician_verified_by);
   const refType = String(intake.data.patient_ref?.type ?? 'guest');
+  const answeredCount = (intake.data.facts ?? []).filter((f) => f.status === 'answered').length;
+  const totalCount = (intake.data.facts ?? []).length;
 
   return (
     <div className="space-y-6">
-      {/* Back button */}
-      <div>
+      {/* Back button & draft banner */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <Link
           to="/"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-muted transition-colors hover:text-ink"
         >
           <ArrowLeft className="size-4" /> {isHi ? 'ओपीडी कतार पर वापस' : 'Back to OPD queue'}
         </Link>
+        <h2 className="text-xs font-bold uppercase tracking-wider text-ink-muted">
+          {t('report.draft')}
+        </h2>
       </div>
 
       {/* Patient Header Banner */}
@@ -145,6 +150,12 @@ export function ReportPage() {
                 {isHi ? 'रोगी' : 'Patient'} #{intakeId.slice(0, 8)}
               </h1>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span
+                  data-testid="coverage"
+                  className="rounded-lg bg-surface-sunken px-2.5 py-1 font-medium text-ink-muted border border-line"
+                >
+                  <span className="text-ink font-semibold">{answeredCount} of {totalCount} answered</span>
+                </span>
                 <span className="rounded-lg bg-surface-sunken px-2.5 py-1 font-medium text-ink-muted border border-line">
                   <span className="text-ink-muted/80">{isHi ? 'संदर्भ: ' : 'Ref: '}</span>
                   <span className="text-ink font-semibold uppercase">{refType}</span>
@@ -168,6 +179,7 @@ export function ReportPage() {
           {isPhysician && (
             <button
               type="button"
+              data-testid="verify-all"
               disabled={verifyRecord.isPending}
               onClick={() => verifyRecord.mutate({})}
               className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 text-xs sm:text-sm font-semibold shadow-sm transition-all hover:-translate-y-px ${
