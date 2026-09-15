@@ -12,19 +12,33 @@ evaluation live on the Jetson, permanently; the report is a template,
 permanently. A protocol here would be an invitation to wire a model into a path
 that must not have one.
 
-`TimelineProvider` is the one addition to that list, and the distinction has to
-be written down rather than assumed. It **selects and dates events that already
-exist in stored records**. It authors no prose: `validate.py` takes each event's
-label from the candidate it claims to be and throws the model's wording away. It
-states no diagnosis, its output renders through the same templates as every
-other line, and the same `safety.py` scan reads it — which matters, because
-those are the only report lines whose contents a model had any say in, and that
-scan is exactly what it exists for.
+`TimelineProvider` and `PrefillProvider` are the two additions to that list, and
+each distinction has to be written down rather than assumed.
 
-The difference from a `ReportWriter` is not one of degree. A writer would decide
-what the document *says*; this decides which of the things already on the record
-are worth a physician's attention today, and pure code then checks every one of
-its answers against the record it claimed to read.
+`TimelineProvider` **selects and dates events that already exist in stored
+records**. It authors no prose: `validate.py` takes each event's label from the
+candidate it claims to be and throws the model's wording away. It states no
+diagnosis, its output renders through the same templates as every other line,
+and the same `safety.py` scan reads it — which matters, because those are the
+only report lines whose contents a model had any say in, and that scan is
+exactly what it exists for.
+
+`PrefillProvider` **suggests values for structured questions the app has not
+yet put**, from the free text the patient has already typed or dictated earlier
+in this same interview. It is not a `NextQuestionProvider`: it never decides
+which question is asked or skipped — the walker still plans and puts every
+question exactly as it would with no provider configured at all. What it
+changes is only what is pre-filled on a screen the patient has not seen yet, and
+every suggestion is re-validated against that question's own options, range and
+type in `app/services/prefill.py` before the app ever receives it. A suggestion
+the patient never confirms is never recorded — see that module for the rest of
+the argument.
+
+The difference from a `ReportWriter` is not one of degree, for either addition.
+A writer would decide what the document *says*; a timeline decides which of the
+things already on the record are worth a physician's attention today, and a
+prefill decides what a patient might tap next — both leave the actual answer to
+pure code and, in the prefill case, to the patient's own action.
 """
 
 from __future__ import annotations
@@ -78,6 +92,25 @@ class TimelineProvider(Protocol):
     name: str
 
     async def summarise(self, request: TimelineRequest) -> TimelineDraft | None: ...
+
+
+class PrefillProvider(Protocol):
+    """Suggests values for upcoming structured questions from free text.
+
+    Given the patient's own free-text answer and a list of questions the walker
+    has not yet put, returns raw suggestion items keyed by `field_id` — never
+    more fields than were asked about, though `app/services/prefill.py` checks
+    that regardless of what the provider claims. Returns `None` on any failure,
+    mirroring `RepairProvider`: an unusable suggestion set is an expected
+    outcome, and the caller's fallback is simply to ask the question, which is
+    exactly what would have happened with no provider configured at all.
+    """
+
+    name: str
+
+    async def suggest(
+        self, *, free_text: str, questions: list[dict[str, Any]]
+    ) -> dict[str, Any] | None: ...
 
 
 class ABHAProvider(Protocol):

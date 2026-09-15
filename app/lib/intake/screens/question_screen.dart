@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../content/answer.dart';
 import '../../content/bundle.dart';
 import '../../core/theme.dart';
 import '../../l10n/strings.dart';
@@ -28,6 +29,7 @@ class QuestionScreen extends StatelessWidget {
     required this.sectionsDone,
     required this.sectionsTotal,
     this.onBack,
+    this.suggestion,
   });
 
   final Question question;
@@ -42,6 +44,11 @@ class QuestionScreen extends StatelessWidget {
   /// a patient who mistapped must be able to correct it without abandoning the
   /// intake.
   final VoidCallback? onBack;
+
+  /// A value [IntakeFlow] suggested for this question's field, from something
+  /// the patient already said in an earlier free-text answer — or `null`, the
+  /// ordinary case. See `buildAnswerWidget`.
+  final AnswerValue? suggestion;
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +115,7 @@ class QuestionScreen extends StatelessWidget {
                     language: language,
                     onAnswered: onAnswered,
                     onDontKnow: onDontKnow,
+                    suggestion: suggestion,
                   ) ??
                   const SizedBox.shrink(),
               const SizedBox(height: Sizes.gutter),

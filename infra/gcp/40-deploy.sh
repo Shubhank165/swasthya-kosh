@@ -9,7 +9,7 @@
 # Two services, one image. They differ only in environment:
 #
 #   API     public, PUBSUB_PUSH_ENABLED unset, so the worker route does not
-#           exist on it at all — an endpoint that is absent cannot be probed.
+#           exist on it at all â€” an endpoint that is absent cannot be probed.
 #   worker  --no-allow-unauthenticated, PUBSUB_PUSH_ENABLED=true, invoked only
 #           by the push subscription's service account, and holding a shared
 #           secret behind that as a second lock.
@@ -53,7 +53,7 @@ ENV_MODELS="OCR_PROVIDER=${OCR_PROVIDER};REPAIR_PROVIDER=${REPAIR_PROVIDER};VERT
 [[ -n "${REPAIR_MODEL_ID}" ]] && ENV_MODELS="${ENV_MODELS};REPAIR_MODEL_ID=${REPAIR_MODEL_ID}"
 ENV_SHARED="${ENV_SHARED};${ENV_MODELS}"
 
-# Repair runs on the API, during ingest, not on the worker — a payload that
+# Repair runs on the API, during ingest, not on the worker â€” a payload that
 # fails its contract has to be repaired before the response, and there is no
 # document involved. So the API needs Vertex access too, which the provisioning
 # script only grants the worker. Idempotent, and skipped entirely when repair is
@@ -68,7 +68,7 @@ fi
 
 # A signed GCS download URL for a patient's own scan (`GET /patients/me/documents`)
 # is V4-signed, which needs a private key. On Cloud Run the credentials are a
-# bearer token with none, so the API signs through the IAM `signBlob` API — which
+# bearer token with none, so the API signs through the IAM `signBlob` API â€” which
 # needs the service account to be able to mint a signature as itself. The cloud
 # deployment always stores documents in GCS (see ENV_SHARED below).
 say "Granting ${API_SERVICE} self-signBlob (for signed document URLs)"
@@ -100,13 +100,13 @@ API_URL="$(gc run services describe "${API_SERVICE}" --region="${REGION}" --form
 # reads a photograph. More memory and a longer timeout for the same reason.
 # The worker's ceiling is 10, not 20: with direct VPC egress attached, Cloud Run
 # requires `maxScale` to be within the project's VPC-connected instance quota,
-# which is 10 on a new project — and it rejects the deploy rather than clamping.
+# which is 10 on a new project â€” and it rejects the deploy rather than clamping.
 # OCR is queue-driven and Pub/Sub redelivers, so a lower ceiling costs latency
 # under a burst, not work.
 #
 # Auth is the subscription's OIDC token (see the push-subscription block below)
 # checked by Cloud Run against this service's `--no-allow-unauthenticated` and
-# the `run.invoker` grant to the push SA — one control, and the real one. The
+# the `run.invoker` grant to the push SA â€” one control, and the real one. The
 # worker also has an optional static-token check (`worker.py`), but that reads
 # the same `Authorization` header the OIDC JWT now occupies, so binding
 # `PUBSUB_PUSH_TOKEN` here made every push a 403. It is deliberately not set.
@@ -179,7 +179,7 @@ say "Checking the deployment"
 if curl -fsS "${API_URL}/readyz" >/dev/null; then
   echo "    /readyz ok"
 else
-  echo "    /readyz FAILED — the revision is live but not ready." >&2
+  echo "    /readyz FAILED â€” the revision is live but not ready." >&2
   echo "    curl ${API_URL}/readyz to see which check failed." >&2
   exit 1
 fi
@@ -193,7 +193,7 @@ if [[ "${code}" != "404" ]]; then
   echo "    It must be 404 there. Check PUBSUB_PUSH_ENABLED on ${API_SERVICE}." >&2
   exit 1
 fi
-echo "    worker route absent from the public API (404) — as intended"
+echo "    worker route absent from the public API (404) â€” as intended"
 
 say "Deployed ${TAG}"
 echo "  env    ${DEPLOY_ENVIRONMENT}"

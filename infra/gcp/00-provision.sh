@@ -5,7 +5,7 @@
 #
 # It deliberately does NOT create the Pub/Sub push subscription. A push
 # subscription needs the worker's URL, and the worker does not exist until
-# 40-deploy.sh has run — so that script owns the subscription. Creating it here
+# 40-deploy.sh has run â€” so that script owns the subscription. Creating it here
 # with a guessed URL would produce a subscription that pushes into nothing and
 # retries for seven days.
 #
@@ -222,7 +222,7 @@ fi
 if ! exists gc secrets versions describe latest --secret="${SECRET_KIOSK_TOKENS}"; then
   cat >&2 <<'NOTE'
 
-    ACTION REQUIRED — the kiosk tokens secret has no version.
+    ACTION REQUIRED â€” the kiosk tokens secret has no version.
 
     One entry per kiosk device, mapping its token to the hospital it belongs
     to. The token's hospital is authoritative: it overrides anything in a

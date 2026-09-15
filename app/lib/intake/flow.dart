@@ -27,6 +27,7 @@
 /// an intake lost.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -36,6 +37,7 @@ import 'package:flutter/foundation.dart';
 import '../consent/consent_repository.dart';
 import '../content/answer.dart';
 import '../content/bundle.dart';
+import '../content/prefill_repository.dart';
 import '../content/walker.dart';
 import '../core/ids.dart';
 import '../core/logging.dart';
@@ -92,10 +94,12 @@ class IntakeFlow extends ChangeNotifier {
     this.departmentCode,
     this.consent,
     this.patientRef = const PatientRef.guest(),
+    PrefillRepository? prefill,
     DateTime Function() clock = DateTime.now,
   })  : _db = database,
         _queue = queue,
         _documents = documents,
+        _prefill = prefill,
         _clock = clock {
     _current = walker.next();
     _stage = _current == null ? FlowStage.documents : FlowStage.question;
@@ -121,6 +125,7 @@ class IntakeFlow extends ChangeNotifier {
     List<ConfirmedFact> confirmed = const [],
     bool returnVisit = false,
     PatientRef patientRef = const PatientRef.guest(),
+    PrefillRepository? prefill,
     DateTime Function() clock = DateTime.now,
     Random? random,
   }) async {
@@ -145,6 +150,7 @@ class IntakeFlow extends ChangeNotifier {
       consent: consent,
       returnVisit: returnVisit,
       patientRef: patientRef,
+      prefill: prefill,
       startedAt: now,
       clock: clock,
     );
@@ -167,6 +173,7 @@ class IntakeFlow extends ChangeNotifier {
     required String appVersion,
     ConsentGrant? consent,
     PatientRef patientRef = const PatientRef.guest(),
+    PrefillRepository? prefill,
     DateTime Function() clock = DateTime.now,
   }) {
     if (draft.contentVersion != bundle.contentVersion) return null;
@@ -201,6 +208,7 @@ class IntakeFlow extends ChangeNotifier {
       consent: consent,
       returnVisit: draft.returnVisit,
       patientRef: patientRef,
+      prefill: prefill,
       startedAt: draft.startedAt,
       clock: clock,
     );
@@ -209,6 +217,7 @@ class IntakeFlow extends ChangeNotifier {
   final LocalDatabase _db;
   final SubmissionQueue _queue;
   final DocumentStore _documents;
+  final PrefillRepository? _prefill;
   final DateTime Function() _clock;
 
   final IntakeWalker walker;
@@ -240,6 +249,16 @@ class IntakeFlow extends ChangeNotifier {
   PageQuality? _rejected;
   int _loggedDegraded = 0;
 
+  /// Field id -> a value a prefill provider suggested for it, from something
+  /// the patient already said in an earlier free-text answer.
+  ///
+  /// **Never an answer.** This is consulted only by the screen for the
+  /// question it names, to pre-fill what it shows; nothing here reaches
+  /// [walker] or the record until the patient acts on the screen the ordinary
+  /// way — a tap, or Continue. See `PrefillRepository` for the rest of the
+  /// argument.
+  final Map<String, AnswerValue> _suggestions = {};
+
   FlowStage get stage => _stage;
 
   /// The question on screen, or null on every other stage.
@@ -248,6 +267,11 @@ class IntakeFlow extends ChangeNotifier {
   String get language => walker.language;
   ContentBundle get bundle => walker.bundle;
   Map<String, Answer> get answers => walker.answers;
+
+  /// A suggested value for [fieldId], or `null` — the ordinary case, and the
+  /// only one when no prefill provider is configured or none of what the
+  /// patient wrote answered this question.
+  AnswerValue? suggestionFor(String fieldId) => _suggestions[fieldId];
 
   /// The rule that stopped the intake, once one has.
   RedFlagHit? get firedFlag => walker.firedFlag;
@@ -420,6 +444,7 @@ class IntakeFlow extends ChangeNotifier {
 
   Future<void> _put(Answer answer) async {
     if (_stage != FlowStage.question) return;
+    final answeredQuestion = _current;
     final outcome = walker.record(answer);
 
     if (outcome == WalkOutcome.redFlag) {
@@ -440,6 +465,75 @@ class IntakeFlow extends ChangeNotifier {
       _stage = FlowStage.question;
     }
     notifyListeners();
+
+    // Best-effort and deliberately not awaited: the patient is already on the
+    // next screen, exactly as they would be with no prefill provider
+    // configured at all, and whatever comes back only ever pre-fills a screen
+    // they have not reached yet.
+    final value = answer.value;
+    if (answeredQuestion != null &&
+        answeredQuestion.answerType == AnswerType.freeText &&
+        answer.status == FieldStatus.answered &&
+        value is TextValue) {
+      unawaited(_requestPrefill(source: answeredQuestion, text: value.text));
+    }
+  }
+
+  /// Ask for suggestions against the questions still ahead, from an answer the
+  /// patient just gave to a free-text one.
+  ///
+  /// Fire-and-forget from [_put]'s point of view — the interview has already
+  /// moved on by the time this resolves. A suggestion that arrives is simply
+  /// there the next time [suggestionFor] is asked about that field; one that
+  /// never arrives, or arrives after the question was already answered another
+  /// way, changes nothing.
+  Future<void> _requestPrefill({required Question source, required String text}) async {
+    final prefill = _prefill;
+    if (prefill == null) return;
+    // Too short to plausibly answer anything ahead — not worth the call.
+    if (text.trim().length < 3) return;
+    final pending = _upcomingStructuredQuestions();
+    if (pending.isEmpty) return;
+    // No clinical text here — the question id this came from and a count,
+    // same restraint `_noteDegradation` already applies to content ids.
+    logEvent('prefill_requested', fields: {
+      'question_id': source.questionId,
+      'pending': pending.length,
+    });
+    final result = await prefill.suggest(
+      intakeId: intakeId,
+      language: language,
+      freeText: text,
+      pending: pending,
+    );
+    if (result.isEmpty) return;
+    _suggestions.addAll(result);
+    notifyListeners();
+  }
+
+  /// A bounded look-ahead through the walker's own plan: not yet answered, not
+  /// a type this feature targets, and rendered in the patient's language.
+  ///
+  /// Deliberately approximate. A question here may still turn out
+  /// `not_applicable` once its precondition resolves, or be skipped because
+  /// another question already settled its field — working that out in advance
+  /// would duplicate the walker's own job. A suggestion for a question that is
+  /// never put is simply never read.
+  List<Question> _upcomingStructuredQuestions({int limit = 8}) {
+    const excluded = {AnswerType.freeText, AnswerType.date, AnswerType.unknown};
+    final seenFields = <String>{};
+    final upcoming = <Question>[];
+    for (final id in walker.plan) {
+      if (walker.answers.containsKey(id)) continue;
+      final question = bundle.questions[id];
+      if (question == null) continue;
+      if (excluded.contains(question.answerType)) continue;
+      if (question.promptFor(language) == null) continue;
+      if (!seenFields.add(question.fieldId)) continue;
+      upcoming.add(question);
+      if (upcoming.length >= limit) break;
+    }
+    return upcoming;
   }
 
   /// §6, in the order §6 gives.
@@ -486,7 +580,15 @@ class IntakeFlow extends ChangeNotifier {
   }
 
   Future<void> _reopen(String questionId) async {
+    final retracted = bundle.questions[questionId];
     if (!walker.retract(questionId)) return;
+    if (retracted?.answerType == AnswerType.freeText) {
+      // The suggestions on file were drawn from the text just retracted, which
+      // the patient may now change or remove entirely. Dropping all of them is
+      // the safe direction: a stale suggestion beside a rewritten complaint is
+      // worse than none.
+      _suggestions.clear();
+    }
     _current = walker.next();
     await _saveDraft();
     // Back to documents rather than to the review when there is nothing left to

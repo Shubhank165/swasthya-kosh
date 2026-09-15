@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.adapters.abha.providers import MockABHAProvider, SandboxABHAProvider, build_provider
-from app.adapters.llm.mock import MockRepairProvider
+from app.adapters.llm.mock import MockPrefillProvider, MockRepairProvider
 from app.adapters.ocr.mock import MockOCRProvider
 from app.adapters.otp.senders import MockOTPSender, SMSOTPSender, build_sender
 from app.adapters.protocols import (
@@ -19,6 +19,7 @@ from app.adapters.protocols import (
     ObjectStore,
     OCRProvider,
     OTPSender,
+    PrefillProvider,
     RepairProvider,
     TimelineProvider,
 )
@@ -42,6 +43,10 @@ class Providers:
     #: still carries a full dated history — pure code builds it — so "disabled"
     #: here means no relevance filtering, not no timeline.
     timeline: TimelineProvider | None = None
+    #: `None` when `PREFILL_PROVIDER=none`. With no provider every structured
+    #: question is simply put to the patient — "disabled" is the interview as
+    #: it existed before this feature, not a degraded version of it.
+    prefill: PrefillProvider | None = None
 
     def describe(self) -> dict[str, str]:
         """What is live. Safe to serve from `/readyz`."""
@@ -52,6 +57,7 @@ class Providers:
             "storage": self.storage.name,
             "otp": self.otp.name,
             "timeline": self.timeline.name if self.timeline is not None else "disabled",
+            "prefill": self.prefill.name if self.prefill is not None else "disabled",
         }
 
 
@@ -105,6 +111,23 @@ def build_timeline(settings: Settings) -> TimelineProvider | None:
     return None
 
 
+def build_prefill(settings: Settings) -> PrefillProvider | None:
+    """The prefill provider, or `None` when prefill is switched off.
+
+    Unlike repair, prefill is never required: with no provider every question
+    is simply asked, which is what happened before this feature existed. A
+    hospital that will not have a model see a patient's own words before a
+    physician does gets exactly that intake experience, unchanged.
+    """
+    if settings.prefill_provider == "none":
+        return None
+    if settings.prefill_provider == "vertex":
+        from app.adapters.llm.vertex import VertexPrefillProvider
+
+        return VertexPrefillProvider(settings)
+    return MockPrefillProvider()
+
+
 def build_abha(settings: Settings) -> MockABHAProvider | SandboxABHAProvider:
     return build_provider(settings)
 
@@ -126,6 +149,7 @@ def build_providers(settings: Settings) -> Providers:
         storage=build_storage(settings),
         otp=build_otp(settings),
         timeline=build_timeline(settings),
+        prefill=build_prefill(settings),
     )
     logger.info("providers_selected", **providers.describe())
     return providers

@@ -50,6 +50,7 @@ from app.services.documents import DocumentService
 from app.services.identity import IdentityService
 from app.services.ingest import IngestService
 from app.services.patient_auth import PatientAuthService
+from app.services.prefill import PrefillService
 from app.services.reports import ReportService
 from app.services.terminology import TerminologyService
 from app.services.timeline import TimelineService
@@ -361,6 +362,16 @@ async def get_patient_auth_service(
 PatientAuthServiceDep = Annotated[PatientAuthService, Depends(get_patient_auth_service)]
 
 
+async def get_prefill_service(providers: ProvidersDep) -> PrefillService:
+    """Best-effort suggestions from a free-text answer — no session, no
+    tenant scope: the provider is process-wide and nothing here is persisted.
+    """
+    return PrefillService(providers.prefill)
+
+
+PrefillServiceDep = Annotated[PrefillService, Depends(get_prefill_service)]
+
+
 
 
 # --- idempotency -------------------------------------------------------------
@@ -462,6 +473,7 @@ __all__ = [
     "IngestServiceDep",
     "LabelsDep",
     "MetricsRepoDep",
+    "PrefillServiceDep",
     "Principal",
     "ProvidersDep",
     "RawRepoDep",

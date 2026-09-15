@@ -14,3 +14,7 @@ build/
 *.egg-info/
 uploads/
 .last-image-tag
+
+# GCP service-account keys for local Vertex AI testing — never committed.
+secrets/*
+!secrets/.gitkeep

@@ -128,6 +128,7 @@ class _IntakeHostState extends ConsumerState<IntakeHost> {
       sectionsDone: done,
       sectionsTotal: total,
       onBack: flow.canGoBack ? flow.back : null,
+      suggestion: flow.suggestionFor(question.fieldId),
     );
   }
 

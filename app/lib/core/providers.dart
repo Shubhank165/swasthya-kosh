@@ -13,6 +13,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../consent/consent_repository.dart';
+import '../content/prefill_repository.dart';
 import '../content/bundle.dart';
 import '../content/bundle_repository.dart';
 import '../documents/document_store.dart';
@@ -45,6 +46,10 @@ final apiProvider = Provider<ApiClient>((ref) {
     readHospitalId: () => ref.read(selectedHospitalProvider)?.id,
   );
 });
+
+final prefillRepositoryProvider = Provider<PrefillRepository>(
+  (ref) => PrefillRepository(api: ref.watch(apiProvider)),
+);
 
 final authProvider = Provider<AuthRepository>((ref) => AuthRepository(
       api: ref.watch(apiProvider),

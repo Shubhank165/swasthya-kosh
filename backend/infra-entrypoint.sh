@@ -9,7 +9,7 @@
 # and Cloud Run's concurrency, a burst of cold starts runs `alembic upgrade
 # head` several times at once against one database, and the first migration to
 # take the lock decides what the others see. Worse, it means a rollback of the
-# application is not a rollback — the schema has already moved. Migrations are a
+# application is not a rollback â€” the schema has already moved. Migrations are a
 # pre-deploy step with one runner: `make migrate`, or the migrate job in
 # compose, or `infra/gcp/40-deploy.sh` before it shifts traffic.
 set -euo pipefail

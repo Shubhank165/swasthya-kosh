@@ -94,3 +94,37 @@ def _repair_field(body: Any) -> dict[str, Any]:
     if field["status"] in VALUELESS_STATUSES:
         field["value"] = None
     return field
+
+
+class MockPrefillProvider:
+    """Rule-based prefill. No model, no network, fully deterministic.
+
+    Matches a `yes_no_unknown` question's own prompt text against the free text
+    as a literal substring, with a leading "no"/"not"/"never" flipping the
+    answer. That is deliberately as far as it goes: it exercises the prefill
+    path — request in, suggestion out, validated by `app/services/prefill.py`
+    exactly as a real one would be — with no network and no nondeterminism.
+    Real extraction from a patient's own words is Vertex's job; a mock that
+    tried to do more would give the test suite false confidence in a heuristic
+    nobody would ship.
+    """
+
+    name = "mock"
+
+    async def suggest(
+        self, *, free_text: str, questions: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
+        haystack = free_text.lower()
+        suggestions: dict[str, Any] = {}
+        for question in questions:
+            field_id = question.get("field_id")
+            if not field_id or question.get("answer_type") != "yes_no_unknown":
+                continue
+            prompt = str(question.get("prompt") or "").lower().strip()
+            if not prompt or prompt not in haystack:
+                continue
+            negated = any(
+                f"{word} {prompt}" in haystack for word in ("no", "not", "never")
+            )
+            suggestions[field_id] = {"kind": "bool", "value": "false" if negated else "true"}
+        return suggestions

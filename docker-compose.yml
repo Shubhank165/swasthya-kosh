@@ -30,6 +30,20 @@ x-app: &app
     OCR_PROVIDER: ${OCR_PROVIDER:-mock}
     REPAIR_PROVIDER: ${REPAIR_PROVIDER:-mock}
     ABHA_PROVIDER: ${ABHA_PROVIDER:-mock}
+    # Prefill (suggests answers from what the patient already typed) and the
+    # Vertex AI settings it, repair and OCR all share. Left unset, prefill
+    # defaults to `mock` inside the app itself — these three only matter once
+    # someone sets PREFILL_PROVIDER (or OCR_PROVIDER/REPAIR_PROVIDER) to
+    # `vertex` or `gemini` in their own .env.
+    PREFILL_PROVIDER: ${PREFILL_PROVIDER:-mock}
+    PREFILL_MODEL_ID: ${PREFILL_MODEL_ID:-}
+    VERTEX_PROJECT: ${VERTEX_PROJECT:-}
+    VERTEX_REGION: ${VERTEX_REGION:-asia-south1}
+    VERTEX_ZDR_ENABLED: ${VERTEX_ZDR_ENABLED:-false}
+    # Points at a service-account key mounted from ./secrets below. Empty by
+    # default, which is fine: nothing reads it unless a vertex provider is
+    # actually constructed.
+    GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
     # No broker locally: OCR runs as a background task in the API process, which
     # is what makes this stack a complete pipeline offline.
     DOCUMENT_QUEUE: inline
@@ -45,6 +59,11 @@ x-app: &app
     PATIENT_REF_PEPPER: ${PATIENT_REF_PEPPER:?set PATIENT_REF_PEPPER in .env}
   volumes:
     - uploads:/app/backend/uploads
+    # A GCP service-account key for Vertex AI, if you're using it. This
+    # directory is created empty and mounted read-only for everyone, so
+    # nobody who leaves it empty is affected — it only matters once you set
+    # GOOGLE_APPLICATION_CREDENTIALS to a path inside it.
+    - ./secrets:/app/secrets:ro
   depends_on:
     postgres:
       condition: service_healthy

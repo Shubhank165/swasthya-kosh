@@ -238,6 +238,7 @@ class _ReturningPatientGateState extends ConsumerState<ReturningPatientGate> {
       // before, which is what makes the Ayurveda section the current-state
       // subset rather than the full module (§5 screen 8).
       returnVisit: confirmed.isNotEmpty || ref.read(carryForwardProvider).valueOrNull?.isNotEmpty == true,
+      prefill: ref.read(prefillRepositoryProvider),
       consent: consent == null
           ? null
           : ConsentGrant(
