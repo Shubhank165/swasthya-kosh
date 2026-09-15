@@ -14,6 +14,13 @@ app/build/
 app/.dart_tool/
 app/.pub-cache/
 
+# The on-device speech models. 243 MB of ONNX — whisper-tiny and
+# IndicConformer — that exist to run inference on the phone, and which this
+# image never opens: every model the backend uses is a Vertex call. They were
+# most of a 268 MB source tarball uploaded to Cloud Build on every backend
+# deploy.
+app/assets/asr/
+
 __pycache__/
 *.pyc
 .venv/
