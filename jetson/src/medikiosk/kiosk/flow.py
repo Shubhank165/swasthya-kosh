@@ -763,6 +763,87 @@ class KioskFlow:
 
     # ------------------------------------------------------------------ stage payloads
 
+#: Touch controls for questions whose answer is a quantity.
+#:
+#: **Keyed by question id, not by answer type.** A type alone cannot say that a
+#: temperature steps by 0.1 between 95 and 108 while an age steps by 1 between 0
+#: and 120, and a stepper with the wrong step is worse than a text box — it
+#: makes a patient press + ninety times, or offers them 37.0 degrees of fever.
+#:
+#: Anything absent from this table keeps the input it has today. Adding a
+#: question here is the whole of what it takes to give it a stepper; nothing in
+#: the tablet changes.
+#:
+#: `unit_key` names a translated label the client already has. `initial` is
+#: where the control opens, chosen as a plausible middle rather than the
+#: minimum, so the common answer is a few presses away in either direction —
+#: and it is *not* an answer until the patient confirms it.
+TOUCH_CONTROLS: dict[str, dict] = {
+    "registration.age": {
+        "type": "stepper",
+        "min": 0,
+        "max": 120,
+        "step": 1,
+        "big_step": 10,
+        "initial": 30,
+        "unit_key": "years",
+    },
+    "history.age": {
+        "type": "stepper",
+        "min": 0,
+        "max": 120,
+        "step": 1,
+        "big_step": 10,
+        "initial": 30,
+        "unit_key": "years",
+    },
+    "fever.maximum_temperature": {
+        "type": "stepper",
+        "min": 95.0,
+        "max": 108.0,
+        "step": 0.1,
+        "big_step": 1.0,
+        "initial": 100.0,
+        "decimals": 1,
+        "unit_key": "fahrenheit",
+    },
+    "sleep.hours": {
+        "type": "stepper",
+        "min": 0,
+        "max": 24,
+        "step": 1,
+        "initial": 7,
+        "unit_key": "hours",
+    },
+    "menstrual.cycle_length": {
+        "type": "stepper",
+        "min": 15,
+        "max": 60,
+        "step": 1,
+        "initial": 28,
+        "unit_key": "days",
+    },
+    "general.severity": {
+        "type": "scale",
+        "min": 0,
+        "max": 10,
+    },
+}
+
+
+def control_for(question_id: str | None) -> dict | None:
+    """The touch control for a question, or `None` to leave it as it is.
+
+    Returning `None` rather than a default is deliberate: a question nobody has
+    thought about the range for should keep the input that already works, not
+    inherit a stepper with invented limits.
+    """
+    if not question_id:
+        return None
+    control = TOUCH_CONTROLS.get(question_id)
+    return dict(control) if control else None
+
+
     def screen(self, state: PatientState) -> dict:
         screen = self._screen(state)
         actions = ["repeat", "slower", "more_time", "help", "restart"]
@@ -793,6 +874,12 @@ class KioskFlow:
             }:
                 actions.append("withdraw")
         screen.update(language=self.language, allowed_actions=actions)
+        # Attached here rather than in each branch of `_screen`: every screen
+        # that names a question gets its control by the same rule, and a new
+        # entry in `TOUCH_CONTROLS` reaches all of them at once.
+        control = control_for(screen.get("question_id"))
+        if control is not None:
+            screen["control"] = control
         return screen
 
     def _screen(self, state: PatientState) -> dict:

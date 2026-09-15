@@ -277,6 +277,9 @@ class KioskRoot(BoxLayout):
         self.stage = None
         self.question_id = None
         self.option_values: list[str] = []
+        self.control: dict | None = None
+        self.control_value: float = 0.0
+        self.value_label = None
 
         self.audio = Audio(self._send_audio, self.set_status)
         self.client = KioskClient(self.handle_message, self.set_status)
@@ -393,9 +396,20 @@ class KioskRoot(BoxLayout):
         self.set_camera(self.stage in CAMERA_STAGES)
         self.buttons.clear_widgets()
 
-        for index in range(1, len(options) + 1):
-            # Numbers only: the labels are already drawn, correctly shaped, on the frame above.
-            self.add_button(str(index), lambda i=index: self.choose(i), font_size="30sp")
+        control = screen.get("control")
+        self.control = control
+        self.value_label = None
+        if control:
+            # A quantity, not a choice. The question itself is still the frame above, rendered on
+            # the Jetson with raqm; only digits and +/- are laid out here, and digits need no
+            # shaping. That keeps the rule this client exists for - no Indic text is composed on
+            # the tablet - while giving the patient something to press instead of a voice prompt
+            # they may not answer.
+            self.build_control(control)
+        else:
+            for index in range(1, len(options) + 1):
+                # Numbers only: the labels are already drawn, correctly shaped, on the frame above.
+                self.add_button(str(index), lambda i=index: self.choose(i), font_size="30sp")
 
         if not options and self.stage == "abha":
             self.add_button("SCAN CARD", self.scan_abha)
@@ -404,7 +418,78 @@ class KioskRoot(BoxLayout):
             self.add_button("SCAN", self.scan_document)
             self.add_button("DONE", lambda: self.client.send({"type": "flow.next"}))
 
-        self.buttons.height = 96 if self.buttons.children else 0
+        # A stepper needs room: 48sp glyphs on the +/- keys and a 64sp value between them do not
+        # fit the 96px a row of numbered option buttons uses. Taller only when there is a control,
+        # so every existing screen keeps the height it was laid out against.
+        if not self.buttons.children:
+            self.buttons.height = 0
+        elif self.control:
+            self.buttons.height = 160
+        else:
+            self.buttons.height = 96
+
+    @mainthread
+    def build_control(self, control: dict) -> None:
+        """A touch control for a quantity: a stepper, or a 0-10 scale.
+
+        The value lives here and only the confirmed number is sent. Round-tripping every press to
+        the Jetson for a re-render would put a frame poll between a finger and the digit it
+        changed, which on a 1 second poll reads as a broken button and gets pressed again.
+        """
+        self.control = control
+        kind = control.get("type")
+        if kind == "scale":
+            self._build_scale(control)
+        else:
+            self._build_stepper(control)
+
+    def _build_scale(self, control: dict) -> None:
+        low, high = int(control.get("min", 0)), int(control.get("max", 10))
+        for value in range(low, high + 1):
+            self.add_button(str(value), lambda v=value: self.submit_value(str(v)), font_size="26sp")
+
+    def _build_stepper(self, control: dict) -> None:
+        self.control_value = float(control.get("initial", control.get("min", 0)))
+        self.value_label = Label(
+            text=self._format_value(),
+            font_size="64sp",
+            bold=True,
+            color=(0.95, 0.96, 0.98, 1),
+        )
+        # Minus and plus are the widest targets on screen and sit at the two edges, so a patient
+        # holding the tablet with both hands reaches them with either thumb without looking.
+        self.add_button("-", lambda: self.nudge(-1), font_size="48sp")
+        self.buttons.add_widget(self.value_label)
+        self.add_button("+", lambda: self.nudge(1), font_size="48sp")
+        self.add_button("OK", lambda: self.submit_value(self._format_value()), font_size="26sp")
+
+    def _format_value(self) -> str:
+        decimals = int((self.control or {}).get("decimals", 0))
+        if decimals:
+            return f"{self.control_value:.{decimals}f}"
+        return str(int(round(self.control_value)))
+
+    def nudge(self, direction: int) -> None:
+        """One press. Clamped, so the control can never offer an impossible answer."""
+        control = self.control or {}
+        step = float(control.get("step", 1))
+        low = float(control.get("min", 0))
+        high = float(control.get("max", 999))
+        self.control_value = max(low, min(high, self.control_value + direction * step))
+        if self.value_label is not None:
+            self.value_label.text = self._format_value()
+
+    def submit_value(self, value: str) -> None:
+        """Send a confirmed quantity down the same path a tapped option takes."""
+        self.client.send(
+            {
+                "type": "flow.action",
+                "action": "answer",
+                "value": value,
+                "question_id": self.question_id,
+                "method": "touch",
+            }
+        )
 
     def add_button(self, label: str, handler, font_size: str = "22sp") -> None:
         button = Button(
