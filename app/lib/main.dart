@@ -46,12 +46,22 @@ class _MediKioskAppState extends ConsumerState<MediKioskApp> {
         ref.read(readAloudEnabledProvider.notifier).state = stored;
       }
     }, fireImmediately: true);
-    // Copy the bundled speech model into app storage now, off the first frame,
-    // so the microphone on the first question is ready without a pause. No
+    // Copy the bundled speech model into app storage, off the first frame, so
+    // the microphone on the first question is ready without a pause. No
     // network, no prompt; a failure just means voice input is unavailable.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(transcriberProvider).ensureModel(ref.read(languageProvider));
-    });
+    //
+    // Once per language, not once per launch: each language has its own
+    // checkpoint (English is Whisper, Hindi is IndicConformer — §76), the
+    // patient picks the language after launch, and warming only the one the
+    // app started in leaves the first Hindi question paying a 140 MB copy
+    // while the patient is looking at it. `ensureInstalled` returns early when
+    // the files are already there, so re-warming an already-warm language is
+    // a stat call.
+    ref.listenManual(languageProvider, (_, language) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(transcriberProvider).ensureModel(language);
+      });
+    }, fireImmediately: true);
     // Drain the submission queue on launch — §9, §15 item 8.
     //
     // Unawaited and unannounced: an intake finished on a train goes out the
