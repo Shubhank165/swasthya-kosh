@@ -86,7 +86,11 @@ flutter:
   generate: true
   assets:
     - assets/bundle/
-    # The offline ASR model — ~103 MB of Whisper-tiny int8, shipped in the APK
-    # so voice input works on first launch with no download. See
-    # lib/voice/asr_models.dart.
+    # The offline ASR models — shipped in the APK so voice input works on
+    # first launch with no download, and never fetched. ~103 MB of
+    # Whisper-tiny int8 for English, ~140 MB of IndicConformer int8 for Hindi;
+    # neither transcribes the other's language usably. See
+    # lib/voice/asr_models.dart for the measurements behind that split, and
+    # tool/asr/build_indicconformer.py for how the Hindi one is produced.
     - assets/asr/whisper-tiny/
+    - assets/asr/indic-hi/

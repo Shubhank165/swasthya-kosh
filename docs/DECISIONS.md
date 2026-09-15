@@ -1488,12 +1488,27 @@ measurable. `app/tool/asr/build_indicconformer.py` does all three and checks
 `vocab_size` against the model's own output dimension rather than trusting it —
 a mismatch there decodes to the wrong characters without failing.
 
-**The gate does not move yet.** `WhisperModel.servedLanguages` is still `{'en'}`
-because the app does not yet know how to build a NeMo-CTC recogniser — today
-`transcribe.dart` hard-codes `OfflineWhisperModelConfig`. Widening the set
-before that is wired would offer a microphone backed by nothing, which is the
-exact failure §69 exists to prevent. The measurement is recorded now so the
-person who does the wiring is not re-deriving it.
+**The gate moves, and the shape of the gate changes with it.**
+`servedLanguages` was a hard-coded set beside a single `multilingual` model.
+Two engines cannot live behind that: a Whisper checkpoint is an encoder/decoder
+pair and a NeMo CTC checkpoint is one graph, and handing either to the other's
+config fails at load. So the set becomes derived — `AsrModel.registry` maps
+`'en' -> whisperTiny`, `'hi' -> indicConformerHindi`, and `servedLanguages` is
+its keys. One map is the whole policy, and a language absent from it still
+resolves to no model, which every caller above already turns into an absent
+microphone.
+
+`ModelFiles` is now **sealed** — `WhisperFiles` or `NemoCtcFiles` — so the
+isolate's `switch` has to handle every engine. A third family cannot be added
+and silently fall through to Whisper's config; it is a compile error instead.
+
+**The asset is 140 MB, which is over GitHub's blob limit**, so it is tracked
+through Git LFS. Leaving it out was the alternative and is worse: `pubspec.yaml`
+declares the directory, an empty declared asset directory fails the Flutter
+build, and a teammate who cloned without it would ship a Hindi microphone that
+appears and fails at first tap. `on_device_voice_test.dart` fails on an
+unfetched LFS pointer for that reason — the mistake surfaces in a test run, not
+on a patient's phone.
 
 **And one honest limit.** `हाँ` still comes back as `हा` or `ख`: CTC needs
 encoder context and a 400 ms utterance does not give it any. Yes/no and

@@ -188,7 +188,7 @@ class _AsrIsolate {
     final rx = ReceivePort();
     final isolate = await Isolate.spawn(
       _asrWorkerEntry,
-      _AsrInit(rx.sendPort, files.encoder, files.decoder, files.tokens, language),
+      _AsrInit(rx.sendPort, files, language),
       errorsAreFatal: true,
       debugName: 'asr-$language',
     );
@@ -218,12 +218,13 @@ class _AsrIsolate {
 }
 
 class _AsrInit {
-  const _AsrInit(
-      this.reply, this.encoder, this.decoder, this.tokens, this.language);
+  const _AsrInit(this.reply, this.files, this.language);
   final SendPort reply;
-  final String encoder;
-  final String decoder;
-  final String tokens;
+  final ModelFiles files;
+
+  /// Whisper needs this baked into its config; a per-language CTC model does
+  /// not, because the checkpoint *is* the language. Carried either way so the
+  /// isolate reports which language it is serving.
   final String language;
 }
 
@@ -238,24 +239,36 @@ void _asrWorkerEntry(_AsrInit init) {
   sherpa.OfflineRecognizer recognizer;
   try {
     sherpa.initBindings();
-    recognizer = sherpa.OfflineRecognizer(
-      sherpa.OfflineRecognizerConfig(
-        model: sherpa.OfflineModelConfig(
+    // 2 big cores + 2 little on the target class of device. More than this
+    // contends with the UI isolate for no gain.
+    const threads = 4;
+    final files = init.files;
+    final model = switch (files) {
+      WhisperFiles() => sherpa.OfflineModelConfig(
           whisper: sherpa.OfflineWhisperModelConfig(
-            encoder: init.encoder,
-            decoder: init.decoder,
+            encoder: files.encoder,
+            decoder: files.decoder,
             // Whisper is multilingual; the interview language is fixed here for
             // the life of this isolate rather than auto-detected per clip.
             language: init.language,
             task: 'transcribe',
           ),
-          tokens: init.tokens,
+          tokens: files.tokens,
           modelType: 'whisper',
-          // 2 big cores + 2 little on the target class of device. More than
-          // this contends with the UI isolate for no gain.
-          numThreads: 4,
+          numThreads: threads,
         ),
-      ),
+      // A per-language CTC checkpoint takes no language argument — there is
+      // nothing to detect and nothing to force, which is the property that
+      // rules out mid-sentence script drift. DECISIONS §76.
+      NemoCtcFiles() => sherpa.OfflineModelConfig(
+          nemoCtc: sherpa.OfflineNemoEncDecCtcModelConfig(model: files.model),
+          tokens: files.tokens,
+          modelType: 'nemo_ctc',
+          numThreads: threads,
+        ),
+    };
+    recognizer = sherpa.OfflineRecognizer(
+      sherpa.OfflineRecognizerConfig(model: model),
     );
   } on Object catch (e) {
     init.reply.send('init failed: $e');

@@ -170,43 +170,99 @@ void main() {
         'assets/asr/whisper-tiny/tiny-encoder.int8.onnx',
         'assets/asr/whisper-tiny/tiny-decoder.int8.onnx',
         'assets/asr/whisper-tiny/tiny-tokens.txt',
+        'assets/asr/indic-hi/model.int8.onnx',
+        'assets/asr/indic-hi/tokens.txt',
       ]) {
-        expect(File(f).existsSync(), isTrue, reason: '$f is missing from the repo');
+        expect(File(f).existsSync(), isTrue,
+            reason: '$f is missing from the repo. The .onnx files are Git LFS '
+                'objects — a clone without `git lfs pull` leaves a pointer '
+                'file here, and the APK then ships a microphone backed by '
+                'nothing. Hindi is rebuildable with '
+                'tool/asr/build_indicconformer.py.');
+      }
+
+      // An LFS pointer is a few hundred bytes of text. It satisfies
+      // `existsSync` and fails at model load, on a device, mid-interview.
+      for (final f in [
+        'assets/asr/whisper-tiny/tiny-decoder.int8.onnx',
+        'assets/asr/indic-hi/model.int8.onnx',
+      ]) {
+        expect(File(f).lengthSync(), greaterThan(1 << 20),
+            reason: '$f looks like an unfetched Git LFS pointer, not a model');
       }
     });
   });
 
   group('voice is offered only where the model earns it', () {
-    // Whisper-tiny romanises Hindi rather than writing Devanagari: on clean
+    // A language gets a microphone when a bundled checkpoint has been measured
+    // on it, and not before. Whisper-tiny romanises Hindi — on clean
     // synthesised speech "तीन दिनों से" came back as "Team denose", which is
     // not a rougher transcript but a different sentence, in a record a
-    // physician acts on. whisper-base is no better. So the served set is a
-    // deliberate, measured list and shrinking the mic to match is the feature,
-    // not a regression — see the doc comment on WhisperModel.servedLanguages.
+    // physician acts on (DECISIONS §69). IndicConformer, converted for
+    // sherpa-onnx, scores 0.04 CER on the same clips and reopened Hindi
+    // (DECISIONS §76). The other seven languages are still unmeasured, so the
+    // mic is still absent there and the patient taps or types.
     final models = File('lib/voice/asr_models.dart').readAsStringSync();
 
-    test('a language the model cannot write is not offered a microphone', () {
-      final served = RegExp(r'servedLanguages\s*=\s*\{([^}]*)\}')
-          .firstMatch(models)
-          ?.group(1);
-      expect(served, isNotNull,
-          reason: 'the served-language set must stay declared in one place');
-      expect(served, contains("'en'"));
-      for (final unserved in ['hi', 'bn', 'ta', 'te', 'mr', 'gu', 'kn', 'pa']) {
-        expect(served, isNot(contains("'$unserved'")),
-            reason: 'no bundled model transcribes $unserved usably yet; adding '
-                'it here without adding a model that can ships romanised '
-                'answers into a clinical record');
+    /// The language keys of `AsrModel.registry`, read from the source so the
+    /// policy stays one map in one file.
+    Set<String> registeredLanguages() {
+      final body = RegExp(r'registry\s*=\s*\{([^}]*)\}').firstMatch(models);
+      expect(body, isNotNull,
+          reason: 'the language -> model map must stay declared in one place');
+      return RegExp(r"'([a-z]{2})'\s*:")
+          .allMatches(body!.group(1)!)
+          .map((m) => m.group(1)!)
+          .toSet();
+    }
+
+    test('every served language names a model that is actually bundled', () {
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      expect(registeredLanguages(), containsAll(<String>{'en', 'hi'}));
+
+      // Each registry entry's assetDir must be a declared, populated asset
+      // directory. A language served by a checkpoint that is not in the APK is
+      // a microphone that appears and then fails at first tap.
+      final dirs = RegExp(r"assetDir:\s*'([^']+)'")
+          .allMatches(models)
+          .map((m) => m.group(1)!)
+          .toSet();
+      expect(dirs, isNotEmpty);
+      for (final dir in dirs) {
+        expect(pubspec.contains('$dir/'), isTrue,
+            reason: '$dir is used by a model but not declared in pubspec.yaml');
+        expect(Directory(dir).existsSync(), isTrue,
+            reason: '$dir is declared but not present in the repo');
       }
     });
 
-    test('an unserved language resolves to no model at all', () {
+    test('an unmeasured language is offered no microphone at all', () {
       // The gate is in the model lookup, so every caller above it — isReady,
       // ensureModel, prepare — reports "not available" without a special case,
       // and ListenButton renders the absent microphone it already had.
-      expect(models.contains('WhisperModel? _modelFor'), isTrue,
+      expect(models.contains('AsrModel? _modelFor'), isTrue,
           reason: 'the lookup must be able to answer "nothing serves this"');
-      expect(models.contains('servedLanguages.contains(language)'), isTrue);
+      expect(models.contains('AsrModel.registry[language]'), isTrue);
+
+      for (final unserved in ['bn', 'ta', 'te', 'mr', 'gu', 'kn', 'pa']) {
+        expect(registeredLanguages().contains(unserved), isFalse,
+            reason: 'no bundled model has been measured on $unserved; adding '
+                'it here without a checkpoint that was ships romanised or '
+                'mis-scripted answers into a clinical record. '
+                'tool/asr/bench_hindi.py is how the measuring is done.');
+      }
+    });
+
+    test('each engine a model declares is one the isolate can build', () {
+      // asr_models.dart and transcribe.dart have to agree: a sealed ModelFiles
+      // whose new subtype nobody handled is a compile error, and this keeps
+      // the two halves of that pairing from drifting apart silently.
+      final transcribe = File('lib/voice/transcribe.dart').readAsStringSync();
+      expect(transcribe.contains('WhisperFiles()'), isTrue);
+      expect(transcribe.contains('NemoCtcFiles()'), isTrue);
+      expect(transcribe.contains('OfflineNemoEncDecCtcModelConfig'), isTrue,
+          reason: 'a NeMo CTC checkpoint cannot be loaded through the Whisper '
+              'config; handing it to the wrong one fails at model load');
     });
   });
 

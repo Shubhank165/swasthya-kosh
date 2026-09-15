@@ -1,0 +1,14 @@
+# The Hindi ASR checkpoint is 140 MB, and GitHub refuses a blob over 100 MB.
+# It is tracked through Git LFS rather than left out of the repo: an asset
+# directory declared in pubspec.yaml and empty on disk fails the build, and a
+# teammate cloning the repo would get an APK whose Hindi microphone appears
+# and then fails at first tap.
+#
+# After cloning: `git lfs install && git lfs pull`.
+# app/test/on_device_voice_test.dart fails on an unfetched pointer file, so
+# that mistake surfaces in a test run rather than on a patient's phone.
+#
+# whisper-tiny predates this and is a plain blob — its largest file is 89 MB,
+# under the limit, and rewriting history to move it would cost more than it
+# buys.
+app/assets/asr/indic-hi/*.onnx filter=lfs diff=lfs merge=lfs -text

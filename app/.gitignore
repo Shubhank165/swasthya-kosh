@@ -50,7 +50,3 @@ Claude outputs/
 # every build left ten untracked files in `git status`.
 lib/l10n/app_localizations*.dart
 
-
-# Built by tool/asr/build_indicconformer.py — 140 MB per language, reproducible.
-assets/asr/indic-hi/
-assets/asr/indic-*/
