@@ -111,7 +111,10 @@ def test_a_server_error_is_definitive_not_retryable() -> None:
     """An HTTP status means the server answered - the outcome is known, not in doubt."""
 
     error = urllib.error.HTTPError(
-        "u", 401, "unauthorized", {},
+        "u",
+        401,
+        "unauthorized",
+        {},
         io.BytesIO(b'{"code":"unauthorized","message":"unrecognised service token"}'),
     )
     response = api_that(error).whoami()
@@ -203,49 +206,148 @@ def test_the_envelope_carries_the_contract_version_and_our_own_intake_id() -> No
     """Without schema_version the API files the record as unusable and returns intake_id: null,
     and nothing can be attached to it. Found the hard way against the live deploy."""
 
-    env = kiosk_envelope({"clinical": {"complaint": "abdominal pain"}}, "abc-123")
+    env = kiosk_envelope(
+        {"clinical": {"complaint": "abdominal pain"}}, "abc-123", hospital_id="aiia-delhi"
+    )
     assert env["schema_version"] == "0.2"
     assert env["intake_id"] == "abc-123"
-    assert env["fields"]["complaint"] == "abdominal pain"
+    assert env["hospital_id"] == "aiia-delhi"
+    assert env["status"] == "complete"
+    assert env["fields"]["chief_complaint"] == {"status": "answered", "value": "abdominal pain"}
 
 
-def test_the_envelope_sends_only_bound_values() -> None:
-    """The API refuses a payload that carries a value for an unresolved field.
+def test_every_field_declares_whether_it_was_answered() -> None:
+    """A bare scalar is not a field outcome.
 
-    Our report lists the questions the patient never answered under `not_established`; sending
-    that list as a field is precisely "a value for an unresolved field", and the live deploy
-    rejected it as repair_failed. Empty findings, empty lists and generated_at were the other
-    three of the four errors.
+    `fields` is dict[str, KioskField] and KioskField requires `status`. A payload of scalars does
+    not fail loudly - it drops into the backend's LLM repair path and comes back
+    `repaired: true, needs_review: true`, which files every intake as suspect. Verified against
+    the live deploy: this shape ingests as status complete, repaired false.
     """
 
     report = {
         "clinical": {
-            "complaint": "chest pain", "severity": 7, "duration": None,
+            "complaint": "chest pain",
+            "severity": 7,
+            "duration": None,
             "findings": {"fever": False, "breathlessness": True},
-            "medications": [], "allergies": ["penicillin"],
+            "medications": [],
+            "allergies": ["penicillin"],
             "not_established": ["vomiting", "age_years"],
         },
         "patient": {"language": "hi", "reported_by": "self", "abha_last4": "1234"},
         "routing": {"queue": "Cardiology", "priority": "URGENT"},
-        "red_flags": [{"rule_id": "RF_CHEST_PAIN"}],
+        "red_flags": [{"rule_id": "RF_CHEST_PAIN", "urgency": "EMERGENCY"}],
         "generated_at": "2026-09-12T00:00:00Z",
     }
-    fields = kiosk_envelope(report, "id")["fields"]
-    assert fields == {
-        "complaint": "chest pain", "severity": 7,
-        "fever": False, "breathlessness": True,
-        "allergies": ["penicillin"],
-        "language": "hi", "reported_by": "self", "abha_last4": "1234",
-        "queue": "Cardiology", "priority": "URGENT",
-        "red_flags": ["RF_CHEST_PAIN"],
+    env = kiosk_envelope(report, "id", hospital_id="aiia-delhi")
+    fields = env["fields"]
+
+    assert fields["chief_complaint"] == {
+        "status": "answered",
+        "value": "chest pain",
+        "language": "hi",
     }
-    assert "not_established" not in fields
-    assert "generated_at" not in fields
-    assert "medications" not in fields, "an empty list is an unanswered question, not an answer"
+    assert fields["severity"]["value"] == 7
+    assert fields["screen_fever"]["value"] is False
+    assert fields["breathlessness"]["value"] is True
+    assert fields["allergy"]["value"] == ["penicillin"]
+    # Asked and not answered: recorded as such, and carrying no value.
+    assert fields["screen_vomiting"] == {"status": "unresolved"}
+    assert fields["age"] == {"status": "unresolved"}
+    assert "current_medications" not in fields, "an empty list is not an answer of none"
     assert "duration" not in fields
-    # The full ABHA never travels; only the last four the sheet already shows.
-    assert "12345678901234" not in str(fields)
+    assert env["red_flags"] == [
+        {"rule_id": "RF_CHEST_PAIN", "severity": "EMERGENCY", "label": None}
+    ]
+    assert env["completed_at"] == "2026-09-12T00:00:00Z"
+    # The full ABHA never travels, and the patient stays a guest on the hospital's side.
+    assert env["patient_ref"] == {"type": "guest"}
+    assert "12345678901234" not in str(env)
+
+
+def test_an_answered_field_never_loses_its_value_to_an_unresolved_name() -> None:
+    """`not_established` must not overwrite something the patient did answer."""
+
+    report = {
+        "clinical": {"complaint": "fever", "not_established": ["complaint", "severity"]},
+        "patient": {},
+    }
+    fields = kiosk_envelope(report, "id", hospital_id="h")["fields"]
+    assert fields["chief_complaint"] == {"status": "answered", "value": "fever"}
+    assert fields["severity"] == {"status": "unresolved"}
+
+
+def test_the_ayurveda_questionnaires_reach_the_hospital() -> None:
+    """A patient who sat through 58 Prakriti items must not arrive as "Nothing recorded".
+
+    The ids matter: the backend files `prakriti_self_report` and anything prefixed `ayurveda_`
+    under AYURVEDA. Everything else falls to History of Present Illness, where a constitution
+    reads as a symptom.
+    """
+
+    report = {
+        "patient": {"language": "hi"},
+        "clinical": {},
+        "ayurveda": {
+            "prakriti_tendency": "Pitta",
+            "ahara_shakti": "moderate",
+            "vyayama_shakti": "low",
+            "satva": None,
+            "satmya": "mixed",
+        },
+        "prakriti": {
+            "prakriti": "Vata-Pitta",
+            "scoring_reviewed": False,
+            "answered": 58,
+            "asked_total": 58,
+            "note": "Provisional: requires vaidya review.",
+        },
+    }
+    fields = kiosk_envelope(report, "id", hospital_id="h")["fields"]
+
+    assert fields["prakriti_self_report"] == {
+        "status": "answered",
+        "value": "Vata-Pitta",
+        "language": "hi",
+        # A kiosk tally is not a vaidya's classification, and says so on the record.
+        "scoring_reviewed": False,
+        "answered": 58,
+        "asked_total": 58,
+        # The caveat rides on the reading it qualifies. As its own field it rendered as a
+        # bullet on the physician's sheet, reading as though the patient had been found to
+        # have "Provisional".
+        "note": "Provisional: requires vaidya review.",
+    }
+    assert "ayurveda_prakriti_note" not in fields
+    assert fields["ayurveda_dosha_tendency"]["value"] == "Pitta"
+    assert fields["ayurveda_ahara_shakti"]["value"] == "moderate"
+    assert "ayurveda_satva" not in fields, "an unanswered parameter is not a finding"
+    assert "agni" not in str(fields), "we never asked about Agni; do not claim we did"
+
+
+def test_an_unsupported_prakriti_is_sent_as_unresolved_not_dropped() -> None:
+    """Asked and inconclusive is a different record from never asked."""
+
+    report = {
+        "patient": {},
+        "clinical": {},
+        "prakriti": {"prakriti": None, "answered": 12, "note": "Insufficient answers."},
+    }
+    fields = kiosk_envelope(report, "id", hospital_id="h")["fields"]
+    assert fields["prakriti_self_report"] == {"status": "unresolved"}
+    # An unresolved field carries no value, so an inconclusive instrument carries no note
+    # either - the contract refuses a value on anything but an answered field.
+    assert not [name for name in fields if "note" in name]
+
+
+def test_a_kiosk_that_ran_no_ayurveda_sends_no_ayurveda_fields() -> None:
+    fields = kiosk_envelope({"clinical": {"complaint": "fever"}}, "id", hospital_id="h")["fields"]
+    assert not [name for name in fields if "ayurveda" in name or "prakriti" in name]
 
 
 def test_the_envelope_survives_a_bare_report() -> None:
-    assert kiosk_envelope({}, "id")["fields"] == {}
+    env = kiosk_envelope({}, "id", hospital_id="aiia-delhi")
+    assert env["fields"] == {}
+    assert env["language"] == "en"
+    assert env["reporter"] == "self"

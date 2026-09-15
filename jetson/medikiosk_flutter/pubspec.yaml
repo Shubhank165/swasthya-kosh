@@ -47,6 +47,10 @@ dependencies:
   camera: ^0.11.0+2
   # Remembers the last Jetson address so discovery is instant on the second launch.
   shared_preferences: ^2.3.3
+  # The slip is written as a PDF into the app's own directory and handed to the
+  # Android share sheet, which is how it reaches Files, Drive or a printer.
+  path_provider: ^2.1.4
+  share_plus: ^10.1.2
 
 # record 5.2.1 resolves record_linux 0.7.2, whose hasPermission() signature predates
 # record_platform_interface 1.6.0 and fails the Dart compile - even for an Android build,

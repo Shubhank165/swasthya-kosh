@@ -10,6 +10,11 @@ enum KioskStage {
   documents,
   report,
   emergency,
+  consent,
+  review,
+  finalizing,
+  declined,
+  unavailable,
 }
 
 extension KioskStageExtension on KioskStage {
@@ -37,6 +42,16 @@ extension KioskStageExtension on KioskStage {
         return 'report';
       case KioskStage.emergency:
         return 'emergency';
+      case KioskStage.consent:
+        return 'consent';
+      case KioskStage.review:
+        return 'review';
+      case KioskStage.finalizing:
+        return 'finalizing';
+      case KioskStage.declined:
+        return 'declined';
+      case KioskStage.unavailable:
+        return 'unavailable';
     }
   }
 
@@ -64,8 +79,16 @@ extension KioskStageExtension on KioskStage {
         return KioskStage.report;
       case 'emergency':
         return KioskStage.emergency;
+      case 'consent':
+        return KioskStage.consent;
+      case 'review':
+        return KioskStage.review;
+      case 'finalizing':
+        return KioskStage.finalizing;
+      case 'declined':
+        return KioskStage.declined;
       default:
-        return KioskStage.language;
+        return KioskStage.unavailable;
     }
   }
 }

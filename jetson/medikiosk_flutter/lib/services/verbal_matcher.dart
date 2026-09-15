@@ -54,6 +54,12 @@ class VerbalOptionMatcher {
     }
 
     switch (currentStage) {
+      case KioskStage.consent:
+      case KioskStage.review:
+      case KioskStage.finalizing:
+      case KioskStage.declined:
+      case KioskStage.unavailable:
+        return VerbalMatchResult.none; // Protocol 2 dispatches only on the backend.
       case KioskStage.language:
         return _matchLanguage(text);
 

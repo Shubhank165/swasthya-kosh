@@ -1,24 +1,35 @@
 import asyncio
 import base64
 import contextlib
+import copy
 import io
 import json
+import os
+import socket
+import sqlite3
 import time
 import uuid
 import wave
 from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
-from urllib.parse import parse_qs
+from typing import Annotated, Any
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from medikiosk.clinical.answers import AFFIRMATIVE
+from medikiosk import __version__
 from medikiosk.clinical.heuristic import HeuristicClinicalExtractor
 from medikiosk.clinical.hybrid import HybridClinicalExtractor
 from medikiosk.clinical.questions import (
@@ -30,13 +41,28 @@ from medikiosk.clinical.translations import prompt as prompt_text
 from medikiosk.config import Settings, get_settings
 from medikiosk.edge.runtime import pcm_to_wav, rms
 from medikiosk.edge.vad import FRAME_BYTES, SileroVAD, SpeechSegmenter
-from medikiosk.kiosk import extraction, handwriting
-from medikiosk.kiosk.abha import VisitRecords, from_qr_payload, normalise
-from medikiosk.kiosk.document_outbox import DocumentOutbox, infer_kind
+from medikiosk.kiosk import extraction, handwriting, hospital_sync, slip
+from medikiosk.kiosk.abha import VisitRecords
 from medikiosk.kiosk.flow import KioskFlow, Stage
+from medikiosk.kiosk.protocol import FlowAction, SessionGuard
 from medikiosk.kiosk.queue import QueueStore, load_specialties
+from medikiosk.kiosk.staff_auth import COOKIE, StaffAuth, StaffSession
+from medikiosk.kiosk.voice_actions import (
+    Decision,
+    match_option,
+    parse_command,
+    parse_decision,
+    review_number,
+)
 from medikiosk.languages import LANGUAGES
-from medikiosk.providers.intake_api import IntakeApi, kiosk_envelope, load_token, redacted
+from medikiosk.models import PatientState, RedFlagAlert
+from medikiosk.providers.indic_asr import IndicConformerSTT, RoutedSTT
+from medikiosk.providers.intake_api import (
+    IntakeApi,
+    kiosk_envelope,
+    load_token,
+    redacted,
+)
 from medikiosk.providers.local_llm_provider import LocalLLMClinicalExtractor
 from medikiosk.providers.voices import VoiceBank
 from medikiosk.providers.whisper_provider import WhisperCppSTT
@@ -52,19 +78,27 @@ STATIC_DIR = Path(__file__).with_name("static")
 
 
 def _is_yes(transcript: str) -> bool:
-    """Whether a reply confirms. Accepts every supported language, plus English alongside it,
-    because patients mix "yes" and "haan" freely - the same vocabulary direct_answer() uses."""
+    """Only an unambiguous affirmative confirms the current readback."""
+    return parse_decision(transcript) is Decision.YES
 
-    words = {word.strip(" .,!?।॥") for word in transcript.lower().split()}
-    return any(words & vocabulary for vocabulary in AFFIRMATIVE.values())
 
 # Clinical fields worth attributing on the doctor's sheet. Free-text transcripts are already
 # kept verbatim, so only the extracted values need a source recorded against them.
 PROVENANCE_FIELDS = (
-    "complaint", "duration", "severity", "age_years",
-    "fever", "vomiting", "breathlessness", "chest_pain", "pain_radiation",
-    "sweating", "active_bleeding", "altered_consciousness",
-    "one_sided_weakness", "speech_difficulty",
+    "complaint",
+    "duration",
+    "severity",
+    "age_years",
+    "fever",
+    "vomiting",
+    "breathlessness",
+    "chest_pain",
+    "pain_radiation",
+    "sweating",
+    "active_bleeding",
+    "altered_consciousness",
+    "one_sided_weakness",
+    "speech_difficulty",
 )
 
 
@@ -80,7 +114,9 @@ def _clinical_session(settings: Settings, llm: LocalLLMClinicalExtractor | None)
             OpenAIQuestionNaturalizer,
         )
 
-        extractor: Any = OpenAIClinicalExtractor(settings.openai_api_key or "", settings.openai_model)
+        extractor: Any = OpenAIClinicalExtractor(
+            settings.openai_api_key or "", settings.openai_model
+        )
         naturalizer = OpenAIQuestionNaturalizer(
             settings.openai_api_key or "",
             settings.openai_model,
@@ -130,6 +166,64 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     active_settings = settings or get_settings()
     app = FastAPI(title="MediKiosk Voice", version="0.1.0")
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    staff_auth = StaffAuth(
+        active_settings.staff_users_path, active_settings.staff_allow_insecure_http
+    )
+
+    @app.middleware("http")
+    async def private_responses(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith(("/api/", "/dashboard", "/staff")):
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["Referrer-Policy"] = "no-referrer"
+        return response
+
+    @app.post("/api/staff/login")
+    async def staff_login(request: Request):
+        staff_auth.same_origin(request)
+        try:
+            raw = bytearray()
+            async for chunk in request.stream():
+                if len(raw) + len(chunk) > 8192:
+                    raise HTTPException(413, "Staff sign-in is too large")
+                raw.extend(chunk)
+            data = json.loads(raw)
+            username, password = data["username"], data["password"]
+            if not isinstance(username, str) or not isinstance(password, str):
+                raise ValueError
+            if not 1 <= len(username) <= 100 or not 1 <= len(password) <= 1024:
+                raise ValueError
+            # JSON escapes can produce lone surrogates even in a valid UTF-8 body.
+            username.encode("utf-8")
+            password.encode("utf-8")
+        except (ValueError, KeyError, TypeError, RecursionError):
+            raise HTTPException(400, "Invalid staff sign-in") from None
+        token, staff = await asyncio.to_thread(staff_auth.login, request, username, password)
+        response = JSONResponse({"identity": staff.identity, "csrf_token": staff.csrf})
+        response.set_cookie(
+            COOKIE,
+            token,
+            max_age=1800,
+            httponly=True,
+            samesite="strict",
+            secure=not active_settings.staff_allow_insecure_http,
+            path="/",
+        )
+        return response
+
+    @app.get("/api/staff/session")
+    async def staff_session(staff: Annotated[StaffSession, Depends(staff_auth.require)]):
+        return {"identity": staff.identity, "csrf_token": staff.csrf}
+
+    @app.post("/api/staff/logout")
+    async def staff_logout(
+        request: Request, staff: Annotated[StaffSession, Depends(staff_auth.require)]
+    ):
+        staff_auth.logout(request)
+        response = JSONResponse({"ok": True})
+        response.delete_cookie(COOKIE, path="/")
+        return response
 
     store = None
     records = None
@@ -149,6 +243,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # keeps its process alive between calls (a fresh process per prompt cost ~2s on this board),
     # and constructing WhisperCppSTT is free - it only holds a base URL.
     whisper = WhisperCppSTT(active_settings.whisper_url)
+    stt = RoutedSTT(whisper, IndicConformerSTT(active_settings.indic_asr_url))
     voices = VoiceBank(
         active_settings.piper_binary,
         active_settings.voice_dir,
@@ -157,26 +252,72 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         active_settings.prerendered_audio_dir,
     )
     ocr_model: dict[str, Any] = {"instance": None}
-    # Handwritten pages are held here between the scan and the moment the record exists.
-    outbox = DocumentOutbox(active_settings.session_store_path.parent / "outbox")
-    # The cloud reader is opt-in and needs a provisioned token. Without both, every page stays
-    # on the Jetson exactly as before - the outbox is never written to.
-    intake_api: IntakeApi | None = None
+    # The hospital's cloud, if this kiosk has been provisioned for one. Three things must be
+    # true before a record leaves the building, checked in this order: the device is configured
+    # for it, a token exists, and - at the end of each encounter - the patient granted
+    # `cloud_intake` for that purpose. Neither of the first two is permission; they only decide
+    # whether asking is possible at all.
+    cloud: dict[str, Any] = {"api": None, "hospital_id": None, "config": {}}
+    cloud_cache = active_settings.session_store_path.parent / "hospital"
     if active_settings.handwritten_cloud_ocr:
         kiosk_token = load_token(active_settings.intake_token_path)
-        if kiosk_token:
-            intake_api = IntakeApi(kiosk_token, active_settings.intake_api_url)
-            emit_log_line({"event": "cloud_ocr_enabled", "token": redacted(kiosk_token)})
+        if not kiosk_token:
+            emit_log_line({"event": "cloud_unprovisioned", "reason": "no_kiosk_token"})
         else:
-            emit_log_line({"event": "cloud_ocr_unprovisioned",
-                           "message": "handwritten_cloud_ocr is on but no kiosk token was found"})
+            api = IntakeApi(kiosk_token, active_settings.intake_api_url)
+            # whoami is the only authority on which hospital this token writes into: the
+            # backend overrides whatever a payload claims, so asking is not optional.
+            identity = api.whoami()
+            if identity.ok and (identity.body or {}).get("hospital_id"):
+                cloud = {
+                    "api": api,
+                    "hospital_id": identity.body["hospital_id"],
+                    # Offline-first: the refresh may fail, and every later read of the
+                    # hospital's purposes and departments comes off this cache.
+                    "config": hospital_sync.refresh(api, cloud_cache),
+                }
+                emit_log_line(
+                    {
+                        "event": "cloud_ready",
+                        "hospital": cloud["hospital_id"],
+                        "token": redacted(kiosk_token),
+                        "consent_version": hospital_sync.consent_version(cloud["config"]),
+                        "content_version": hospital_sync.content_version(cloud["config"]),
+                    }
+                )
+            else:
+                # No internet at startup is normal. Run on whatever was cached last time.
+                cloud = {
+                    "api": api,
+                    "hospital_id": None,
+                    "config": hospital_sync.load(cloud_cache),
+                }
+                emit_log_line(
+                    {"event": "cloud_unreachable", "detail": identity.detail[:120] or "no identity"}
+                )
     ocr_lock = asyncio.Lock()
     # The receiving half of the product: a report nobody can read is not a finished intake.
-    queue = QueueStore(active_settings.session_store_path.with_name("queue.db"))
+    queue = QueueStore(
+        active_settings.session_store_path.with_name("queue.db"),
+        encryption_key=active_settings.session_encryption_key,
+    )
+
+    def reconcile_queue() -> None:
+        if store is None:
+            return
+        for entry in queue.finalizing():
+            receipt = store.load_report(entry.encounter_id)
+            if (receipt or {}).get("completion") == "saved_local":
+                queue.publish(entry.encounter_id)
+
+    # The report and workflow share a transaction; queue publication is recoverable,
+    # not a claimed transaction across two database files.
+    reconcile_queue()
     specialties = load_specialties(active_settings.session_store_path.with_name("specialties.json"))
     # Reports live in memory for the doctor view. They are already persisted encrypted in the
     # session store; this is a read cache so the dashboard does not decrypt on every poll.
     reports: dict[str, dict[str, Any]] = {}
+
     def load_report(encounter_id: str) -> dict | None:
         report = reports.get(encounter_id)
         if report is None and store is not None:
@@ -184,8 +325,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if report is not None:
                 reports[encounter_id] = report
         return report
+
     # Unfinished intakes, kept so a dropped connection can continue rather than restart.
     resume_states: dict[str, dict[str, Any]] = {}
+    active_sessions: dict[str, dict[str, Any]] = {}
+    leased_tokens: set[str] = set()
+
+    def scan_owner(
+        request: Request, purpose: str, stage: Stage | frozenset[Stage]
+    ) -> dict[str, Any]:
+        owned = active_sessions.get(request.headers.get("X-Kiosk-Session", ""))
+        if owned is None or not owned["guard"].owns(
+            request.headers.get("X-Kiosk-Session", ""),
+            request.headers.get("X-Kiosk-Token", ""),
+        ):
+            raise HTTPException(401, "An active kiosk session is required")
+        stages = stage if isinstance(stage, frozenset) else frozenset({stage})
+        if (
+            owned["flow"].stage not in stages
+            or not owned["flow"].consent.allows(purpose)
+            or request.headers.get("X-Kiosk-Revision") != str(owned["guard"].revision)
+        ):
+            raise HTTPException(409, "Scan is not authorized for the current prompt")
+        return owned
+
     # The kiosk screen, when one is attached. Shared across sessions because there is one physical
     # display: a tablet in front of the kiosk shows whatever the current patient is being asked.
     # Best-effort exactly like PanelView - a display fault never interrupts an interview.
@@ -214,7 +377,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except OSError as error:
             # Usually the port is already held by a stale display process. A kiosk that refuses to
             # start because a screen is busy is worse than one that runs without the screen.
-            print(f"kiosk display unavailable on :{active_settings.panel_port}: {error}", flush=True)
+            print(
+                f"kiosk display unavailable on :{active_settings.panel_port}: {error}", flush=True
+            )
             tablet = None
 
     llm_extractor = (
@@ -224,11 +389,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     def local_speech_ready() -> bool:
-        return whisper.health()
+        return stt.health()
 
     def clinical_session() -> ClinicalSession:
         llm = llm_extractor if llm_extractor and llm_extractor.health() else None
-        return _clinical_session(active_settings, llm)
+        # Patient input must not reach a configured external extractor by accident.
+        local_settings = active_settings.model_copy(update={"openai_api_key": None})
+        return _clinical_session(local_settings, llm)
 
     @app.get("/")
     async def index() -> FileResponse:
@@ -250,6 +417,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
             "local_voice": {
                 "whisper_reachable": await asyncio.to_thread(whisper.health),
+                "indic_asr_reachable": await asyncio.to_thread(stt.indic.health),
                 "languages": sorted(LANGUAGES),
             },
             "storage": {"encrypted": store is not None},
@@ -257,14 +425,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/demo-turn")
     async def demo_turn(request: DemoTurnRequest) -> dict[str, Any]:
+        if active_settings.deployment_profile != "demo":
+            raise HTTPException(404, "Not found")
         session = await asyncio.to_thread(clinical_session)
         result = await session.process_transcript(request.transcript, request.language)
         return result.model_dump(mode="json")
 
     @app.post("/api/ocr")
-    async def ocr(image: UploadFile) -> dict[str, Any]:
-        """Read one photographed document. Loads the recognizer once and keeps it resident."""
-
+    async def ocr(request: Request, image: UploadFile) -> dict[str, Any]:
+        """Read a document only for the active, consenting encounter."""
+        owner = scan_owner(request, "local_documents", Stage.DOCUMENTS)
+        revision = owner["guard"].revision
         from PIL import Image
 
         payload = await image.read(12 * 1024 * 1024 + 1)
@@ -287,10 +458,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 except Exception as exc:
                     raise HTTPException(503, "OCR model is unavailable on this kiosk") from exc
             workdir = active_settings.session_store_path.parent / "ocr_uploads"
-            workdir.mkdir(parents=True, exist_ok=True)
+            workdir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            # The OCR adapter requires a pathname. Keep this short-lived local
+            # image private; never add it to a transfer queue implicitly.
             photo = workdir / f"{uuid.uuid4().hex}.jpg"
             try:
-                photo.write_bytes(payload)
+                with os.fdopen(
+                    os.open(photo, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb"
+                ) as handle:
+                    handle.write(payload)
                 started = time.monotonic()
                 text, scores = await asyncio.to_thread(ocr_model["instance"].read, photo)
                 elapsed = time.monotonic() - started
@@ -310,8 +486,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # read is all there is, and it is returned flagged so nobody mistakes it for a good one.
         verdict = handwriting.assess(scores)
         outbox_handle: str | None = None
-        if verdict.handwritten and intake_api is not None:
-            outbox_handle = outbox.hold(payload, infer_kind(structured), verdict.reason)
+        # Local OCR permission does not authorize retaining or sending an image.
+        # The cloud path remains blocked pending the hospital's consent mapping.
+        if (
+            owner is not active_sessions.get(owner["guard"].session_id)
+            or revision != owner["guard"].revision
+            or not owner["flow"].consent.allows("local_documents")
+        ):
+            raise HTTPException(409, "The session changed during scanning")
 
         emit_log_line(
             {
@@ -324,7 +506,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "held_for_cloud": outbox_handle is not None,
             }
         )
-        return {
+        result = {
+            "capture_id": uuid.uuid4().hex,
             "lines": lines,
             "text": "\n".join(lines),
             "seconds": round(elapsed, 2),
@@ -332,9 +515,46 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "confidence_note": verdict.reason,
             "outbox_handle": outbox_handle,
         }
+        captures = owner["captures"]
+        # Retakes replace ephemeral previews, not patient-owned documents.
+        while len(captures) >= 8:
+            captures.pop(next(iter(captures)))
+        captures[result["capture_id"]] = result
+        return result
+
+    @app.get("/api/slip.pdf")
+    async def slip_pdf(request: Request) -> Response:
+        """The finished slip, for the tablet to hand to the patient as a file.
+
+        Same ownership rule as a document scan: the capability that owns this encounter, on
+        the current prompt, and only once there is a saved report to print.
+        """
+
+        owner = scan_owner(request, "local_intake", frozenset({Stage.REPORT, Stage.EMERGENCY}))
+        report = owner["flow"].report or {}
+        if report.get("completion") != "saved_local":
+            raise HTTPException(409, "The slip is not ready yet")
+        pdf = await asyncio.to_thread(
+            slip.render,
+            report,
+            owner["flow"].language or "en",
+            {
+                "deva": active_settings.slip_font_devanagari,
+                "latin": active_settings.slip_font_latin,
+            },
+        )
+        short = str(report.get("encounter_id") or "")[:8]
+        return Response(
+            pdf,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="medikiosk-slip-{short}.pdf"',
+                "Cache-Control": "no-store",
+            },
+        )
 
     @app.post("/api/abha-scan")
-    async def abha_scan(image: UploadFile) -> dict[str, Any]:
+    async def abha_scan(request: Request, image: UploadFile) -> dict[str, Any]:
         """Decode an ABHA QR from a photographed card.
 
         The decoding happens here rather than in the tablet app so the app needs no zbar build:
@@ -345,11 +565,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         from medikiosk.kiosk.abha import scan_qr
 
+        owner = scan_owner(request, "local_intake", Stage.ABHA)
+        revision = owner["guard"].revision
+        payload = await image.read(12 * 1024 * 1024 + 1)
+        if len(payload) > 12 * 1024 * 1024:
+            raise HTTPException(413, "Image exceeds 12 MB")
         try:
-            photo = Image.open(io.BytesIO(await image.read())).convert("RGB")
+            photo = Image.open(io.BytesIO(payload)).convert("RGB")
         except (OSError, ValueError) as exc:
             raise HTTPException(422, "Upload a readable image") from exc
         number = await asyncio.to_thread(scan_qr, photo)
+        current = scan_owner(request, "local_intake", Stage.ABHA)
+        if current is not owner or revision != owner["guard"].revision:
+            raise HTTPException(409, "The session changed during scanning")
         print(
             json.dumps({"event": "abha_scan", "found": bool(number)}, ensure_ascii=False),
             flush=True,
@@ -362,9 +590,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return FileResponse(STATIC_DIR / "dashboard.html")
 
     @app.get("/api/queue")
-    async def api_queue() -> dict[str, Any]:
+    async def api_queue(
+        staff: Annotated[StaffSession, Depends(staff_auth.require)],
+    ) -> dict[str, Any]:
         """The OPD list. Review cases first - they are not merely high priority."""
 
+        reconcile_queue()
         entries = queue.waiting()
         return {
             "specialties": specialties,
@@ -373,72 +604,118 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
 
     @app.get("/api/encounters/{encounter_id}")
-    async def api_encounter(encounter_id: str) -> dict[str, Any]:
+    async def api_encounter(
+        encounter_id: str, staff: Annotated[StaffSession, Depends(staff_auth.require)]
+    ) -> dict[str, Any]:
         report = load_report(encounter_id)
         if report is None:
             return {"error": "unknown encounter"}
         entry = queue.get(encounter_id)
-        return {"encounter_id": encounter_id, "queue": vars(entry) if entry else None,
-                "report": report}
+        return {
+            "encounter_id": encounter_id,
+            "queue": vars(entry) if entry else None,
+            "report": report,
+        }
 
     @app.post("/api/encounters/{encounter_id}/state")
-    async def api_set_state(encounter_id: str, body: dict) -> dict[str, Any]:
+    async def api_set_state(
+        encounter_id: str, body: dict, staff: Annotated[StaffSession, Depends(staff_auth.require)]
+    ) -> dict[str, Any]:
         """Doctor lifecycle: WAITING to IN_CONSULTATION to COMPLETED."""
 
         state = str(body.get("state", "")).upper()
         if state not in ("WAITING", "IN_CONSULTATION", "COMPLETED"):
             return {"error": f"unknown state {state!r}"}
+        entry = queue.get(encounter_id)
+        if entry is None or entry.state == "FINALIZING":
+            raise HTTPException(409, "Encounter is not ready for consultation")
         queue.set_state(encounter_id, state)
-        print(json.dumps({"event": "queue_state", "encounter": encounter_id[:8], "state": state}),
-              flush=True)
+        print(
+            json.dumps({"event": "queue_state", "encounter": encounter_id[:8], "state": state}),
+            flush=True,
+        )
         return {"ok": True, "state": state}
 
     @app.post("/api/encounters/{encounter_id}/correct")
-    async def api_correct(encounter_id: str, body: dict) -> dict[str, Any]:
+    async def api_correct(
+        encounter_id: str, body: dict, staff: Annotated[StaffSession, Depends(staff_auth.require)]
+    ) -> dict[str, Any]:
         """A clinician fixing a value. Supersedes rather than overwrites, so the original stays."""
 
         report = load_report(encounter_id)
         if report is None:
             return {"error": "unknown encounter"}
         key, value = str(body.get("key", "")), body.get("value")
-        by = str(body.get("by", "clinician"))
+        report = copy.deepcopy(report)
+        by = staff.identity
         if not key:
             return {"error": "key required"}
         entries = report.setdefault("provenance", {}).setdefault("entries", [])
-        entries.append({
-            "key": key, "value": value, "source": "DOCTOR_VERIFIED",
-            "confidence": None, "evidence": body.get("evidence"),
-            "recorded_at": datetime.now(timezone.utc).isoformat(),
-            "superseded_by": None, "corrected_by": by,
-        })
+        entries.append(
+            {
+                "key": key,
+                "value": value,
+                "source": "DOCTOR_VERIFIED",
+                "confidence": None,
+                "evidence": body.get("evidence"),
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+                "superseded_by": None,
+                "corrected_by": by,
+            }
+        )
         for entry in entries[:-1]:
             if entry.get("key") == key and entry.get("superseded_by") is None:
                 entry["superseded_by"] = by
-        if store is not None:
-            store.save_report(encounter_id, report)
-        print(json.dumps({"event": "correction", "encounter": encounter_id[:8], "key": key}),
-              flush=True)
+        if store is None:
+            raise HTTPException(503, "Encrypted storage unavailable")
+        store.save_report(encounter_id, report)
+        reports[encounter_id] = report
+        print(
+            json.dumps({"event": "correction", "encounter": encounter_id[:8], "key": key}),
+            flush=True,
+        )
         return {"ok": True}
 
     @app.websocket("/ws/session")
     async def voice_session(websocket: WebSocket) -> None:
-        await websocket.accept()
-        # A tablet that lost power or dropped its link reconnects with its session id and
-        # continues. An intake takes minutes, and making a patient in pain start again because
-        # the Wi-Fi blinked is the difference between a demo and something usable in an OPD.
-        # Read from the raw ASGI scope rather than websocket.query_params: the two Starlette
-        # versions in use here (1.3 locally, 1.6 on the Jetson) do not agree on the latter for
-        # websockets, and the resume silently stopped working on the device.
-        resumed = parse_qs(websocket.scope.get("query_string", b"").decode()).get(
-            "resume", [None]
-        )[0]
-        session_id = resumed if resumed else str(uuid.uuid4())
-        session = await asyncio.to_thread(clinical_session)
+        protocols = websocket.scope.get("subprotocols", [])
+        await websocket.accept(subprotocol="medikiosk.v2" if "medikiosk.v2" in protocols else None)
+        # Capabilities must not appear in request URLs/access logs. Never resume
+        # from a public encounter ID or an old client's query parameter.
+        if websocket.scope.get("query_string"):
+            await websocket.close(code=4400, reason="Use protocol 2 resume capability")
+            return
+        resumed = next((p[7:] for p in protocols if p.startswith("resume.")), None)
+        restored = None
+        if resumed:
+            if resumed in leased_tokens:
+                await websocket.close(code=4409, reason="Session already active")
+                return
+            restored = resume_states.pop(resumed, None)
+            if restored is None and store is not None:
+                loaded = store.load_workflow(resumed)
+                if loaded:
+                    restored = loaded["data"]
+            if restored is None:
+                await websocket.close(code=4404, reason="Session cannot be resumed")
+                return
+        guard = SessionGuard(
+            restored["guard"]["session_id"] if restored else None,
+            resumed if restored else None,
+        )
+        session_id = guard.session_id
+        leased_tokens.add(guard.token)
+        try:
+            session = await asyncio.to_thread(clinical_session)
+        except BaseException:
+            leased_tokens.discard(guard.token)
+            raise
         audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=80)
         send_lock = asyncio.Lock()
         turn_tasks: set[asyncio.Task[Any]] = set()
         stt_task: asyncio.Task[Any] | None = None
         tts_task: asyncio.Task[Any] | None = None
+        idle_task: asyncio.Task[Any] | None = None
         # The question this session just asked, so a bare "three days" or "haan" binds to that
         # field instead of forcing every extractor to parse duration/yes-no out of raw text. This
         # is the same asked= mechanism edge.runtime uses for the wired kiosk; the web path never
@@ -451,9 +728,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # ask_age was asked it forever with no way forward.
         attempts: dict[str, int] = {}
         unresolved: list[str] = []
-        # A voice answer is repeated back before it is acted on. Whisper mishears short words
-        # in a noisy OPD, and a patient who cannot read has no other way to catch it.
-        awaiting_confirmation: str | None = None
         # The eight-step workflow around the clinical interview. It owns no clinical logic - the
         # state machine, red flags and extractors are unchanged - it only decides which stage the
         # patient is on and what the client should render.
@@ -472,13 +746,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # transcript raised UnicodeEncodeError out of here, killed the process_final task, and
             # the patient's answer was silently dropped: no next question, and no red flag
             # evaluation for what they just said. Fall back to escaped ASCII, then to nothing.
-            emit_log_line({"session": session_id[:8], "event": event, **fields})
+            # Ordinary diagnostics contain identifiers/counters, never patient words.
+            safe = {
+                key: value
+                for key, value in fields.items()
+                if key not in {"text", "heard", "transcript", "final_state", "message", "detail"}
+            }
+            emit_log_line({"session": session_id[:8], "event": event, **safe})
 
         # Cloud (Sarvam) takes priority if it is genuinely configured; this device has no Sarvam
         # key, so every session on this Jetson runs the local branch - the same Whisper + Piper
         # stack proven in medikiosk.edge.runtime, driven by network audio instead of a local mic.
-        use_cloud = active_settings.sarvam_configured
-        use_local = not use_cloud and await asyncio.to_thread(local_speech_ready)
+        use_cloud = False  # No external ASR/TTS in the offline patient journey.
+        use_local = await asyncio.to_thread(local_speech_ready)
         local_language = active_settings.edge_language
         local_language_locked = not active_settings.auto_detect_language
         local_vad = None
@@ -495,7 +775,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             max_utterance_s=active_settings.max_utterance_s,
         )
 
+        transition_active = False
+        pending_events: list[dict[str, Any]] = []
+
         async def send(payload: dict[str, Any]) -> None:
+            payload = {"session_id": session_id, "revision": guard.revision, **payload}
+            if transition_active and payload["type"] not in {"clinical.processing", "staff.alert"}:
+                pending_events.append(payload)
+                return
             async with send_lock:
                 await websocket.send_json(payload)
 
@@ -508,45 +795,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 tts_task = None
             await send({"type": "tts.cancelled", "reason": reason})
 
-        async def stream_tts(text: str, language: str | None) -> None:
-            if use_cloud:
-                from medikiosk.providers.sarvam_provider import SarvamStreamingTTS
-
-                synthesizer = SarvamStreamingTTS(
-                    active_settings.sarvam_api_key or "",
-                    active_settings.sarvam_tts_speaker,
-                )
-                await send({"type": "tts.start", "sample_rate": 24000})
-                try:
-                    async for pcm in synthesizer.stream(
-                        text,
-                        language or active_settings.sarvam_tts_language,
-                    ):
-                        await send(
-                            {
-                                "type": "tts.audio",
-                                "encoding": "linear16",
-                                "sample_rate": 24000,
-                                "audio": base64.b64encode(pcm).decode("ascii"),
-                            }
-                        )
-                    await send({"type": "tts.end"})
-                except asyncio.CancelledError:
-                    raise
-                except Exception as exc:
-                    await send({"type": "error", "stage": "tts", "message": str(exc)})
+        async def stream_tts(text: str, language: str | None, epoch: tuple[str, int]) -> None:
+            if not use_local or epoch != (session_id, guard.revision):
                 return
-
-            if not use_local:
-                return
-            lang = language or local_language
+            lang = (language or local_language)[:2]
             if lang not in LANGUAGES or not voices.available(lang):
-                lang = active_settings.edge_language
-            await send({"type": "tts.start", "sample_rate": 0})
+                await send(
+                    {
+                        "type": "error",
+                        "stage": "tts",
+                        "message": "Selected offline voice is unavailable",
+                    }
+                )
+                return
+            await send({"type": "tts.start", "sample_rate": 0, "playback_rate": playback_rate})
             try:
-                # Piper/Flite are subprocess calls; off the event loop so one synthesis does not
-                # stall every other message this connection needs to send.
                 wav_bytes = await asyncio.to_thread(voices.synthesize, text, lang)
+                if epoch != (session_id, guard.revision):
+                    return
                 pcm, rate = _wav_pcm_and_rate(wav_bytes)
                 await send(
                     {
@@ -559,57 +825,418 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await send({"type": "tts.end"})
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:
-                await send({"type": "error", "stage": "tts", "message": str(exc)})
+            except Exception:
+                await send(
+                    {"type": "error", "stage": "tts", "message": "Offline speech is unavailable"}
+                )
 
         turn_lock = asyncio.Lock()
         audio_generation = 0
+        capture_epoch: tuple[str, int] | None = None
+        playback_active = False
+        playback_rate = 1.0
+        last_activity = time.monotonic()
+        idle_seconds = active_settings.idle_timeout_s
+        pending_speech: tuple[str, str | None, tuple[str, int]] | None = None
+
+        def snapshot() -> dict[str, Any]:
+            return {
+                "flow": flow.snapshot(),
+                "state": session.state.model_dump(mode="json"),
+                "guard": guard.snapshot(),
+                "attempts": attempts,
+                "unresolved": unresolved,
+                "red_flags": [a.model_dump(mode="json") for a in session_red_flags],
+                "pending_question_id": pending_question.id if pending_question else None,
+                "status": "complete" if intake_complete else "active",
+            }
+
+        def persist() -> None:
+            if transition_active:
+                return
+            data = snapshot()
+            if store is not None:
+                existing = store.load_report(session_id) if intake_complete else None
+                if intake_complete and (existing or {}).get("completion") != "saved_local":
+                    store.save_completion(session_id, data, guard.token)
+                else:
+                    # A receipt resume never overwrites subsequent staff corrections.
+                    store.save_workflow(session_id, data, guard.token)
+            elif flow.consent.allows("local_intake"):
+                raise RuntimeError("Encrypted storage is required for patient intake")
+            resume_states[guard.token] = data
+
+        @contextlib.asynccontextmanager
+        async def transition(
+            action: FlowAction | None = None, epoch: tuple[str, int] | None = None
+        ):
+            """Save state and the action receipt together, before exposing the next prompt."""
+            nonlocal transition_active, flow, guard, session, session_id, pending_question
+            nonlocal intake_complete, pending_speech, last_activity
+            nonlocal local_language, local_language_locked
+            nonlocal playback_active, playback_rate, idle_seconds
+            async with turn_lock:
+                if epoch is not None and epoch != (session_id, guard.revision):
+                    raise ValueError("The prompt changed")
+                if action is not None:
+                    if not guard.check(action):
+                        raise ValueError("Action was already accepted")
+                    if action.action in {
+                        "answer",
+                        "choose",
+                        "confirm",
+                        "unknown",
+                        "refuse",
+                        "skip",
+                    }:
+                        expected_question = flow.screen(session.state).get("question_id")
+                        if (
+                            flow.stage is Stage.INTERVIEW
+                            and not flow.restart_confirm
+                            and not flow.withdraw_confirm
+                        ):
+                            if pending_question is None:
+                                raise ValueError("No clinical question is active")
+                            expected_question = pending_question.id
+                        if action.question_id != expected_question:
+                            raise ValueError("Question changed or missing")
+                old_flow, old_guard = copy.deepcopy(flow), copy.deepcopy(guard)
+                old_session = session
+                old_snapshot = copy.deepcopy(snapshot())
+                old_language = local_language, local_language_locked
+                old_playback = playback_active, playback_rate, idle_seconds
+                old_state = session.state.model_copy(deep=True)
+                old_question = pending_question
+                old_attempts, old_unresolved = attempts.copy(), unresolved.copy()
+                old_flags, old_complete = session_red_flags.copy(), intake_complete
+                old_captures = copy.deepcopy(active_sessions[session_id]["captures"])
+                pending_events.clear()
+                pending_speech = None
+                transition_active = True
+                try:
+                    yield
+                    if action is not None and action.session_id == guard.session_id:
+                        guard.accept(action)
+                    transition_active = False
+                    if guard.session_id != old_guard.session_id:
+                        retired_guard = copy.deepcopy(old_guard)
+                        if action is not None:
+                            retired_guard.accept(action)
+                        old_snapshot["guard"] = retired_guard.snapshot()
+                        old_snapshot["status"] = "closed"
+                        fresh = snapshot()
+                        if store is not None:
+                            store.restart_workflow(
+                                old_snapshot, old_guard.token, fresh, guard.token
+                            )
+                        elif old_flow.consent.allows("local_intake"):
+                            raise RuntimeError("Encrypted storage is required for patient intake")
+                        resume_states.pop(old_guard.token, None)
+                        resume_states[guard.token] = fresh
+                        leased_tokens.discard(old_guard.token)
+                    else:
+                        persist()
+                except BaseException:
+                    transition_active = False
+                    pending_events.clear()
+                    pending_speech = None
+                    leased_tokens.discard(guard.token)
+                    active_sessions.pop(session_id, None)
+                    flow, guard, session_id = old_flow, old_guard, old_guard.session_id
+                    session = old_session
+                    session.state = old_state
+                    local_language, local_language_locked = old_language
+                    playback_active, playback_rate, idle_seconds = old_playback
+                    if hasattr(session, "language"):
+                        session.language = local_language
+                    pending_question = old_question
+                    attempts.clear()
+                    attempts.update(old_attempts)
+                    unresolved[:] = old_unresolved
+                    session_red_flags[:] = old_flags
+                    intake_complete = old_complete
+                    active_sessions[session_id] = {
+                        "flow": flow,
+                        "guard": guard,
+                        "captures": old_captures,
+                    }
+                    leased_tokens.add(guard.token)
+                    invalidate_audio()
+                    raise
+                events, speech = pending_events.copy(), pending_speech
+                pending_events.clear()
+                pending_speech = None
+                last_activity = time.monotonic()
+                if intake_complete:
+                    reports[session_id] = store.load_report(session_id) if store else flow.report
+                    try:
+                        queue.publish(session_id)
+                    except (OSError, sqlite3.Error):
+                        log("queue_publication_pending")
+                for event in events:
+                    await send(event)
+                if speech is not None:
+                    queue_speech(*speech)
+
+        def invalidate_audio() -> None:
+            nonlocal audio_generation, capture_epoch
+            audio_generation += 1
+            capture_epoch = None
+            local_segmenter.reset()
+            if local_vad is not None:
+                local_vad.reset()
+            while not audio_queue.empty():
+                audio_queue.get_nowait()
+
+        async def handle_action(
+            action: str, value: Any = None, question_id: str | None = None, method: str = "touch"
+        ) -> None:
+            nonlocal pending_question, local_language, local_language_locked
+            nonlocal flow, session, session_id, guard, intake_complete, playback_active
+            nonlocal playback_rate, last_activity, idle_seconds
+            if (
+                flow.edit_target is not None
+                and flow.edit_return
+                and action in {"cancel", "back"}
+                and not flow.restart_confirm
+                and not flow.withdraw_confirm
+            ):
+                session.state = PatientState.model_validate(flow.edit_return["state"])
+                attempts.clear()
+                attempts.update(flow.edit_return.get("attempts", {}))
+                unresolved[:] = flow.edit_return.get("unresolved", [])
+                flow.edit_target = None
+                flow.edit_return = None
+                flow.stage = Stage.REVIEW
+                pending_question = None
+                await send_screen()
+                return
+            if (
+                flow.restart_confirm or flow.withdraw_confirm or flow.edit_target is not None
+            ) and action in {"cancel", "back"}:
+                flow.action(action, value, question_id, method=method)
+                await send_screen()
+                return
+            if action in {"repeat", "slower", "more_time", "cancel"}:
+                if action == "slower":
+                    playback_rate = 0.8
+                elif action == "more_time":
+                    idle_seconds = active_settings.idle_timeout_s * 2
+                last_activity = time.monotonic()
+                await send_screen()
+                return
+            if action in {"unknown", "refuse", "skip"} and flow.stage is Stage.INTERVIEW:
+                if pending_question is None:
+                    return
+                status = "refused" if action == "refuse" else "unresolved"
+                flow.record_answer(
+                    pending_question.id,
+                    pending_question.template_for(flow.language),
+                    "",
+                    status=status,
+                    field=pending_question.target_field,
+                    method=method,
+                )
+                if pending_question.id not in unresolved:
+                    unresolved.append(pending_question.id)
+                if flow.edit_target is not None:
+                    for entry in flow.ledger.entries:
+                        if (
+                            entry.key == pending_question.target_field
+                            and entry.superseded_by is None
+                        ):
+                            entry.superseded_by = f"answer:{len(flow.answers)}"
+                    flow.edit_target = None
+                    flow.edit_return = None
+                    flow.stage = Stage.REVIEW
+                pending_question = None
+                await send_screen()
+                return
+            if action in {"keep", "discard", "retake"} and flow.stage is Stage.DOCUMENTS:
+                preview = flow.document_preview
+                if action == "keep":
+                    if preview is None:
+                        raise ValueError("No preview to keep")
+                    flow.add_document(
+                        preview["lines"],
+                        preview.get("seconds"),
+                        handwritten=preview.get("handwritten"),
+                    )
+                    flow.documents[-1].update(
+                        {
+                            key: preview.get(key)
+                            for key in ("capture_id", "confidence_note", "outbox_handle")
+                        }
+                    )
+                flow.document_preview = None
+                await send_screen()
+                if action == "retake":
+                    await send({"type": "device.action", "action": "scan"})
+                return
+            if action in {"document", "preview"}:
+                owned = active_sessions[session_id]
+                capture_id = value.get("capture_id") if isinstance(value, dict) else None
+                result = owned["captures"].get(capture_id)
+                if flow.document_preview is not None:
+                    raise ValueError("Resolve the current preview first")
+                if (
+                    result is None
+                    or flow.stage is not Stage.DOCUMENTS
+                    or not flow.consent.allows("local_documents")
+                ):
+                    raise ValueError("Unowned document capture")
+                flow.document_preview = copy.deepcopy(result)
+                owned["captures"].pop(capture_id)
+                await send_screen()
+                return
+            prior_answers = len(flow.answers)
+            effect = flow.action(action, value, question_id, method=method)
+            if len(flow.answers) > prior_answers and flow.answers[-1]["id"] == "registration.age":
+                accepted = flow.answers[-1]
+                age = accepted["value"] if accepted["status"] == "answered" else None
+                session.state.age_years = age
+                for entry in flow.ledger.entries:
+                    if entry.key == "age_years" and entry.superseded_by is None:
+                        entry.superseded_by = f"answer:{accepted['turn']}"
+                for previous in flow.answers[:-1]:
+                    if previous["id"] == "ask_age":
+                        previous["superseded"] = True
+                if age is not None:
+                    flow.ledger.record(
+                        "age_years", age, flow.spoken_source, evidence=accepted["answer"]
+                    )
+            if effect == "restart":
+                replacement = await asyncio.to_thread(clinical_session)
+                active_sessions.pop(session_id, None)
+                guard = SessionGuard()
+                session_id = guard.session_id
+                leased_tokens.add(guard.token)
+                flow = KioskFlow()
+                session = replacement
+                session_red_flags.clear()
+                attempts.clear()
+                unresolved.clear()
+                intake_complete = False
+                pending_question = None
+                playback_active = False
+                playback_rate = 1.0
+                idle_seconds = active_settings.idle_timeout_s
+                active_sessions[session_id] = {"flow": flow, "guard": guard, "captures": {}}
+                local_language = active_settings.edge_language
+                local_language_locked = False
+                await send({"type": "session.id", "session_token": guard.token})
+            elif effect == "finalize":
+                # Provisioned for a hospital, and the patient has not yet been asked whether
+                # this record may be sent there. Ask now, on the record they just reviewed;
+                # answering it comes back here as another "finalize".
+                if (
+                    cloud["api"] is not None
+                    and cloud["hospital_id"] is not None
+                    and not flow.transfer_decided
+                ):
+                    flow.ask_transfer_permission()
+                    await send_screen()
+                    return
+                await finish_session()
+                return
+            elif effect in {"scan", "retake", "discard"}:
+                await send({"type": "device.action", "action": effect})
+                return
+            elif effect == "help":
+                await send({"type": "staff.alert", "status": "requested", "acknowledged": False})
+            elif effect == "edit":
+                target = flow.edit_target
+                question = QUESTIONS.get(target or "")
+                if question is None:
+                    raise ValueError("This answer requires staff correction")
+                flow.edit_return = {
+                    "state": session.state.model_dump(mode="json"),
+                    "attempts": attempts.copy(),
+                    "unresolved": unresolved.copy(),
+                }
+                previous_value = getattr(session.state, question.target_field)
+                setattr(
+                    session.state,
+                    question.target_field,
+                    [] if isinstance(previous_value, list) else None,
+                )
+                unresolved[:] = [q for q in unresolved if q != question.id]
+                attempts.pop(question.id, None)
+                pending_question = question
+                flow.stage = Stage.INTERVIEW
+            local_language = flow.language or local_language
+            local_language_locked = bool(flow.language)
+            if hasattr(session, "language"):
+                session.language = local_language
+            await send_screen()
 
         async def process_final(
-            transcript: str, language: str | None, spoken: bool = True
+            transcript: str,
+            language: str | None,
+            spoken: bool = True,
+            action: FlowAction | None = None,
+            epoch: tuple[str, int] | None = None,
         ) -> None:
-            async with turn_lock:
+            async with transition(action=action, epoch=epoch):
                 nonlocal tts_task, pending_question, intake_complete
-                if flow.stage is not Stage.INTERVIEW:
-                    # Speech before the interview stage is not an answer to anything - it is a patient
-                    # greeting the kiosk, or someone talking nearby. Feeding it to the extractor made
-                    # "Namaste" come back as a chief complaint of "ear pain" and consumed the first
-                    # question without ever asking it.
-                    log("ignored_off_stage", text=transcript, stage=flow.stage.value)
-                    return
-                if intake_complete:
-                    # The state machine is done; nothing downstream would act on this. Drop it here so
-                    # a patient still chatting after the closing prompt is not silently transcribed
-                    # into a record no one reads.
-                    log("ignored_after_close", text=transcript)
-                    return
-                nonlocal awaiting_confirmation
-                spoken_language = (flow.language or local_language or "en")[:2]
-
-                if awaiting_confirmation is not None:
-                    answer, awaiting_confirmation = awaiting_confirmation, None
-                    if _is_yes(transcript):
-                        log("confirmed", text=answer)
-                        transcript = answer
-                    else:
-                        # Not a yes: discard what was heard and ask the same question again rather
-                        # than recording a value the patient did not agree to.
-                        log("confirm_rejected", heard=answer)
-                        await speak(prompt_text("confirm_retry", spoken_language))
-                        pending_question = None
-                        await ask_current_question()
-                        return
-
-                elif spoken and flow.stage is Stage.INTERVIEW and pending_question is not None:
-                    awaiting_confirmation = transcript
-                    log("confirming", text=transcript)
-                    await speak(
-                        prompt_text("confirm_heard", spoken_language).replace("{answer}", transcript)
+                if flow.stage is Stage.REVIEW and (number := review_number(transcript)) is not None:
+                    live = [a for a in flow.answers if not a.get("superseded")]
+                    if not 1 <= number <= len(live):
+                        raise ValueError("Choose a current review answer")
+                    await handle_action(
+                        "edit", live[number - 1]["id"], method="voice" if spoken else "touch"
                     )
                     return
+                command_name = parse_command(transcript, flow.language)
+                if command_name:
+                    await handle_action(command_name, method="voice" if spoken else "touch")
+                    return
+                if (
+                    flow.stage is not Stage.INTERVIEW
+                    or flow.restart_confirm
+                    or flow.withdraw_confirm
+                ):
+                    screen = flow.screen(session.state)
+                    choice = match_option(transcript, screen.get("options", []), flow.language)
+                    if choice is not None:
+                        await handle_action(
+                            "choose",
+                            choice,
+                            screen.get("question_id"),
+                            method="voice" if spoken else "touch",
+                        )
+                    elif screen.get("input") in {"text", "camera_or_text", "number"}:
+                        await handle_action(
+                            "answer",
+                            transcript,
+                            screen.get("question_id"),
+                            method="voice" if spoken else "touch",
+                        )
+                    else:
+                        await send_screen()
+                    return
+                if not flow.consent.allows("local_intake"):
+                    await send(
+                        {
+                            "type": "error",
+                            "stage": "consent",
+                            "message": "Intake permission required",
+                        }
+                    )
+                    return
+                if intake_complete:
+                    # Do not transcribe post-completion conversation into a closed record.
+                    log("ignored_after_close", text=transcript)
+                    return
+                answer_method = "voice" if spoken else "touch"
 
                 asked = pending_question
-                log("transcript", text=transcript, language=language, asked=asked.id if asked else None)
+                log(
+                    "transcript",
+                    text=transcript,
+                    language=language,
+                    asked=asked.id if asked else None,
+                )
                 await send({"type": "clinical.processing"})
                 try:
                     result = await session.process_transcript(
@@ -620,26 +1247,44 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         attempts[question_id] = attempts.get(question_id, 0) + 1
                         if attempts[question_id] > active_settings.max_question_attempts:
                             unresolved.append(question_id)
-                            question = session.state_machine.next_question(session.state, unresolved)
+                            question = session.state_machine.next_question(
+                                session.state, unresolved
+                            )
                             result.next_question_id = question.id if question else None
-                            result.next_question = question.template_for(flow.language) if question else None
+                            result.next_question = (
+                                question.template_for(flow.language) if question else None
+                            )
                             if question:
                                 attempts[question.id] = attempts.get(question.id, 0) + 1
-                    if store is not None:
-                        try:
-                            store.save(session_id, result.state)
-                        except Exception as exc:
-                            log("storage_failed", message=str(exc))
+                    if asked is not None:
+                        value = getattr(result.state, asked.target_field, None)
+                        flow.record_answer(
+                            asked.id,
+                            asked.template_for(flow.language),
+                            transcript,
+                            status="answered" if value is not None else "unresolved",
+                            field=asked.target_field,
+                            value=value,
+                            method=answer_method,
+                        )
+                    persist()
                     await send({"type": "clinical.turn", "data": result.model_dump(mode="json")})
-                    # Record what this turn established, attributed to whoever is speaking. A relative
-                    # answering for the patient is reporting second-hand, and the doctor's sheet says
-                    # so rather than presenting it as the patient's own words.
+                    # Attribute second-hand answers to the representative, not the patient.
                     for field in PROVENANCE_FIELDS:
                         value = getattr(result.state, field, None)
-                        if value is not None and flow.ledger.current(field) is None:
+                        prior = flow.ledger.current(field)
+                        if value is not None and (prior is None or prior.value != value):
+                            for entry in flow.ledger.entries:
+                                if (
+                                    entry.key == field
+                                    and entry.source == flow.spoken_source
+                                    and entry.superseded_by is None
+                                ):
+                                    entry.superseded_by = f"answer:{len(flow.answers)}"
                             flow.ledger.record(
                                 field, value, flow.spoken_source, evidence=transcript
                             )
+                    persist()
                     log(
                         "clinical_turn",
                         next_question=result.next_question_id,
@@ -655,104 +1300,110 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         await send(
                             {
                                 "type": "staff.alert",
-                                "alerts": [alert.model_dump(mode="json") for alert in result.red_flags],
+                                "alerts": [
+                                    alert.model_dump(mode="json") for alert in result.red_flags
+                                ],
                             }
                         )
                         # Cut straight to the emergency screen from whatever stage we were on, then
                         # still produce the sheet - staff need the details, not just the alarm.
                         flow.check_red_flags(result.red_flags)
                         await finish_session()
+                    elif flow.edit_target is not None:
+                        flow.edit_target = None
+                        flow.edit_return = None
+                        flow.stage = Stage.REVIEW
+                        pending_question = None
+                        await send_screen()
                     elif result.next_question:
                         # The field the next question targets, so the reply to it - even a bare word
                         # or number - binds correctly instead of forcing the extractor to guess.
                         pending_question = QUESTIONS.get(result.next_question_id or "")
                         await cancel_tts("next_question")
-                        await send({"type": "clinical.question", "id": result.next_question_id,
-                                    "text": result.next_question,
-                                    "answer_ui": answer_ui(result.next_question_id or "")})
+                        guard.invalidate_prompt()
+                        invalidate_audio()
+                        persist()
+                        wording = question_text(result.next_question_id or "", result.next_question)
+                        await send(
+                            {
+                                "type": "clinical.question",
+                                "id": result.next_question_id,
+                                "text": wording,
+                                "answer_ui": answer_ui(result.next_question_id or ""),
+                                "accumulate": result.next_question_id == "ask_complaint",
+                                "allowed_actions": flow.screen(session.state)["allowed_actions"],
+                            }
+                        )
                         # The interview stage has no headline of its own - the clinical question IS
                         # the screen, same as the wired kiosk shows in edge/runtime.py.
-                        show_on_panel(result.next_question)
-                        tts_task = asyncio.create_task(
-                            stream_tts(result.next_question, result.language),
-                            name=f"tts-{session_id}",
-                        )
+                        show_on_panel(wording)
+                        queue_speech(wording, result.language)
                     else:
-                        # The clinical interview is done, but the workflow is not: the Ayurvedic
-                        # questionnaire and document scan come after it. Hand back to the flow rather
-                        # than ending here.
+                        # Hand back to the flow for questionnaires and documents.
                         log("interview_complete")
                         await cancel_tts("interview_complete")
                         if flow.stage is Stage.INTERVIEW:
-                            flow.advance()
+                            flow.complete_interview()
                         await send_screen()
                 except Exception as exc:
-                    log("error", stage="clinical", message=str(exc))
-                    await send({"type": "error", "stage": "clinical", "message": str(exc)})
+                    log("error", stage="clinical")
+                    raise RuntimeError("Clinical answer could not be saved") from exc
 
         def spawn_turn(transcript: str, language: str | None, spoken: bool = True) -> None:
-            task = asyncio.create_task(
-                process_final(transcript, language, spoken=spoken),
-                name=f"turn-{session_id}",
-            )
+            expected_revision = guard.revision
+            expected_session = session_id
+
+            async def guarded_turn() -> None:
+                if expected_revision != guard.revision or expected_session != session_id:
+                    return
+                try:
+                    await process_final(
+                        transcript,
+                        language,
+                        spoken=spoken,
+                        epoch=(expected_session, expected_revision),
+                    )
+                except (ValueError, RuntimeError, OSError, sqlite3.Error):
+                    await send(
+                        {
+                            "type": "error",
+                            "stage": "flow",
+                            "message": "Please use the current prompt",
+                        }
+                    )
+
+            task = asyncio.create_task(guarded_turn(), name=f"turn-{session_id}")
             turn_tasks.add(task)
             task.add_done_callback(turn_tasks.discard)
 
-        async def on_stt_event(event: dict[str, Any]) -> None:
-            event_name = event.get("event") or event.get("type") or "unknown"
-            if event_name == "vad.speech_start":
-                await cancel_tts("barge_in")
-                await send({"type": "vad", "state": "speech_start", "source": "saaras"})
-            elif event_name == "vad.speech_end":
-                await send({"type": "vad", "state": "speech_end", "source": "saaras"})
-            elif event_name == "transcript.partial":
-                await send(
-                    {
-                        "type": "transcript.partial",
-                        "text": event.get("text", ""),
-                        "language": event.get("language"),
-                    }
-                )
-            elif event_name == "transcript.final":
-                transcript = str(event.get("text", "")).strip()
-                language = event.get("language") or active_settings.sarvam_stt_language
-                await send({"type": "transcript.final", "text": transcript, "language": language})
-                if transcript:
-                    spawn_turn(transcript, language)
-            elif event_name == "error":
-                await send(
-                    {
-                        "type": "error",
-                        "stage": "stt",
-                        "message": event.get("message", "Sarvam realtime error"),
-                        "fatal": event.get("is_fatal", False),
-                    }
-                )
+        def question_text(question_id: str, template: str) -> str:
+            """The opening question is one open prompt, not "what brings you in today?"."""
+            if question_id == "ask_complaint":
+                return prompt_text("narrative", flow.language or local_language or "en")
+            return template
 
-        async def run_stt() -> None:
-            from medikiosk.providers.sarvam_provider import SarvamRealtimeSTT
+        def narrative_open() -> bool:
+            """True while the patient is describing their problem into the box.
 
-            recognizer = SarvamRealtimeSTT(
-                active_settings.sarvam_api_key or "",
-                active_settings.sarvam_stt_language,
+            Speech then accumulates on the tablet instead of being dispatched sentence by
+            sentence; the whole description is extracted once when they press Proceed, and the
+            interview asks only for what that left empty.
+            """
+            return (
+                flow.stage is Stage.INTERVIEW
+                and pending_question is not None
+                and pending_question.id == "ask_complaint"
+                and not flow.restart_confirm
+                and not flow.withdraw_confirm
             )
-            try:
-                await recognizer.run(audio_queue, on_stt_event)
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                await send({"type": "error", "stage": "stt", "message": str(exc)})
 
         async def transcribe_local(pcm: bytes) -> tuple[str, str | None]:
-            nonlocal local_language, local_language_locked
             wav_bytes = pcm_to_wav(pcm)
-            pin = local_language if local_language_locked else None
-            text, detected = await asyncio.to_thread(whisper.transcribe, wav_bytes, pin)
-            if not local_language_locked and text and detected in LANGUAGES:
-                if voices.available(detected):
-                    local_language = detected
-                local_language_locked = True
-            return text, local_language
+            # Detection helps choose the initial language; only an explicit
+            # workflow selection may pin subsequent recognition.
+            pin = flow.language or None
+            text, detected = await asyncio.to_thread(stt.transcribe, wav_bytes, pin)
+            return text, pin or detected
 
         async def run_local_stt() -> None:
             """Frame the browser's raw PCM into VAD-sized windows and turn-detect locally.
@@ -766,11 +1417,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
             assert local_vad is not None
             buffer = b""
+            generation = audio_generation
             try:
                 while True:
                     chunk = await audio_queue.get()
                     if chunk is None:
                         break
+                    if generation != audio_generation:
+                        buffer = b""
+                        generation = audio_generation
                     buffer += chunk
                     while len(buffer) >= FRAME_BYTES:
                         frame, buffer = buffer[:FRAME_BYTES], buffer[FRAME_BYTES:]
@@ -781,7 +1436,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         if rms(utterance) < active_settings.min_utterance_rms:
                             # Whisper invents fluent speech from silence rather than reporting no
                             # speech, so this turn never reaches it - dropped on energy alone.
-                            log("silent_turn", rms=rms(utterance), floor=active_settings.min_utterance_rms)
+                            log(
+                                "silent_turn",
+                                rms=rms(utterance),
+                                floor=active_settings.min_utterance_rms,
+                            )
                             await send({"type": "vad", "state": "speech_end", "source": "local"})
                             continue
                         await send({"type": "vad", "state": "speech_end", "source": "local"})
@@ -791,16 +1450,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             buffer = b""
                             continue
                         transcript = transcript.strip()
-                        await send(
-                            {"type": "transcript.final", "text": transcript, "language": language}
+                        accumulate = bool(
+                            transcript
+                            and narrative_open()
+                            and parse_command(transcript, flow.language) is None
                         )
-                        if transcript:
+                        await send(
+                            {
+                                "type": "transcript.final",
+                                "text": transcript,
+                                "language": language,
+                                "accumulate": accumulate,
+                            }
+                        )
+                        if transcript and not accumulate:
                             spawn_turn(transcript, language)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                log("error", stage="stt", message=str(exc))
-                await send({"type": "error", "stage": "stt", "message": str(exc)})
+                log("error", stage="stt", error_type=type(exc).__name__)
+                await send(
+                    {
+                        "type": "error",
+                        "stage": "stt",
+                        "message": (
+                            "Offline speech recognition stopped. Use touch or request staff help."
+                        ),
+                    }
+                )
 
         await send(
             {
@@ -822,7 +1499,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             }
         )
 
-        def show_on_panel(headline: str, options: tuple[str, ...] = (), alert: bool = False) -> None:
+        def show_on_panel(
+            headline: str, options: tuple[str, ...] = (), alert: bool = False
+        ) -> None:
             """Draw on the kiosk display, if one is attached. Never raises into an interview."""
 
             if tablet is None or not headline:
@@ -848,7 +1527,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             """Push the current stage to the client, and speak it when there is something to say."""
 
             nonlocal tts_task
+            guard.invalidate_prompt()
+            invalidate_audio()
+            persist()
             screen = flow.screen(session.state)
+            screen.update({"session_id": session_id, "revision": guard.revision})
             await send({"type": "flow.screen", "data": screen})
             log("flow_stage", stage=screen["stage"], input=screen.get("input"))
             show_on_panel(
@@ -857,30 +1540,80 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 alert=bool(screen.get("alert")),
             )
             headline = screen.get("headline")
-            if headline and screen["stage"] != Stage.INTERVIEW.value:
+            if headline:
                 await cancel_tts("flow_stage")
                 # Read the choices out too, numbered to match the cards on screen. Speaking only
                 # the question leaves a patient who cannot read with no idea what the options are.
                 spoken = [headline]
                 for index, option in enumerate(screen.get("options") or [], start=1):
                     spoken.append(f"{index}. {option['label']}")
-                tts_task = asyncio.create_task(
-                    stream_tts(". ".join(spoken), flow.language), name=f"tts-{session_id}"
-                )
-            elif screen["stage"] == Stage.INTERVIEW.value and pending_question is None:
-                # The interview screen has no headline of its own, so arriving here used to leave
-                # the kiosk silent until the patient guessed they should talk - and whatever they
-                # said was then treated as the answer to a question nobody had asked.
-                await ask_current_question()
+                for index, answer in enumerate(screen.get("review") or [], start=1):
+                    outcome = (
+                        answer["answer"]
+                        if answer["status"] == "answered"
+                        else ("उत्तर नहीं दिया" if flow.language == "hi" else "not established")
+                    )
+                    spoken.append(f"{index}. {answer['question']}. {outcome}")
+                queue_speech(". ".join(spoken), flow.language)
+            elif screen["stage"] == Stage.INTERVIEW.value:
+                if pending_question is None:
+                    await ask_current_question()
+                else:
+                    wording = question_text(
+                        pending_question.id, pending_question.template_for(flow.language)
+                    )
+                    await send(
+                        {
+                            "type": "clinical.question",
+                            "id": pending_question.id,
+                            "text": wording,
+                            "answer_ui": answer_ui(pending_question.id),
+                            "accumulate": pending_question.id == "ask_complaint",
+                            "allowed_actions": screen["allowed_actions"],
+                        }
+                    )
+                    await speak(wording)
+
+        def queue_speech(
+            text: str, language: str | None, epoch: tuple[str, int] | None = None
+        ) -> None:
+            nonlocal tts_task, pending_speech
+            speech = (text, language, epoch or (session_id, guard.revision))
+            if transition_active:
+                pending_speech = speech
+            else:
+                tts_task = asyncio.create_task(stream_tts(*speech), name=f"tts-{session_id}")
 
         async def speak(text: str) -> None:
             """Say something without changing the screen."""
-
-            nonlocal tts_task
             await cancel_tts("speak")
-            tts_task = asyncio.create_task(
-                stream_tts(text, flow.language), name=f"tts-{session_id}"
-            )
+            queue_speech(text, flow.language)
+
+        async def watch_idle() -> None:
+            """Privacy timeout: warn an untouched kiosk, then close it for the next patient.
+
+            "More time" doubles the allowance; any accepted action resets the clock. The
+            language screen never times out because nobody's data is on it yet.
+            """
+            warned = False
+            while True:
+                await asyncio.sleep(min(5.0, idle_seconds / 10))
+                if flow.stage is Stage.LANGUAGE or transition_active:
+                    warned = False
+                    continue
+                idle = time.monotonic() - last_activity
+                warning_at = idle_seconds - min(60.0, idle_seconds / 2)
+                if idle >= idle_seconds:
+                    log("session_idle_closed", stage=flow.stage.value)
+                    with suppress(RuntimeError, OSError):
+                        await websocket.close(code=4408, reason="Idle")
+                    return
+                if idle >= warning_at and not warned:
+                    warned = True
+                    await send({"type": "session.idle", "remaining": idle_seconds - idle})
+                    await speak(prompt_text("idle_warning", flow.language))
+                elif idle < warning_at:
+                    warned = False
 
         async def ask_current_question() -> None:
             """Ask the clinical question the state machine wants next, in the chosen language."""
@@ -890,7 +1623,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if question is None:
                 pending_question = None
                 if flow.stage is Stage.INTERVIEW:
-                    flow.advance()
+                    flow.complete_interview()
                     await send_screen()
                 return
             attempts[question.id] = attempts.get(question.id, 0) + 1
@@ -902,8 +1635,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await ask_current_question()
                 return
             pending_question = question
+            guard.invalidate_prompt()
+            invalidate_audio()
+            persist()
             language = flow.language or local_language
-            text = question.template_for(language)
+            text = question_text(question.id, question.template_for(language))
             await send(
                 {
                     "type": "clinical.question",
@@ -912,6 +1648,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     # Which pictorial control to draw, so a patient who cannot read the
                     # question can still answer it.
                     "answer_ui": answer_ui(question.id),
+                    "accumulate": question.id == "ask_complaint",
+                    "allowed_actions": flow.screen(session.state)["allowed_actions"],
                     # Set when this is a re-ask of something the last answer did not settle.
                     "clarifying": bool(getattr(question, "clarifying", False)),
                 }
@@ -919,135 +1657,185 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             log("asked", question=question.id, language=language)
             show_on_panel(text)
             await cancel_tts("ask_question")
-            tts_task = asyncio.create_task(stream_tts(text, language), name=f"tts-{session_id}")
+            queue_speech(text, language)
 
-        def submit_held_documents(record: dict[str, Any], handles: list[str]) -> dict[str, Any]:
-            """Ingest the record, then upload this session's held pages against its intake_id.
+        async def export_to_hospital(built: dict[str, Any]) -> str:
+            """Send the finished record to the hospital, if the patient allowed exactly that.
 
-            Ingest is idempotent on the session id, so a retry after a crash returns the same
-            intake. The uploads are not - the outbox enforces that an ambiguous send is never
-            repeated, so calling this twice cannot duplicate a document.
+            Returns what to write on the sheet, so a staff member reading a report can tell a
+            record that reached the hospital from one that is still only on this Jetson.
+
+            `cloud_intake` is asked for on its own. Permission to be interviewed by a kiosk is
+            not permission to transmit the interview, and treating one as the other is the
+            failure this branch exists to make impossible.
             """
 
-            assert intake_api is not None
-            # The session id is the intake id: a UUID, unique per session, known before the
-            # scan stage, and the same key a retry of this session would reuse.
-            ingested = intake_api.ingest(kiosk_envelope(record, session_id),
-                                         idempotency_key=session_id)
-            if not ingested.ok:
-                log("cloud_ingest_failed", outcome=ingested.outcome.value,
-                    status=ingested.status, detail=ingested.detail[:200])
-                return {"ingest": ingested.outcome.value, "documents": []}
-            body = ingested.body or {}
-            intake_id = body.get("intake_id")
-            if not intake_id:
-                # The API filed the record as unusable and says why. Nothing exists to attach
-                # a document to, so the held pages stay pending and the reason goes on the sheet.
-                log("cloud_ingest_unusable", reason=body.get("reason"),
-                    errors=[e.get("msg") for e in body.get("errors", [])][:5])
-                return {"ingest": "unusable", "reason": body.get("reason"),
-                        "errors": body.get("errors", [])[:5], "documents": []}
+            api, hospital_id = cloud["api"], cloud["hospital_id"]
+            if api is None:
+                return "not_requested"
+            if hospital_id is None:
+                # Provisioned but never reached the cloud: nothing here knows which hospital
+                # this token writes into, and guessing is how a record lands in the wrong one.
+                # Checked before consent so the sheet never reports a refusal by a patient who
+                # was never asked - they were not, because there was nothing to ask about.
+                log("cloud_export_skipped", reason="hospital_unknown")
+                return "unreachable"
+            if not flow.transfer_decided:
+                log("cloud_export_skipped", reason="not_asked")
+                return "not_asked"
+            if not flow.consent.allows("cloud_intake"):
+                log("cloud_export_skipped", reason="refused")
+                return "declined_by_patient"
 
-            results = outbox.submit(intake_api, str(intake_id), handles)
-            summary = [
-                {"handle": d.handle, "kind": d.kind, "state": d.state,
-                 "document_id": d.document_id, "detail": d.detail[:120]}
-                for d in results
-            ]
-            log("cloud_documents", intake_id=str(intake_id),
-                states={d.state: sum(1 for r in results if r.state == d.state) for d in results})
-            return {"ingest": "ok", "intake_id": str(intake_id), "documents": summary}
+            config = cloud["config"]
+            record = kiosk_envelope(
+                built,
+                session_id,
+                hospital_id=hospital_id,
+                status="complete",
+                content_version=hospital_sync.content_version(config),
+                kiosk_id=active_settings.kiosk_id or socket.gethostname(),
+                engine_version=f"medikiosk-{__version__}",
+            )
+            department = hospital_sync.department_code(
+                config, hospital_id, (built.get("routing") or {}).get("queue")
+            )
+            if department:
+                record["department_code"] = department
+            # The session id is the intake id: unique per encounter and stable across a retry,
+            # so an ingest repeated after a crash returns the same intake rather than a second.
+            response = await asyncio.to_thread(api.ingest, record, session_id)
+            body = response.body or {}
+            if not response.ok:
+                log(
+                    "cloud_ingest_failed",
+                    outcome=response.outcome.value,
+                    status=response.status,
+                    detail=response.detail[:200],
+                )
+                return f"failed:{response.outcome.value}"
+            if not body.get("intake_id"):
+                log("cloud_ingest_unusable", reason=body.get("reason"))
+                return f"unusable:{body.get('reason')}"
+            built["hospital_intake_id"] = body["intake_id"]
+            log(
+                "cloud_ingested",
+                intake=body["intake_id"],
+                status=body.get("status"),
+                repaired=body.get("repaired"),
+                needs_review=body.get("needs_review"),
+            )
+            return "sent"
 
         async def finish_session() -> None:
-            """Build the doctor's sheet and, for a returning patient, file this visit under it."""
-
+            """A saved local report is independent of optional cloud delivery."""
             nonlocal intake_complete
-            intake_complete = True
+            if intake_complete:
+                await send({"type": "flow.report", "data": flow.report})
+                return
+            if not flow.consent.allows("local_intake") or store is None:
+                raise RuntimeError("Consented encrypted storage is required")
+            emergency = flow.stage is Stage.EMERGENCY
+            if not emergency and flow.stage not in {Stage.REVIEW, Stage.FINALIZING}:
+                raise ValueError("Review the intake before finalizing")
+            if not emergency:
+                flow.stage = Stage.FINALIZING
+            # Journal before the separate idempotent report/queue/visit writes.
+            # A crash here resumes finalization, never creates a new encounter.
+            store.save_workflow(session_id, snapshot(), guard.token)
             built = flow.finish(session.state, session_red_flags)
-            if flow.abha_number and records is not None:
-                try:
-                    records.save(
-                        flow.abha_number,
-                        {
-                            "complaint": session.state.complaint,
-                            "severity": session.state.severity,
-                            "queue": built["routing"]["queue"],
-                        },
-                    )
-                except Exception as exc:  # a storage fault must not lose the patient's report
-                    log("visit_save_failed", message=str(exc))
-            # Hand the finished intake to the OPD. Until this existed the kiosk produced a
-            # report and then had nowhere to send it.
-            reports[session_id] = built
+            built["encounter_id"] = session_id
+            built["completion"] = "finalizing"
+            built["cloud_status"] = "not_requested"
+            built["consent"] = flow.consent.model_dump(mode="json")
+            store.save_report(session_id, built)
             entry = queue.assign(session_id, built)
-            built["queue_entry"] = vars(entry)
-            # Handwritten pages held during the scan stage go to the cloud reader now that the
-            # record exists to attach them to. Off the event loop: it is network I/O, and a slow
-            # link must not stall the report the patient is waiting for. Nothing here can raise
-            # into the session - a failed upload is recorded on the document, not thrown.
-            if intake_api is not None and flow.held_document_handles:
-                built["cloud_documents"] = await asyncio.to_thread(
-                    submit_held_documents, built, flow.held_document_handles
+            built["queue_entry"] = {**vars(entry), "state": "WAITING"}
+            if flow.abha_number and records is not None and flow.consent.allows("history_linkage"):
+                records.save(
+                    flow.abha_number,
+                    {
+                        "complaint": session.state.complaint,
+                        "severity": session.state.severity,
+                        "queue": built["routing"]["queue"],
+                    },
+                    encounter_id=session_id,
                 )
-            if store is not None:
-                try:
-                    store.save_report(session_id, built)
-                except Exception as exc:
-                    log("report_save_failed", message=str(exc))
-                    built["persistence_error"] = "Report is only available until the kiosk restarts"
+            built["completion"] = "saved_local"
+            flow.report = built
+            flow.stage = Stage.EMERGENCY if emergency else Stage.REPORT
+            intake_complete = True
+            persist()
+            # Only now, with the record safely on this disk, is the hospital's copy attempted.
+            # A failed export is a delivery problem, never a lost intake: the patient already
+            # has a token and staff already have the sheet.
+            built["cloud_status"] = await export_to_hospital(built)
+            flow.report = built
+            persist()
             await send({"type": "flow.report", "data": built})
-            log(
-                "report_ready",
-                queue=built["routing"]["queue"],
-                band=entry.band,
-                number=entry.number,
-                stage=flow.stage.value,
-            )
+            log("report_ready", band=entry.band, number=entry.number)
             await send_screen()
 
-        restored = resume_states.pop(session_id, None) if resumed else None
-        if restored is not None:
-            flow, session.state = restored["flow"], restored["state"]
-            local_language = flow.language or local_language
-            local_language_locked = bool(flow.language) or not active_settings.auto_detect_language
-            attempts.update(restored.get("attempts", {}))
-            unresolved.extend(restored.get("unresolved", []))
-            session_red_flags.extend(restored.get("red_flags", []))
-            log("session_resumed", stage=flow.stage.value)
-
-        log(
-            "session_start",
-            mode="cloud" if use_cloud else ("local" if use_local else "typed-only"),
-            resumed=restored is not None,
-        )
-        await send({"type": "session.id", "session_id": session_id})
-        await send_screen()
-
-        if use_cloud:
-            stt_task = asyncio.create_task(run_stt(), name=f"stt-{session_id}")
-        elif use_local:
-            stt_task = asyncio.create_task(run_local_stt(), name=f"stt-local-{session_id}")
-            await send({"type": "configuration.required", "missing": [], "message": (
-                f"Microphone is live via the on-device Whisper + {active_settings.edge_language} "
-                "voice. No cloud key configured or needed."
-            )})
-        else:
-            await send(
-                {
-                    "type": "configuration.required",
-                    "missing": ["SARVAM_API_KEY", "local Whisper server"],
-                    "message": (
-                        "Microphone STT/TTS is disabled; typed transcript testing remains "
-                        "available."
-                    ),
-                }
-            )
-
         try:
+            if restored is not None:
+                flow = KioskFlow.from_snapshot(restored["flow"])
+                session.state = PatientState.model_validate(restored["state"])
+                guard.restore(restored["guard"])
+                intake_complete = (
+                    restored.get("status") == "complete"
+                    and (flow.report or {}).get("completion") == "saved_local"
+                )
+                local_language = flow.language or local_language
+                local_language_locked = bool(flow.language)
+                attempts.update(restored.get("attempts", {}))
+                pending_question = QUESTIONS.get(restored.get("pending_question_id") or "")
+                unresolved.extend(restored.get("unresolved", []))
+                session_red_flags.extend(
+                    RedFlagAlert.model_validate(a) for a in restored.get("red_flags", [])
+                )
+                log("session_resumed", stage=flow.stage.value)
+            active_sessions[session_id] = {"flow": flow, "guard": guard, "captures": {}}
+            log(
+                "session_start",
+                mode="local" if use_local else "touch-only",
+                resumed=restored is not None,
+            )
+            await send({"type": "session.id", "session_token": guard.token})
+            if intake_complete:
+                await send({"type": "flow.report", "data": flow.report})
+            await send_screen()
+            idle_task = asyncio.create_task(watch_idle(), name=f"idle-{session_id}")
+            if use_local:
+                stt_task = asyncio.create_task(run_local_stt(), name=f"stt-local-{session_id}")
+                await send(
+                    {
+                        "type": "configuration.required",
+                        "missing": [],
+                        "message": "Local speech is available; no cloud service is used.",
+                    }
+                )
+            else:
+                await send(
+                    {
+                        "type": "configuration.required",
+                        "missing": ["local speech service"],
+                        "message": (
+                            "Offline speech is unavailable. Use touch or request staff help."
+                        ),
+                    }
+                )
             while True:
                 incoming = await websocket.receive()
                 if incoming.get("bytes") is not None:
-                    if (use_cloud or use_local) and stt_task is not None and not stt_task.done():
+                    if len(incoming["bytes"]) > 65536:
+                        continue
+                    if (
+                        use_local
+                        and not playback_active
+                        and capture_epoch == (session_id, guard.revision)
+                        and stt_task is not None
+                        and not stt_task.done()
+                    ):
                         if audio_queue.full():
                             audio_queue.get_nowait()
                         audio_queue.put_nowait(incoming["bytes"])
@@ -1065,156 +1853,73 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     await send({"type": "error", "stage": "protocol", "message": "Invalid command"})
                     continue
                 command_type = command.get("type")
-                expected_stage = {
-                    "flow.language": Stage.LANGUAGE, "flow.abha": Stage.ABHA,
-                    "flow.who": Stage.WHO, "flow.ayurveda": Stage.AYURVEDA,
-                    "flow.prakriti": Stage.PRAKRITI, "flow.document": Stage.DOCUMENTS,
-                }.get(command_type)
-                if expected_stage is not None and flow.stage is not expected_stage:
-                    await send({"type": "error", "stage": "flow", "message": "Stale stage action"})
+                if command_type == "session.stop":
+                    break
+                if command_type == "audio.start":
+                    if (
+                        command.get("session_id") == session_id
+                        and command.get("revision") == guard.revision
+                        and not playback_active
+                    ):
+                        capture_epoch = (session_id, guard.revision)
                     continue
-                if command_type in ("flow.restart", "flow.back", "flow.next"):
+                if command_type == "playback.state":
+                    if (
+                        command.get("session_id") == session_id
+                        and command.get("revision") == guard.revision
+                    ):
+                        playback_active = command.get("playing") is True
+                        invalidate_audio()
+                    continue
+                if command_type != "flow.action":
+                    await send(
+                        {
+                            "type": "error",
+                            "stage": "protocol",
+                            "message": "This client must use workflow protocol 2",
+                        }
+                    )
+                    continue
+                try:
+                    action = FlowAction.model_validate(command)
+                    if not guard.check(action):
+                        await send(
+                            {"type": "flow.ack", "action_id": action.action_id, "duplicate": True}
+                        )
+                        continue
                     for task in list(turn_tasks):
                         task.cancel()
                     if turn_tasks:
                         await asyncio.gather(*list(turn_tasks), return_exceptions=True)
-                    await cancel_tts("navigation")
-                    audio_generation += 1
-                    local_segmenter.reset()
-                    if local_vad is not None:
-                        local_vad.reset()
-                    while not audio_queue.empty():
-                        audio_queue.get_nowait()
-                if command_type == "transcript.submit":
-                    transcript = str(command.get("text", "")).strip()
-                    if transcript:
-                        # Typed, not heard: no read-back needed.
-                        spawn_turn(transcript, flow.language or command.get("language", "en-IN"), spoken=False)
-                elif command_type == "barge_in":
-                    await cancel_tts("browser_vad")
-                    await send({"type": "vad", "state": "speech_start", "source": "browser"})
-                elif command_type == "flow.language":
-                    try:
-                        flow.choose_language(str(command.get("value", "")))
-                    except ValueError as exc:
-                        await send({"type": "error", "stage": "language", "message": str(exc)})
+                    await cancel_tts("action")
+                    invalidate_audio()
+                    if (
+                        flow.stage is Stage.INTERVIEW
+                        and not flow.restart_confirm
+                        and not flow.withdraw_confirm
+                        and action.action in {"answer", "choose"}
+                    ):
+                        if action.question_id and (
+                            pending_question is None or action.question_id != pending_question.id
+                        ):
+                            raise ValueError("Question changed")
+                        value = "" if action.value is None else str(action.value)
+                        await process_final(value, flow.language, spoken=False, action=action)
                     else:
-                        # An explicit choice beats auto-detection: Whisper guessed English from a
-                        # one-word "Namaste" and then decoded every Hindi answer as English.
-                        local_language = flow.language or local_language
-                        local_language_locked = True
-                        # The adaptive session renders its own question text, so it needs the
-                        # chosen language before the first question is drawn. Without this the
-                        # opening question arrived in the configured default and only corrected
-                        # itself once the patient had answered it.
-                        if hasattr(session, "language"):
-                            session.language = local_language
-                        log("language_selected", language=local_language)
-                        await send_screen()
-                elif command_type == "flow.abha":
-                    raw_value = str(command.get("value") or "")
-                    number = normalise(raw_value) or from_qr_payload(raw_value)
-                    if raw_value.strip() and number is None:
-                        await send({"type": "error", "stage": "abha", "message": "Enter a valid 14-digit ABHA number or skip"})
-                        continue
-                    history = records.history(number) if (number and records) else []
-                    if number and store:
-                        # Prakriti does not change, so a patient who answered it on any previous
-                        # visit is never asked again.
-                        with contextlib.suppress(Exception):
-                            flow.load_prakriti(store.load_prakriti(number))
-                    flow.set_abha(number, history)
-                    log("abha", matched=bool(number), previous_visits=len(history))
-                    await send_screen()
-                elif command_type == "flow.who":
-                    if command.get("value") not in ("self", "other"):
-                        await send({"type": "error", "stage": "who", "message": "Choose patient or representative"})
-                        continue
-                    flow.set_who(command["value"])
-                    await send_screen()
-                elif command_type == "flow.ayurveda":
-                    try:
-                        flow.answer_ayurveda(
-                            str(command.get("question_id", "")), str(command.get("value", ""))
-                        )
-                    except ValueError as exc:
-                        await send({"type": "error", "stage": "ayurveda", "message": str(exc)})
-                    else:
-                        await send_screen()
-                elif command_type == "flow.prakriti":
-                    # One command for both halves of the stage: the gate answer ("have you filled
-                    # this before?") carries no question_id, an actual answer does.
-                    try:
-                        if command.get("question_id"):
-                            flow.answer_prakriti(
-                                str(command["question_id"]), str(command.get("value", ""))
-                            )
-                        else:
-                            flow.answer_prakriti_gate(str(command.get("value", "")))
-                    except ValueError as exc:
-                        await send({"type": "error", "stage": "prakriti", "message": str(exc)})
-                    else:
-                        if flow.prakriti_record is not None and flow.abha_number and store:
-                            # Once in a lifetime means it has to outlive the session, and only an
-                            # ABHA gives a later visit anything to look it up by.
-                            with contextlib.suppress(Exception):
-                                store.save_prakriti(flow.abha_number, flow.prakriti_record)
-                        await send_screen()
-                elif command_type == "flow.document":
-                    handle = command.get("outbox_handle")
-                    # Only accept a handle the outbox actually issued. A client cannot make the
-                    # kiosk upload an arbitrary file by naming a path.
-                    if handle is not None and outbox.get(str(handle)) is None:
-                        handle = None
-                    flow.add_document(
-                        [str(line) for line in (command.get("lines") or [])],
-                        command.get("seconds"),
-                        handwritten=command.get("handwritten"),
-                        outbox_handle=str(handle) if handle else None,
+                        async with transition(action=action):
+                            await handle_action(action.action, action.value, action.question_id)
+                    await send(
+                        {"type": "flow.ack", "action_id": action.action_id, "duplicate": False}
                     )
-                    await send_screen()
-                elif command_type == "flow.next":
-                    # Skip / done: the patient declined this stage, or finished scanning.
-                    if flow.stage is Stage.REPORT:
-                        pass
-                    elif flow.advance() is Stage.REPORT:
-                        await finish_session()
-                    else:
-                        await send_screen()
-                elif command_type == "flow.repeat":
-                    # Say the current screen again. For a patient who cannot read, the spoken
-                    # question is the only version of it there is.
-                    if flow.stage is Stage.INTERVIEW and pending_question is not None:
-                        await speak(pending_question.template_for(flow.language))
-                    else:
-                        await send_screen()
-                elif command_type == "flow.back":
-                    flow.back()
-                    pending_question = None
-                    await send_screen()
-                elif command_type == "flow.restart":
-                    session_id = str(uuid.uuid4())
-                    # Start a whole new patient. A kiosk gets walked away from mid-intake, and the
-                    # next person must not inherit the last one's answers.
-                    flow = KioskFlow()
-                    session = await asyncio.to_thread(clinical_session)
-                    session_red_flags.clear()
-                    attempts.clear()
-                    unresolved.clear()
-                    awaiting_confirmation = None
-                    await send({"type": "session.id", "session_id": session_id})
-                    pending_question = None
-                    intake_complete = False
-                    local_language_locked = not active_settings.auto_detect_language
-                    local_language = active_settings.edge_language
-                    log("session_restart")
-                    await send_screen()
-                elif command_type == "client.log":
-                    # The tablet app has no console anyone can read, so its failures are reported
-                    # here and land in the same log as everything else.
-                    log("client", message=str(command.get("message", ""))[:400])
-                elif command_type == "session.stop":
-                    break
+                except (ValueError, RuntimeError, OSError, sqlite3.Error):
+                    await send(
+                        {
+                            "type": "error",
+                            "stage": "flow",
+                            "action_id": command.get("action_id"),
+                            "message": "Action not saved; please use the current prompt",
+                        }
+                    )
         except WebSocketDisconnect:
             log("session_disconnect")
         except RuntimeError as exc:
@@ -1238,12 +1943,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if stt_task:
                 stt_task.cancel()
                 await asyncio.gather(stt_task, return_exceptions=True)
+            if idle_task:
+                # Only ever sleeping; nothing to wait for.
+                idle_task.cancel()
+            active_sessions.pop(session_id, None)
+            leased_tokens.discard(guard.token)
             if not intake_complete:
-                # Only unfinished intakes are worth resuming; a completed one is in the queue.
-                resume_states[session_id] = {"flow": flow, "state": session.state,
-                                             "attempts": attempts, "unresolved": unresolved,
-                                             "red_flags": session_red_flags}
-            log("session_end", final_state=session.state.model_dump(mode="json"))
+                with suppress(OSError, RuntimeError):
+                    persist()
+            else:
+                resume_states.pop(guard.token, None)
+            log("session_end")
 
     return app
 

@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from cryptography.fernet import Fernet
+
 # Shipped default. A hospital overrides it with its own file; nothing here assumes these exist.
 DEFAULT_SPECIALTIES: tuple[str, ...] = (
     "Emergency",
@@ -98,7 +100,8 @@ class QueueStore:
     query away from someone's history.
     """
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, encryption_key: str | None = None) -> None:
+        self.cipher = Fernet(encryption_key.encode("ascii")) if encryption_key else None
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
@@ -130,7 +133,11 @@ class QueueStore:
         band = band_for(routing)
         complaint = (report.get("clinical") or {}).get("complaint")
         reason = routing.get("reason", "")
+        if self.cipher:
+            complaint = self.cipher.encrypt(json.dumps(complaint).encode())
+            reason = self.cipher.encrypt(json.dumps(reason).encode())
         now = datetime.now(timezone.utc).isoformat()
+        state = "FINALIZING" if report.get("completion") == "finalizing" else "WAITING"
 
         with self._lock, self._connect() as connection:
             existing = connection.execute(
@@ -148,14 +155,30 @@ class QueueStore:
                 """
                 INSERT INTO queue_entries
                     (encounter_id, specialty, band, number, complaint, reason, state, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, 'WAITING', ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (encounter_id, specialty, band, taken + 1, complaint, reason, now),
+                (encounter_id, specialty, band, taken + 1, complaint, reason, state, now),
             )
             row = connection.execute(
                 "SELECT * FROM queue_entries WHERE encounter_id = ?", (encounter_id,)
             ).fetchone()
         return self._row(row)
+
+    def finalizing(self) -> list[QueueEntry]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM queue_entries WHERE state = 'FINALIZING'"
+            ).fetchall()
+        return [self._row(row) for row in rows]
+
+    def publish(self, encounter_id: str) -> None:
+        """Expose a committed encounter without resetting a staff lifecycle change."""
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                "UPDATE queue_entries SET state='WAITING' "
+                "WHERE encounter_id=? AND state='FINALIZING'",
+                (encounter_id,),
+            )
 
     def waiting(self) -> list[QueueEntry]:
         """Everyone still waiting, review cases first, then arrival order within each band."""
@@ -181,16 +204,22 @@ class QueueStore:
             ).fetchone()
         return self._row(row) if row is not None else None
 
-    @staticmethod
-    def _row(row: sqlite3.Row) -> QueueEntry:
+    def _row(self, row: sqlite3.Row) -> QueueEntry:
+        def decode(value):
+            if isinstance(value, bytes):
+                if self.cipher is None:
+                    raise ValueError("Queue encryption key required")
+                return json.loads(self.cipher.decrypt(value))
+            return value  # Historical plaintext is readable, never rewritten implicitly.
+
         return QueueEntry(
             id=row["id"],
             encounter_id=row["encounter_id"],
             specialty=row["specialty"],
             band=row["band"],
             number=row["number"],
-            complaint=row["complaint"],
-            reason=row["reason"],
+            complaint=decode(row["complaint"]),
+            reason=decode(row["reason"]),
             state=row["state"],
             created_at=row["created_at"],
         )

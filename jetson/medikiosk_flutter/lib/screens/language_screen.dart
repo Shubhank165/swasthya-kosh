@@ -6,12 +6,15 @@ class LanguageScreen extends StatelessWidget {
   final String selectedLanguage;
   final ValueChanged<String> onLanguageSelected;
   final VoidCallback onRepeatAudio;
+  /// Backend language codes ('en', 'hi') to offer; null shows every card.
+  final List<String>? codes;
 
   const LanguageScreen({
     super.key,
     required this.selectedLanguage,
     required this.onLanguageSelected,
     required this.onRepeatAudio,
+    this.codes,
   });
 
   @override
@@ -103,8 +106,10 @@ class LanguageScreen extends StatelessWidget {
                     spacing: 16,
                     runSpacing: 16,
                     alignment: WrapAlignment.center,
-                    children: supportedLanguages.map((lang) {
-                      final isSelected = selectedLanguage == lang.code;
+                    children: supportedLanguages.where((lang) =>
+                        codes == null || codes!.contains(lang.code.split('-').first)).map((lang) {
+                      final short = lang.code.split('-').first;
+                      final isSelected = selectedLanguage == lang.code || selectedLanguage == short;
 
                       return SizedBox(
                         width: cardWidth,
@@ -115,7 +120,7 @@ class LanguageScreen extends StatelessWidget {
                       shadowColor: Colors.black12,
                       borderRadius: BorderRadius.circular(20),
                       child: InkWell(
-                        onTap: () => onLanguageSelected(lang.code),
+                        onTap: () => onLanguageSelected(short),
                         borderRadius: BorderRadius.circular(20),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

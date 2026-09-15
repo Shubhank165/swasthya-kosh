@@ -89,7 +89,16 @@
       <span class="sub">MediKiosk intake &middot; review cases are not queued, they are escalated</span>
       <span class="live" id="live">connecting…</span>
     </header>
-    <main>
+    <form id="login" style="padding:24px" hidden>
+      <h2>Offline staff sign-in</h2>
+      <p>Use a separately provisioned staff account. Patient session codes do not grant access.</p>
+      <label>Username <input name="username" required autocomplete="username" maxlength="100"></label>
+      <label>Password <input name="password" type="password" required autocomplete="current-password" maxlength="1024"></label>
+      <button class="act" type="submit">Sign in</button>
+      <p id="login-status" role="status"></p>
+    </form>
+    <button id="logout" class="act ghost" hidden>Sign out</button>
+    <main id="workspace" hidden>
       <div class="list" id="list"><div class="empty">Loading queue…</div></div>
       <div class="detail" id="detail"><div class="empty">Select a patient to see their intake.</div></div>
     </main>
@@ -99,13 +108,48 @@
       const detailEl = document.querySelector("#detail");
       const liveEl = document.querySelector("#live");
       let selected = null;
+      let csrf = null;
+      const login = document.querySelector('#login');
+      const workspace = document.querySelector('#workspace');
+      const logout = document.querySelector('#logout');
+      function signedOut() {
+        csrf = null; selected = null;
+        login.hidden = false; workspace.hidden = true; logout.hidden = true;
+        listEl.textContent = ''; detailEl.textContent = '';
+        liveEl.textContent = 'staff sign-in required';
+      }
+      async function api(path, init = {}) {
+        const response = await fetch(path, {...init, headers: {'Content-Type': 'application/json',
+          ...(csrf ? {'X-CSRF-Token': csrf} : {}), ...(init.headers || {})}, cache: 'no-store'});
+        if (response.status === 401) signedOut();
+        if (!response.ok) throw new Error('Staff request failed');
+        return response.json();
+      }
+      login.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const values = new FormData(login);
+        try {
+          const session = await api('/api/staff/login', {method:'POST', body: JSON.stringify({
+            username: values.get('username'), password: values.get('password')})});
+          login.reset(); csrf = session.csrf_token;
+          login.hidden = true; workspace.hidden = false; logout.hidden = false;
+          refresh();
+        } catch (_) {
+          login.reset();
+          document.querySelector('#login-status').textContent = 'Sign-in failed. Check local provisioning, HTTPS, and credentials.';
+        }
+      });
+      logout.addEventListener('click', async () => {
+        try { await api('/api/staff/logout', {method:'POST'}); } finally { signedOut(); }
+      });
 
       const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
         ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
       async function refresh() {
+        if (!csrf) return;
         try {
-          const data = await (await fetch("/api/queue")).json();
+          const data = await api('/api/queue');
           liveEl.textContent = `${data.review.length} for review · ${data.waiting.length} waiting`;
           renderList(data);
         } catch (error) {
@@ -144,7 +188,7 @@
 
       async function open(id) {
         selected = id;
-        const data = await (await fetch(`/api/encounters/${id}`)).json();
+        const data = await api(`/api/encounters/${encodeURIComponent(id)}`);
         if (data.error) { detailEl.innerHTML = `<div class="empty">${esc(data.error)}</div>`; return; }
         detailEl.innerHTML = renderReport(id, data.report, data.queue);
         detailEl.querySelector("#seen")?.addEventListener("click", () => setState(id, "IN_CONSULTATION"));
@@ -153,7 +197,7 @@
       }
 
       async function setState(id, state) {
-        await fetch(`/api/encounters/${id}/state`, {
+        await api(`/api/encounters/${encodeURIComponent(id)}/state`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ state }),
@@ -222,7 +266,12 @@
           </div>`;
       }
 
-      refresh();
+      try {
+        const session = await api('/api/staff/session');
+        csrf = session.csrf_token;
+        login.hidden = true; workspace.hidden = false; logout.hidden = false;
+        refresh();
+      } catch (_) { signedOut(); }
       setInterval(refresh, 4000);
     </script>
   </body>

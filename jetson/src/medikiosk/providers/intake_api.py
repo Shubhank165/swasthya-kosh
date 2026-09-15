@@ -54,57 +54,239 @@ KINDS = ("prescription", "lab_report", "discharge_summary", "other")
 SCHEMA_VERSION = "0.2"
 
 
-def kiosk_envelope(report: dict[str, Any], intake_id: str) -> dict[str, Any]:
-    """Wrap the kiosk's report in the shape ingest accepts.
+# Our report's names for the answers, in the ids the backend's section table already lists as
+# "exact field ids the Jetson's extractor is known to emit" - so they file under the right
+# heading on the physician's sheet instead of falling through to History of Present Illness.
+FIELD_IDS: dict[str, str] = {
+    "complaint": "chief_complaint",
+    "duration": "duration",
+    "severity": "severity",
+    "age_years": "age",
+    "medications": "current_medications",
+    "allergies": "allergy",
+    "fever": "screen_fever",
+    "vomiting": "screen_vomiting",
+    "breathlessness": "breathlessness",
+    "chest_pain": "chest_pain",
+    "pain_radiation": "radiation",
+    "sweating": "screen_sweating",
+    "active_bleeding": "bleeding",
+    "altered_consciousness": "altered_sensorium",
+    "one_sided_weakness": "screen_one_sided_weakness",
+    "speech_difficulty": "screen_speech_difficulty",
+}
+
+# What the patient never answered. `unresolved` is the contract's word for it, and a field in
+# that state must carry no value - saying "we asked and got nothing" is the entire point.
+UNRESOLVED = "unresolved"
+ANSWERED = "answered"
+
+
+def _outcome(value: Any, language: str | None, original: str | None = None) -> dict[str, Any]:
+    """One field outcome in the contract's shape."""
+
+    field: dict[str, Any] = {"status": ANSWERED, "value": value}
+    if original and original != value:
+        field["original_text"] = original
+    if language:
+        field["language"] = language
+    return field
+
+
+# The Ayurveda answers, under ids the backend files in its AYURVEDA section (an `ayurveda_`
+# prefix, or the exact id `prakriti_self_report`). Our own names are kept rather than mapped
+# onto agni/koshtha/nidra/mala/mutra: those are specific classical parameters, and claiming we
+# asked about Koshtha because we asked about appetite would put a finding on a physician's
+# sheet that no question established.
+AYURVEDA_FIELDS = ("ahara_shakti", "vyayama_shakti", "satva", "satmya")
+
+
+def _ayurveda_fields(report: dict[str, Any], language: str | None) -> dict[str, dict[str, Any]]:
+    """What the Dashavidha and Prakriti questionnaires found, if either was run.
+
+    Prakriti is sent as `prakriti_self_report` - self-report is what it is. It stays provisional
+    until a vaidya signs off the item weights, and `scoring_reviewed` travels with it so the
+    hospital cannot mistake a kiosk tally for a clinician's classification. Answers that did not
+    support a Prakriti are sent as `unresolved`, not as an absent field: the patient sat through
+    the instrument, and a record that omits it cannot be told apart from one never asked.
+    """
+
+    fields: dict[str, dict[str, Any]] = {}
+    ayurveda = report.get("ayurveda") or {}
+    prakriti = report.get("prakriti") or {}
+
+    for name in AYURVEDA_FIELDS:
+        if ayurveda.get(name) is not None:
+            fields[f"ayurveda_{name}"] = _outcome(ayurveda[name], language)
+    if ayurveda.get("prakriti_tendency"):
+        fields["ayurveda_dosha_tendency"] = _outcome(ayurveda["prakriti_tendency"], language)
+
+    if prakriti:
+        name = prakriti.get("prakriti")
+        if name:
+            entry = _outcome(name, language)
+            entry["scoring_reviewed"] = bool(prakriti.get("scoring_reviewed"))
+            entry["answered"] = prakriti.get("answered")
+            entry["asked_total"] = prakriti.get("asked_total")
+            # A qualifier on this reading, not a finding of its own. Sent as an attribute so a
+            # renderer that prints one bullet per field cannot turn "Provisional: item weights
+            # are reconstructed..." into a line that reads as something found in the patient.
+            if prakriti.get("note"):
+                entry["note"] = prakriti["note"]
+            fields["prakriti_self_report"] = entry
+        else:
+            fields["prakriti_self_report"] = {"status": UNRESOLVED}
+    return fields
+
+
+def _turns(report: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Every question asked, and which turn bound each field.
+
+    Without this a physician clicking a line on the hospital's sheet gets nothing to check it
+    against - the record validates, and is unverifiable. Superseded answers are sent too: a
+    value the patient corrected is part of how the final one came to be, and the contract
+    carries the whole history rather than only the survivor.
+
+    Voice fields are sent as explicit nulls rather than omitted, matching what the hospital's
+    own app sends, so one shape reaches the normalizer from both clients. A tapped answer has
+    no transcript and says so; claiming the option label was a transcript would put words in
+    the patient's mouth.
+    """
+
+    turns: list[dict[str, Any]] = []
+    source: dict[str, int] = {}
+    for entry in report.get("answer_history") or []:
+        spoken = entry.get("method") == "voice"
+        bound = _bound_field(entry)
+        turns.append(
+            {
+                "turn_id": entry.get("turn"),
+                "question_id": entry.get("id"),
+                "asked_text": entry.get("question") or None,
+                "transcript": (entry.get("answer") or None) if spoken else None,
+                "asr_confidence": None,
+                "bound_field": bound,
+                "bound_value": entry.get("value"),
+                "resolved": entry.get("status") == "answered",
+                "language": entry.get("language"),
+            }
+        )
+        if bound and not entry.get("superseded") and entry.get("turn") is not None:
+            source[bound] = entry["turn"]
+    return turns, source
+
+
+def _bound_field(entry: dict[str, Any]) -> str | None:
+    """Which key in `fields` this turn answered, or None when it answered no single field.
+
+    The 58 Prakriti items are the honest None: they are scored together into one constitution,
+    so no single item is the source of it.
+    """
+
+    question_id = entry.get("id") or ""
+    if question_id.startswith("registration."):
+        return FIELD_IDS.get(f"{question_id.split('.', 1)[1]}_years")
+    field = entry.get("field")
+    return FIELD_IDS.get(field) if field else None
+
+
+def kiosk_envelope(
+    report: dict[str, Any],
+    intake_id: str,
+    *,
+    hospital_id: str,
+    status: str = "complete",
+    kiosk_id: str | None = None,
+    engine_version: str | None = None,
+    content_version: str | None = None,
+    started_at: str | None = None,
+) -> dict[str, Any]:
+    """Wrap the kiosk's report as a KioskIntake v0.2 record.
 
     The kiosk chooses its own intake_id (a UUID) and the API echoes it back, which is what lets a
     document scanned at stage 7 be addressed to an intake that only gets ingested at stage 9.
 
-    Only *bound* values go in `fields`. The API's contract separates a field that was answered
-    from one that never was, and refuses a payload that carries a value for an unresolved field -
-    which is exactly what sending our `not_established` list did: the names of the questions the
-    patient never answered, delivered as if they were an answer. Found against the live deploy
-    as `repair_failed`. Our own report keeps that distinction too; it just spells it differently:
+    Why every value is an object, not a scalar
+    ------------------------------------------
+    `fields` is `dict[str, KioskField]`, and a KioskField is required to say `status` - whether
+    the question was answered, refused, or asked and left unresolved. A payload of bare scalars
+    does not fail loudly: it fails the contract, drops into the backend's LLM repair path, and
+    comes back `repaired: true, needs_review: true`, which puts every kiosk intake in front of a
+    physician as suspect data. That is what this shape exists to avoid.
 
-        clinical.complaint / duration / severity   bound scalars
-        clinical.findings                          bound yes/no answers, keyed by field
-        clinical.medications / allergies           bound lists, meaningful only when non-empty
-        clinical.not_established                   the unresolved names - metadata, never sent
+    `not_established` therefore belongs here after all, as `unresolved` entries carrying no
+    value - the distinction the contract draws, and the one our own report already keeps.
 
-    generated_at is not sent either: the API rejects it outright, presumably because that is a
-    timestamp it sets, not one it accepts.
-
-    The authoritative shape is the backend's tests/fixtures/kiosk/0.2.json, which this side does
-    not have. What is sent here is accepted (`status: partial`) and creates a real intake that
-    documents can attach to; the API maps the names it recognises and flags the rest for review.
+    `hospital_id` is required by the contract. The backend overrides whatever we send with the
+    hospital the token is registered to, so naming the wrong one cannot write into another
+    hospital's records - but omitting it fails validation before that check is ever reached.
     """
 
     clinical = report.get("clinical") or {}
     patient = report.get("patient") or {}
     routing = report.get("routing") or {}
+    language = patient.get("language")
 
-    fields: dict[str, Any] = {}
+    fields: dict[str, dict[str, Any]] = {}
     for key in ("complaint", "duration", "severity"):
         if clinical.get(key) is not None:
-            fields[key] = clinical[key]
-    fields.update(clinical.get("findings") or {})
+            fields[FIELD_IDS[key]] = _outcome(clinical[key], language)
+    if patient.get("age_years") is not None:
+        age = _outcome(patient["age_years"], language)
+        age["unit"] = "year"
+        fields[FIELD_IDS["age_years"]] = age
+    for key, value in (clinical.get("findings") or {}).items():
+        fields[FIELD_IDS.get(key, f"screen_{key}")] = _outcome(value, language)
     for key in ("medications", "allergies"):
+        # An empty list is an unanswered question, not an answer of "none".
         if clinical.get(key):
-            fields[key] = list(clinical[key])
-    for key, value in (
-        ("language", patient.get("language")),
-        ("reported_by", patient.get("reported_by")),
-        ("abha_last4", patient.get("abha_last4")),
-        ("queue", routing.get("queue")),
-        ("priority", routing.get("priority")),
-    ):
-        if value is not None:
-            fields[key] = value
-    raised = [flag.get("rule_id") for flag in report.get("red_flags") or [] if flag.get("rule_id")]
-    if raised:
-        fields["red_flags"] = raised
+            fields[FIELD_IDS[key]] = _outcome(list(clinical[key]), language)
+    if patient.get("reported_by"):
+        fields["reporter"] = _outcome(patient["reported_by"], language)
+    fields.update(_ayurveda_fields(report, language))
+    for name in clinical.get("not_established") or []:
+        fields.setdefault(FIELD_IDS.get(name, name), {"status": UNRESOLVED})
 
-    return {"schema_version": SCHEMA_VERSION, "intake_id": intake_id, "fields": fields}
+    turns, source = _turns(report)
+    for field_id, turn_id in source.items():
+        if field_id in fields:
+            fields[field_id]["source_turn"] = turn_id
+
+    record: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "intake_id": intake_id,
+        "hospital_id": hospital_id,
+        "status": status,
+        "language": language or "en",
+        "reporter": patient.get("reported_by") or "self",
+        "patient_ref": {"type": "guest"},
+        "turns": turns,
+        "fields": fields,
+        "red_flags": [
+            {
+                "rule_id": flag["rule_id"],
+                "severity": flag.get("urgency") or flag.get("severity") or "high",
+                "label": flag.get("message") or flag.get("label"),
+            }
+            for flag in report.get("red_flags") or []
+            if flag.get("rule_id")
+        ],
+    }
+    if report.get("generated_at"):
+        # The API stamps its own received-at; this is when the interview ended.
+        record["completed_at"] = report["generated_at"]
+    if started_at:
+        record["started_at"] = started_at
+    # Which device took this intake, and what was running on it. The hospital's own app sends
+    # null for both by design; a kiosk that does the same is indistinguishable from it, and two
+    # kiosks in one OPD become impossible to tell apart.
+    record["kiosk_id"] = kiosk_id
+    record["engine_version"] = engine_version
+    if content_version:
+        record["content_version"] = content_version
+    if routing.get("department_code"):
+        record["department_code"] = routing["department_code"]
+    return record
 
 
 class Outcome(str, Enum):
@@ -260,6 +442,25 @@ class IntakeApi:
             method="POST",
         )
         return self._send(request)
+
+    # ------------------------------------------------------- what the hospital tells us
+    # The only three reads a kiosk token is allowed. Everything else on this API - the
+    # worklist, terminology, the intakes themselves - answers 403 for role `kiosk`.
+
+    def consent_notice(self) -> Response:
+        """The purposes this hospital asks permission for, labelled in all nine languages."""
+
+        return self._send(urllib.request.Request(f"{self.base_url}/api/v1/content/consent"))
+
+    def hospitals(self) -> Response:
+        """Departments, default language and timezone for the hospitals this token can see."""
+
+        return self._send(urllib.request.Request(f"{self.base_url}/api/v1/hospitals"))
+
+    def content_version(self) -> Response:
+        """Which question content the hospital is on, recorded with every exported record."""
+
+        return self._send(urllib.request.Request(f"{self.base_url}/api/v1/content/bundle/version"))
 
     def post_results(self, intake_id: str, extraction: dict[str, Any]) -> Response:
         """Path B: the Jetson read it, so only the extracted text travels - the image stays here."""

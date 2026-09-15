@@ -12,6 +12,11 @@ it can only make the record more complete, never override a fact the determinist
 established. A patient describing "my ankle hurts" or "sugar badh gayi hai" - nothing in the
 heuristic's fixed phrase list - is exactly the case this exists for.
 
+Before the LLM's values are used at all they pass through clinical/grounding.py: a value the
+transcript does not support (a body part never mentioned, a number never said) is dropped. On
+this Jetson gemma3:1b copies its prompt examples when it does not understand an utterance, and a
+schema cannot tell a copied "ear pain" from a real one. The transcript can.
+
 `severity` is excluded even so: on-device testing had gemma3:1b invent a 0-10 score from
 adjectives alone ("a bad headache" -> 10; unspecified Hindi ear pain -> 6) despite the prompt
 saying not to. red_flags.py compares severity against numeric thresholds to decide an EMERGENCY
@@ -24,14 +29,26 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from medikiosk.clinical.grounding import ground
 from medikiosk.models import ClinicalUpdate
 
 # severity is deliberately absent - see the module docstring. It stays heuristic/direct-answer only.
 SCALAR_FIELDS = (
-    "complaint", "duration", "onset",
-    "vomiting", "fever", "breathlessness", "chest_pain", "pain_radiation", "sweating",
-    "active_bleeding", "altered_consciousness", "one_sided_weakness", "speech_difficulty",
-    "pregnancy_possible", "age_years",
+    "complaint",
+    "duration",
+    "onset",
+    "vomiting",
+    "fever",
+    "breathlessness",
+    "chest_pain",
+    "pain_radiation",
+    "sweating",
+    "active_bleeding",
+    "altered_consciousness",
+    "one_sided_weakness",
+    "speech_difficulty",
+    "pregnancy_possible",
+    "age_years",
 )
 
 
@@ -49,7 +66,7 @@ class HybridClinicalExtractor:
         if self.llm is None:
             return primary
 
-        fallback = await self.llm.extract(transcript)
+        fallback = ground(await self.llm.extract(transcript), transcript)
         merged = primary.model_copy(deep=True)
         for field in SCALAR_FIELDS:
             if getattr(merged, field) is None:

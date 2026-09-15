@@ -21,8 +21,8 @@ import 'package:record/record.dart';
 class AudioService extends ChangeNotifier {
   static const int sampleRate = 16000;
 
-  final AudioRecorder _recorder = AudioRecorder();
-  final AudioPlayer _player = AudioPlayer();
+  final AudioRecorder _recorder;
+  final AudioPlayer _player;
 
   StreamSubscription<Uint8List>? _micSubscription;
   Timer? _resumeTimer;
@@ -51,6 +51,7 @@ class AudioService extends ChangeNotifier {
   String _activeLocaleId = 'hi_IN';
   String _status = 'idle';
 
+  bool get isPlaying => _playing;
   bool get isAvailable => _isAvailable;
   bool get isListening => _isCapturing && !_paused && !_playing && !_temporaryPause;
   bool get isPausedTemporarily => _paused || _playing || _temporaryPause;
@@ -68,7 +69,8 @@ class AudioService extends ChangeNotifier {
   /// Retained for callers; the server delivers finished transcripts over the socket.
   ValueChanged<String>? onFinalTranscript;
 
-  AudioService({this.onPcm, this.onFinalTranscript});
+  AudioService({this.onPcm, this.onFinalTranscript, AudioPlayer? player, AudioRecorder? recorder})
+      : _player = player ?? AudioPlayer(), _recorder = recorder ?? AudioRecorder();
 
   void _setStatus(String value) {
     if (_disposed) return;
@@ -268,7 +270,7 @@ class AudioService extends ChangeNotifier {
 
   /// Play one chunk of speech from the server. `tts.audio` carries bare PCM at a rate that varies
   /// between Piper and Flite voices, so a WAV header is built in memory for it.
-  Future<void> playPcm(Uint8List pcm, int rate) {
+  Future<void> playPcm(Uint8List pcm, int rate, {double playbackRate = 1.0}) {
     if (_disposed || rate <= 0 || pcm.isEmpty) return Future.value();
     final generation = _playbackGeneration;
     _playbackQueue = _playbackQueue.then((_) async {
@@ -279,6 +281,7 @@ class AudioService extends ChangeNotifier {
       final subscription = _player.onPlayerComplete.listen((_) {
         if (!completed.isCompleted) completed.complete();
       });
+      var stopped = true;
       try {
         await _player.setAudioContext(AudioContext(
           android: const AudioContextAndroid(
@@ -290,17 +293,26 @@ class AudioService extends ChangeNotifier {
           BytesSource(_wrapWav(pcm, rate)),
           mode: PlayerMode.mediaPlayer,
         );
+        await _player.setPlaybackRate(playbackRate.clamp(0.5, 1.5));
         // Include actual playback completion so chunks cannot overwrite each other.
         await completed.future.timeout(
-          Duration(milliseconds: pcm.length * 500 ~/ rate + 2000),
+          Duration(milliseconds: (pcm.length * 500 / rate / playbackRate.clamp(0.5, 1.5)).ceil() + 2000),
         );
       } catch (error) {
         if (!_disposed && generation == _playbackGeneration) {
-          _setStatus('playback failed: $error');
+          stopped = false;
+          try {
+            // A duration timeout is not proof that the native player stopped.
+            await _player.stop();
+            stopped = true;
+          } catch (_) {
+            _setStatus('Cannot stop speech playback; microphone remains paused');
+          }
+          if (stopped) _setStatus('playback failed: $error');
         }
       } finally {
         await subscription.cancel();
-        if (!_disposed && generation == _playbackGeneration) {
+        if (!_disposed && generation == _playbackGeneration && stopped) {
           _playing = false;
           pauseTemporarily(const Duration(milliseconds: 250));
         }
@@ -310,13 +322,20 @@ class AudioService extends ChangeNotifier {
   }
 
   Future<void> stopPlayback() async {
-    ++_playbackGeneration;
-    _playbackQueue = Future.value();
-    _playing = false;
-    try {
-      await _player.stop();
-    } catch (_) {}
-    if (!_disposed) notifyListeners();
+    final generation = ++_playbackGeneration;
+    _playing = true;
+    final stopping = () async {
+      try {
+        await _player.stop();
+        if (generation == _playbackGeneration) _playing = false;
+      } catch (_) {
+        _setStatus('Cannot stop speech playback; microphone remains paused');
+      }
+      if (!_disposed) notifyListeners();
+    }();
+    // New chunks cannot start before this stop finishes.
+    _playbackQueue = stopping;
+    await stopping;
   }
 
   static Uint8List _wrapWav(Uint8List pcm, int rate) {
