@@ -24,6 +24,22 @@
       "preferred_language": "ta",
       "external_mrn": null,
       "synthetic": true
+    },
+    "rishiisingh2201@abdm": {
+      "display_name": "Rishi Singh",
+      "birth_year": 2001,
+      "sex": "male",
+      "preferred_language": "hi",
+      "external_mrn": "UHID-100742",
+      "synthetic": true
+    },
+    "shubhank165@abdm": {
+      "display_name": "Shubhank Gupta",
+      "birth_year": 2002,
+      "sex": "male",
+      "preferred_language": "en",
+      "external_mrn": "UHID-100743",
+      "synthetic": true
     }
   }
 }
