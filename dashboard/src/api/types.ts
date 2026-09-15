@@ -27,6 +27,9 @@ export type PhysicianAction = S['PhysicianAction'];
 export type FactValue = NonNullable<S['FactVerifyRequest']['value']>;
 export type FactVerifyRequest = S['FactVerifyRequest'];
 export type DocumentRef = S['DocumentOut'];
+export type HospitalList = S['HospitalListResponse'];
+export type Hospital = S['HospitalOut'];
+export type HospitalDepartment = S['DepartmentOut'];
 /**
  * `Fact.carried_forward`, which OpenAPI types as an open object. Shaped here to
  * match `app/domain/record.py::CarriedForward`.

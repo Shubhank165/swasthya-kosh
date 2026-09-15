@@ -27,6 +27,7 @@ import type {
   Intake,
   PhysicianAction,
   Report,
+  HospitalList,
   Worklist,
   WorklistState,
 } from './types';
@@ -50,6 +51,7 @@ export const keys = {
   evidence: (intakeId: string, factId: string) =>
     ['evidence', intakeId, factId] as const,
   correctionRate: () => ['metrics', 'correction-rate'] as const,
+  hospitals: () => ['hospitals'] as const,
 };
 
 function query(params: Record<string, string | number | boolean | null | undefined>) {
@@ -92,6 +94,22 @@ export function useAlerts(
   });
 }
 
+/**
+ * The facilities this deployment actually serves, and their real departments.
+ *
+ * Read from the backend rather than listed in the client, because a hardcoded
+ * facility is one a physician can select and then find an empty worklist
+ * behind: the tenancy guard scopes every query by `hospital_id`, so an id that
+ * exists only in a dropdown returns nothing and looks like an outage.
+ */
+export function useHospitals() {
+  return useQuery<HospitalList>({
+    queryKey: keys.hospitals(),
+    queryFn: () => api.get<HospitalList>('/hospitals'),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useIntake(intakeId: string) {
   return useQuery<Intake>({
     queryKey: keys.intake(intakeId),
@@ -102,6 +120,10 @@ export function useIntake(intakeId: string) {
 export function useReport(intakeId: string, language: string | null = null) {
   return useQuery<Report>({
     queryKey: keys.report(intakeId, language),
+    // Always sent, English included. Special-casing `en` to an absent param
+    // means an English-reading physician gets the backend default — which is
+    // the *patient's* language — so a Hindi intake comes back in Hindi for a
+    // reader who asked for English. The test stub matches the route prefix.
     queryFn: () =>
       api.get<Report>(`/intakes/${intakeId}/report${query({ language })}`),
   });

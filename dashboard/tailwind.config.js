@@ -18,6 +18,30 @@ export default {
         conflict: { DEFAULT: '#a8321f', soft: '#fdf0ee' },
         verified: { DEFAULT: '#1a6b45', soft: '#eef8f2' },
         urgent: { DEFAULT: '#b3261e', soft: '#fdecea' },
+        // AYUSH & clinical portal palette
+        herb: { DEFAULT: '#0f766e', soft: '#e6f4ea', deep: '#134e4a' },
+        saffron: { DEFAULT: '#b45309', soft: '#fef3c7' },
+        alert: { DEFAULT: '#b91c1c', soft: '#fee2e2' },
+        'surface-tint': '#f8faf9',
+      },
+      keyframes: {
+        'pulse-flag': {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(185, 28, 28, 0.4)' },
+          '50%': { boxShadow: '0 0 0 10px rgba(185, 28, 28, 0)' },
+        },
+        'fade-rise': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        'login-float': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-6px)' },
+        },
+      },
+      animation: {
+        'pulse-flag': 'pulse-flag 2s ease-in-out infinite',
+        'fade-rise': 'fade-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'login-float': 'login-float 3.8s ease-in-out infinite',
       },
       // Inter was declared here and never loaded — no @font-face, no link in
       // index.html — so every screen has always rendered in system-ui while

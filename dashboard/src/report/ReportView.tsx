@@ -32,6 +32,8 @@ import { statesFor, type FactLike, type FactState } from './factState';
 
 export type { PhysicianReport, ReportLine, ReportSection, Contradiction };
 
+export type ReportTab = 'complaint' | 'ayurveda' | 'meds' | 'labs' | 'discrepancies' | 'all';
+
 interface Props {
   report: PhysicianReport;
   /** Facts by id, for the state of each line. */
@@ -40,6 +42,7 @@ interface Props {
   onSelectFact: (factId: string) => void;
   /** Rendered beside a line when the reader may act on it — §6. */
   renderActions?: (factId: string) => React.ReactNode;
+  activeTab?: ReportTab;
 }
 
 /** The chief complaint is what the consultation is about, so it is set larger. */
@@ -51,6 +54,7 @@ export function ReportView({
   selectedFactId,
   onSelectFact,
   renderActions,
+  activeTab = 'all',
 }: Props) {
   const t = useT();
   const label = t('report.aria');
@@ -58,17 +62,52 @@ export function ReportView({
   const labelFor = (fieldId: string) =>
     report.field_labels?.[fieldId] ?? fieldId.replace(/_/g, ' ');
 
+  // Filter sections by activeTab
+  const filteredSections = sections.filter((s) => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'complaint') {
+      return (
+        s.section === 'chief_complaint' ||
+        s.section === 'hpi' ||
+        s.section === 'red_flag_screen' ||
+        s.section === 'review_of_systems'
+      );
+    }
+    if (activeTab === 'ayurveda') {
+      return s.section === 'ayurveda';
+    }
+    if (activeTab === 'meds') {
+      return s.section === 'medications' || s.section === 'allergies';
+    }
+    if (activeTab === 'labs') {
+      return (
+        s.section === 'investigations' ||
+        s.section === 'past_medical' ||
+        s.section === 'past_surgical' ||
+        s.section === 'family_history' ||
+        s.section === 'personal_history'
+      );
+    }
+    if (activeTab === 'discrepancies') {
+      return false; // Discrepancies has Unresolved, Conflicts & DocumentNotes
+    }
+    return true;
+  });
+
+  const showAyurvedaEmptyNotice =
+    activeTab === 'ayurveda' &&
+    (filteredSections.length === 0 ||
+      filteredSections.every((s) => !s.lines || s.lines.length === 0));
+
   return (
-    <article className="space-y-7" aria-label={label}>
-      {/* Above everything. A criterion that stopped the interview is not a
-          section a reader should have to scroll to. */}
+    <article className="space-y-6" aria-label={label}>
+      {/* Alerts render on every tab. A red flag a physician cannot see because
+          they are looking at the Ayurveda tab is a red flag that did not fire —
+          the point of the block is that it is impossible to miss. */}
       <AlertsBlock alerts={report.alerts ?? []} t={t} />
 
-      {/* Every section the backend sent, including the empty ones. An absent
-          Allergies heading and an empty one say different things — "we never
-          asked" is not "no allergies" — and a report whose shape changes from
-          patient to patient is one a physician cannot learn to scan. */}
-      {sections.map((section) => (
+      {/* Render matching sections */}
+      {filteredSections.map((section) => (
         <ReportSectionBlock
           key={section.section}
           section={section}
@@ -81,31 +120,56 @@ export function ReportView({
         />
       ))}
 
-      {/* Computed by the backend and, until now, discarded by this screen. */}
-      <InteractionsBlock interactions={report.interactions ?? []} t={t} />
-      <HistoryBlock history={report.history ?? null} t={t} />
-      <TimelineBlock entries={report.document_timeline ?? []} t={t} />
-      <DocumentNotesBlock
-        lines={report.document_notes ?? []}
-        facts={facts}
+      {showAyurvedaEmptyNotice && (
+        <div className="surface-card p-6 text-center text-ink-muted">
+          <p className="font-medium text-sm text-ink">No Specific Ayurvedic Assessment Reported</p>
+          <p className="mt-1 text-xs">
+            Patient did not report Dosha-specific aggravation or prior Ayurvedic treatment during kiosk intake.
+          </p>
+        </div>
+      )}
+
+      {/* Interactions on meds or all */}
+      {(activeTab === 'all' || activeTab === 'meds') && (
+        <InteractionsBlock interactions={report.interactions ?? []} t={t} />
+      )}
+
+      {/* History and Timeline on labs or all */}
+      {(activeTab === 'all' || activeTab === 'labs') && (
+        <>
+          <HistoryBlock history={report.history ?? null} t={t} />
+          <TimelineBlock entries={report.document_timeline ?? []} t={t} />
+        </>
+      )}
+
+      {/* Notes are supporting material and stay on their tab. */}
+      {(activeTab === 'all' || activeTab === 'discrepancies') && (
+        <DocumentNotesBlock
+          lines={report.document_notes ?? []}
+          facts={facts}
+          selectedFactId={selectedFactId}
+          onSelectFact={onSelectFact}
+          t={t}
+        />
+      )}
+
+      {/* Conflicts and unresolved are NOT tab-scoped, and must not become so.
+          3/3 §12: they are full sections, never behind a toggle — and a tab is
+          a toggle. A physician on the default tab would otherwise read a report
+          that looks complete while three facts went unanswered and seven
+          disagree, with nothing on screen saying so. */}
+      <ConflictsBlock
+        conflicts={report.conflicts ?? []}
+        labelFor={labelFor}
         selectedFactId={selectedFactId}
         onSelectFact={onSelectFact}
-        t={t}
       />
-
-      {/* Full sections, never a toggle — §12. */}
       <UnresolvedBlock
         lines={report.unresolved ?? []}
         facts={facts}
         selectedFactId={selectedFactId}
         onSelectFact={onSelectFact}
         renderActions={renderActions}
-      />
-      <ConflictsBlock
-        conflicts={report.conflicts ?? []}
-        labelFor={labelFor}
-        selectedFactId={selectedFactId}
-        onSelectFact={onSelectFact}
       />
     </article>
   );

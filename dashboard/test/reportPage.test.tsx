@@ -156,7 +156,10 @@ const EVIDENCE: Record<string, unknown> = {
 function stub(extra: Record<string, () => { status?: number; body?: unknown }> = {}) {
   return stubFetch({
     'GET /intakes/i-1': () => ({ body: INTAKE }),
-    'GET /intakes/i-1/report': () => ({ body: REPORT }),
+    // Trailing `*`: the screen now asks for the report in the reader's language,
+    // so the path carries `?language=`. Matching on the prefix keeps the stub
+    // honest about the route without pinning the query string.
+    'GET /intakes/i-1/report*': () => ({ body: REPORT }),
     'GET /intakes/i-1/documents': () => ({
       body: [{ document_id: 'doc-1', kind: 'lab_report', status: 'processed', page_count: 1, url: 'https://signed.example/doc-1.png' }],
     }),

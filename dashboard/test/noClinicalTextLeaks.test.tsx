@@ -53,7 +53,7 @@ describe('what reaches the console', () => {
     const written = captureConsole();
     stubFetch({
       'GET /intakes/i-1': () => ({ status: 500, body: { detail: PHI } }),
-      'GET /intakes/i-1/report': () => ({ status: 500, body: { detail: PHI } }),
+      'GET /intakes/i-1/report*': () => ({ status: 500, body: { detail: PHI } }),
       'GET /intakes/i-1/documents': () => ({ body: [] }),
     });
     signInAs('physician');
