@@ -120,6 +120,10 @@ export function useIntake(intakeId: string) {
 export function useReport(intakeId: string, language: string | null = null) {
   return useQuery<Report>({
     queryKey: keys.report(intakeId, language),
+    // Always sent, English included. Special-casing `en` to an absent param
+    // means an English-reading physician gets the backend default — which is
+    // the *patient's* language — so a Hindi intake comes back in Hindi for a
+    // reader who asked for English. The test stub matches the route prefix.
     queryFn: () =>
       api.get<Report>(`/intakes/${intakeId}/report${query({ language })}`),
   });

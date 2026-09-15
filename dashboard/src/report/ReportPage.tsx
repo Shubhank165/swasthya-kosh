@@ -178,6 +178,7 @@ export function ReportPage() {
           {isPhysician && (
             <button
               type="button"
+              data-testid="verify-all"
               disabled={verifyRecord.isPending}
               onClick={() => verifyRecord.mutate({})}
               className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 text-xs sm:text-sm font-semibold shadow-sm transition-all hover:-translate-y-px ${
