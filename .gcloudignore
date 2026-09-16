@@ -21,6 +21,15 @@ app/.pub-cache/
 # deploy.
 app/assets/asr/
 
+# The kiosk tablet's Flutter app. Its build output is ~1 GB of Gradle and NDK
+# intermediates, and `.gitignore` hiding them is no help here — gcloud reads
+# this file and nothing else, so one `flutter build apk` turned a 36 MB source
+# upload into a 1 GB one.
+jetson/medikiosk_flutter/build/
+jetson/medikiosk_flutter/.dart_tool/
+jetson/tablet_app/.buildozer/
+jetson/tablet_app/bin/
+
 __pycache__/
 *.pyc
 .venv/
