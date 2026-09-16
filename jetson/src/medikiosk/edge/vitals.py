@@ -12,6 +12,7 @@ sign, and staff review every record anyway.
 
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass
 
@@ -20,6 +21,59 @@ import numpy as np
 # Long enough for the estimator, which needs MIN_WINDOW_S (8 s) of clean signal and rejects
 # stretches where the face was lost, and short enough that a patient will sit still for it.
 MEASURE_S = 20.0
+
+# One camera, one owner. A measurement holds this for its whole run; the preview takes it only
+# when nobody is measuring, and otherwise shows the frame the measurement last stored.
+_camera = threading.Lock()
+_latest_lock = threading.Lock()
+_latest_jpeg: bytes | None = None
+_latest_face = False
+
+
+def _remember(frame, face_found: bool) -> None:
+    """Keep the most recent frame as a JPEG, cheaply enough to do it every frame."""
+
+    global _latest_jpeg, _latest_face
+    try:
+        import cv2
+
+        ok, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
+    except Exception:  # noqa: BLE001 - a preview is never worth failing a measurement for
+        return
+    if not ok:
+        return
+    with _latest_lock:
+        _latest_jpeg = buffer.tobytes()
+        _latest_face = face_found
+
+
+def preview_jpeg(camera: int | str = 0) -> tuple[bytes | None, bool]:
+    """The current camera view as a JPEG, and whether a face was found in it.
+
+    During a measurement this is whatever the capture loop last saw, which is the honest answer:
+    the camera is busy and that frame is seconds old at most. Otherwise the camera is opened for
+    one frame and released again, so aiming it does not require starting a measurement.
+    """
+
+    if _camera.acquire(blocking=False):
+        try:
+            import cv2
+
+            capture = cv2.VideoCapture(camera)
+            try:
+                if capture.isOpened():
+                    for _ in range(3):  # the first frames off a USB camera are often black
+                        ok, frame = capture.read()
+                    if ok:
+                        _remember(frame, False)
+            finally:
+                capture.release()
+        except Exception:  # noqa: BLE001 - fall through to whatever was last stored
+            pass
+        finally:
+            _camera.release()
+    with _latest_lock:
+        return _latest_jpeg, _latest_face
 
 
 @dataclass(frozen=True)
@@ -53,15 +107,19 @@ def measure(camera: int | str = 0, seconds: float = MEASURE_S) -> Vitals:
     except Exception as error:  # noqa: BLE001 - any import failure is "not available here"
         return Vitals(None, False, f"heart rate unavailable: {error}")
 
+    if not _camera.acquire(timeout=5.0):
+        return Vitals(None, False, "camera busy")
     capture = cv2.VideoCapture(camera)
     if not capture.isOpened():
         capture.release()
+        _camera.release()
         return Vitals(None, False, "camera unavailable")
 
     try:
         tracker = FaceTracker()
     except Exception as error:  # noqa: BLE001 - missing face model, no GPU, etc.
         capture.release()
+        _camera.release()
         return Vitals(None, False, f"face tracking unavailable: {error}")
 
     gate, smoother = SkinGate(), OneEuroFilter()
@@ -95,17 +153,23 @@ def measure(camera: int | str = 0, seconds: float = MEASURE_S) -> Vitals:
                         rgb = tuple(crop[selected].mean(axis=0)[::-1])
                         valid = True
             samples.append((now, *rgb, float(valid)))
+            # Publish as we go: this is what makes the camera aimable from the tablet.
+            _remember(frame, valid)
             frames += 1
     except Exception as error:  # noqa: BLE001 - a capture fault is a failed measurement, not a crash
         return Vitals(None, False, f"measurement failed: {error}")
     finally:
         capture.release()
         tracker.close()
+        _camera.release()
 
     if len(samples) < 2:
         return Vitals(None, False, "no frames from camera")
     data = np.asarray(samples, dtype=np.float64)
     result, status = analyze_window(data[:, 0], data[:, 1:4], data[:, 4] > 0, seconds)
     if result is None:
+        seen = float(data[:, 4].mean()) if len(data) else 0.0
+        if seen < 0.5:
+            return Vitals(None, False, "no face in view - point the camera at the patient's face")
         return Vitals(None, False, status)
     return Vitals(round(float(result.bpm), 1), bool(result.confident), "ok")

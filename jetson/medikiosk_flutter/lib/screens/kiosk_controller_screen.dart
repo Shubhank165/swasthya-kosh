@@ -240,6 +240,8 @@ class WorkflowBody extends StatefulWidget {
 class _WorkflowBodyState extends State<WorkflowBody> {
   final _answer = TextEditingController();
   final _narrative = TextEditingController();
+  Timer? _previewTimer;
+  int _previewTick = 0;
   String? _slipStatus;
   KioskClient get client => widget.client;
   bool get _blocked => client.isProcessing || client.status != ConnectionStatus.connected;
@@ -270,6 +272,49 @@ class _WorkflowBodyState extends State<WorkflowBody> {
     } catch (_) {
       setState(() => _slipStatus = tr('slip_failed', client.language));
     }
+  }
+
+  /// Poll the kiosk's camera while this screen is up, and stop the moment it is not.
+  void _watchPreview(bool wanted) {
+    if (wanted && _previewTimer == null) {
+      _previewTimer = Timer.periodic(const Duration(milliseconds: 700), (_) {
+        if (mounted) setState(() => _previewTick++);
+      });
+    } else if (!wanted && _previewTimer != null) {
+      _previewTimer!.cancel();
+      _previewTimer = null;
+    }
+  }
+
+  Widget _vitalsView(List<String> actions) {
+    final url = '${ApiService(host: client.host).baseUrl}/api/vitals/frame.jpg?t=$_previewTick';
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Semantics(header: true, child: Text(client.headline, style: Theme.of(context).textTheme.headlineSmall)),
+      const SizedBox(height: 16),
+      Center(child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          width: 420,
+          height: 315,
+          child: Image.network(
+            url,
+            headers: client.scanHeaders,
+            gaplessPlayback: true,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stack) => Container(
+              color: Colors.black12,
+              alignment: Alignment.center,
+              child: Text(tr('vitals_no_camera', client.language), textAlign: TextAlign.center),
+            ),
+          ),
+        ),
+      )),
+      const SizedBox(height: 20),
+      Wrap(alignment: WrapAlignment.center, children: [
+        for (final action in actions.where((a) => !{'answer', 'choose', 'edit', 'preview', 'document'}.contains(a)))
+          button(_label(action), action),
+      ]),
+    ]);
   }
 
   Widget _narrativeBox(List<String> actions) {
@@ -315,6 +360,9 @@ class _WorkflowBodyState extends State<WorkflowBody> {
     final preview = screen['capture_preview'] as Map?;
     final stage = client.currentStage;
     final optionValues = client.options.map((o) => '${o['value']}').toList();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _watchPreview(stage == KioskStage.vitals),
+    );
 
     if (stage == KioskStage.language && client.options.isNotEmpty) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -341,6 +389,7 @@ class _WorkflowBodyState extends State<WorkflowBody> {
       ]);
     }
     if (stage == KioskStage.interview && client.accumulate) return _narrativeBox(actions);
+    if (stage == KioskStage.vitals) return _vitalsView(actions);
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Semantics(header: true, child: Text(client.headline, style: Theme.of(context).textTheme.headlineSmall)),
@@ -413,5 +462,5 @@ class _WorkflowBodyState extends State<WorkflowBody> {
     _ => action,
   };
   @override
-  void dispose() { _answer.dispose(); _narrative.dispose(); super.dispose(); }
+  void dispose() { _previewTimer?.cancel(); _answer.dispose(); _narrative.dispose(); super.dispose(); }
 }

@@ -553,6 +553,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         )
 
+    @app.get("/api/vitals/frame.jpg")
+    async def vitals_frame(request: Request) -> Response:
+        """The camera's current view, so the tablet can show what is being measured."""
+
+        scan_owner(request, "local_intake", Stage.VITALS)
+        from medikiosk.edge.vitals import preview_jpeg
+
+        jpeg, face = await asyncio.to_thread(preview_jpeg)
+        if jpeg is None:
+            raise HTTPException(503, "No camera frame available")
+        return Response(
+            jpeg,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "no-store", "X-Face-Found": "1" if face else "0"},
+        )
+
     @app.post("/api/abha-scan")
     async def abha_scan(request: Request, image: UploadFile) -> dict[str, Any]:
         """Decode an ABHA QR from a photographed card.
