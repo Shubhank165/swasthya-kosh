@@ -185,7 +185,13 @@ class _KioskControllerScreenState extends State<KioskControllerScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('MediKiosk'), actions: [
       IconButton(onPressed: _configure, tooltip: 'Local connection settings', icon: const Icon(Icons.settings)),
-      IconButton(onPressed: _client.reconnect, tooltip: 'Reconnect safely', icon: const Icon(Icons.refresh)),
+      IconButton(
+        onPressed: _client.status == ConnectionStatus.connected
+            ? () => _client.action('restart')
+            : _client.reconnect,
+        tooltip: 'Start over',
+        icon: const Icon(Icons.restart_alt),
+      ),
     ]),
     body: SafeArea(child: Column(children: [
       Padding(padding: const EdgeInsets.all(16), child: Text(

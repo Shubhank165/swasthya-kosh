@@ -1562,9 +1562,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await cancel_tts("flow_stage")
                 # Read the choices out too, numbered to match the cards on screen. Speaking only
                 # the question leaves a patient who cannot read with no idea what the options are.
-                spoken = [headline]
-                for index, option in enumerate(screen.get("options") or [], start=1):
-                    spoken.append(f"{index}. {option['label']}")
+                spoken = [screen.get("speech") or headline]
+                # Options are read out so a patient who cannot read still knows what is on offer -
+                # except where the labels are not in the language being spoken.
+                if screen.get("speak_options", True):
+                    for index, option in enumerate(screen.get("options") or [], start=1):
+                        spoken.append(f"{index}. {option['label']}")
                 for index, answer in enumerate(screen.get("review") or [], start=1):
                     outcome = (
                         answer["answer"]

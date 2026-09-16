@@ -1,0 +1,14 @@
+[Unit]
+Description=MediKiosk 2.8" panel placard (team entry card)
+After=network.target
+
+[Service]
+# System python, not the audio venv: the panel needs spidev and Jetson.GPIO, which only it has.
+WorkingDirectory=/home/ubuntu/medikiosk
+Environment=PYTHONPATH=/home/ubuntu/medikiosk/src
+ExecStart=/usr/bin/python3 -m medikiosk.edge.placard
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

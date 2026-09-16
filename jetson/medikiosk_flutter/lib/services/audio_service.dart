@@ -121,12 +121,14 @@ class AudioService extends ChangeNotifier {
           numChannels: 1,
           // Our own prompt playback must not pause Android's recorder.
           audioInterruption: AudioInterruptionMode.none,
-          echoCancel: true,
-          noiseSuppress: true,
-          // Android's voice-communication path gives us its echo canceller. A kiosk speaking
-          // through its own speaker will otherwise transcribe its own questions back.
+          // The hardware echo canceller is off deliberately. It only exists to stop the kiosk
+          // transcribing its own questions, and playPcm already drops every chunk that arrives
+          // while a prompt is playing - so the protection stays, without the voice-call routing
+          // that was degrading the prompt on the way out.
+          echoCancel: false,
+          noiseSuppress: false,
           androidConfig: AndroidRecordConfig(
-            audioSource: AndroidAudioSource.voiceCommunication,
+            audioSource: AndroidAudioSource.mic,
           ),
         ),
       );
@@ -285,7 +287,10 @@ class AudioService extends ChangeNotifier {
       try {
         await _player.setAudioContext(AudioContext(
           android: const AudioContextAndroid(
-            contentType: AndroidContentType.speech,
+            // Media, not speech: "speech" lands on the voice-call path while the recorder holds a
+            // capture session, and the device's echo canceller then runs over the prompt itself.
+            usageType: AndroidUsageType.media,
+            contentType: AndroidContentType.music,
             audioFocus: AndroidAudioFocus.none,
           ),
         ));

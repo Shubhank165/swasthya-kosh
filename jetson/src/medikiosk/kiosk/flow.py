@@ -1051,6 +1051,12 @@ class KioskFlow:
                 + BOOTSTRAP["en"]
                 + " / "
                 + BOOTSTRAP["hi"],
+                # Read aloud, that headline is one voice mispronouncing the other's script, and
+                # the nine option labels below are nine more scripts again. The screen keeps all
+                # of it - each language is written in its own hand, which is how a patient finds
+                # theirs - and speech takes the short line instead.
+                "speech": text("language", self.language),
+                "speak_options": False,
                 # Each language is written in its own script, which is the icon: a patient who
                 # cannot read English still recognises their own writing.
                 "options": [
