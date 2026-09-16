@@ -2,6 +2,7 @@ enum KioskStage {
   language,
   registration,
   hub,
+  vitals,
   abha,
   who,
   interview,
@@ -26,6 +27,8 @@ extension KioskStageExtension on KioskStage {
         return 'registration';
       case KioskStage.hub:
         return 'hub';
+      case KioskStage.vitals:
+        return 'vitals';
       case KioskStage.abha:
         return 'abha';
       case KioskStage.who:
@@ -63,6 +66,8 @@ extension KioskStageExtension on KioskStage {
         return KioskStage.registration;
       case 'hub':
         return KioskStage.hub;
+      case 'vitals':
+        return KioskStage.vitals;
       case 'abha':
         return KioskStage.abha;
       case 'who':

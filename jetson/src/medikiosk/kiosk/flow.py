@@ -39,6 +39,7 @@ class Stage(str, Enum):
     CONSENT = "consent"
     REGISTRATION = "registration"
     HUB = "hub"
+    VITALS = "vitals"
     REVIEW = "review"
     FINALIZING = "finalizing"
     DECLINED = "declined"
@@ -422,6 +423,11 @@ class KioskFlow:
         self.edit_return: dict | None = None
         self.document_preview: dict | None = None
         self.withdraw_confirm = False
+        # The last camera measurement, and whether one is running right now. A measurement holds
+        # the patient in front of the camera for twenty seconds, so the screen has to be able to
+        # say so while it happens.
+        self.vitals: dict | None = None
+        self.vitals_busy = False
 
     def snapshot(self) -> dict:
         data = copy.deepcopy(vars(self))
@@ -442,6 +448,28 @@ class KioskFlow:
         flow.ledger = Ledger.model_validate(data["ledger"])
         flow.consent = ConsentLedger.model_validate(data["consent"])
         return flow
+
+    def record_vitals(self, bpm: float | None, confident: bool, status: str) -> None:
+        """File one measurement as an ordinary answer, and hand the patient back to the hub.
+
+        An estimate the signal maths would not vouch for is filed unresolved rather than as a
+        vital sign: a number nobody can stand behind is worse on a clinical record than a gap.
+        """
+
+        self.vitals_busy = False
+        self.vitals = {"bpm": bpm, "confident": confident, "status": status}
+        measured = bpm is not None and confident
+        self.record_answer(
+            "vitals.heart_rate",
+            t("vitals", self.language),
+            f"{bpm:.0f} bpm" if measured else "",
+            "answered" if measured else "unresolved",
+            field="heart_rate_bpm",
+            value=bpm if measured else None,
+            method="camera",
+        )
+        # Stay here: this is the only screen that shows the reading, and staying is what makes a
+        # retry possible when the camera could not hold the patient's face.
 
     def record_answer(
         self,
@@ -545,6 +573,8 @@ class KioskFlow:
                 self.stage = Stage.LANGUAGE
             elif self.stage is Stage.CONSENT and self.consent_purpose == "local_intake":
                 self.stage = Stage.WHO
+            elif self.stage is Stage.VITALS:
+                self.stage = Stage.HUB
             elif self.stage is Stage.HUB:
                 self.stage = Stage.ABHA
             elif self.stage is Stage.ABHA:
@@ -652,10 +682,32 @@ class KioskFlow:
                 raise ValueError("Enter or skip identity")
             self.stage = Stage.HUB
         elif self.stage is Stage.HUB:
-            if action != "choose" or value not in {"clinical", "prakriti"}:
+            if action != "choose" or value not in {"clinical", "prakriti", "vitals"}:
                 raise ValueError("Choose a service")
-            self.prefers_ayush = value == "prakriti"
-            self.stage = Stage.INTERVIEW if value == "clinical" else Stage.PRAKRITI
+            if value == "vitals":
+                self.stage = Stage.VITALS
+            else:
+                self.prefers_ayush = value == "prakriti"
+                self.stage = Stage.INTERVIEW if value == "clinical" else Stage.PRAKRITI
+        elif self.stage is Stage.VITALS:
+            if self.vitals_busy:
+                raise ValueError("A measurement is already running")
+            if action == "measure":
+                return "measure"
+            if action in {"skip", "unknown", "refuse"}:
+                # A reading already on file was recorded when it was taken; leaving the screen
+                # afterwards is not a refusal and must not supersede it with an empty answer.
+                if self.vitals is None:
+                    self.record_answer(
+                        "vitals.heart_rate",
+                        t("vitals", self.language),
+                        "",
+                        "refused" if action == "refuse" else "unresolved",
+                        method=method,
+                    )
+                self.stage = Stage.HUB
+            else:
+                raise ValueError("Measure or skip")
         elif self.stage in {Stage.AYURVEDA, Stage.PRAKRITI}:
             if self.stage is Stage.PRAKRITI and self._previous_question_pending:
                 if action == "choose" and value in {"yes", "no"}:
@@ -853,6 +905,7 @@ class KioskFlow:
             actions += {
                 Stage.REGISTRATION: ["answer", "unknown", "refuse"],
                 Stage.ABHA: ["answer", "scan", "skip"],
+                Stage.VITALS: [] if self.vitals_busy else ["measure", "skip"],
                 Stage.INTERVIEW: ["answer", "unknown", "refuse", "cancel"],
                 Stage.AYURVEDA: ["unknown", "refuse"],
                 Stage.PRAKRITI: ["unknown", "refuse"],
@@ -862,7 +915,7 @@ class KioskFlow:
                 Stage.REVIEW: ["edit", "confirm"],
                 Stage.FINALIZING: ["confirm"],
             }.get(self.stage, [])
-            if self.stage in {Stage.WHO, Stage.ABHA, Stage.HUB} or (
+            if self.stage in {Stage.WHO, Stage.ABHA, Stage.HUB, Stage.VITALS} or (
                 self.stage is Stage.CONSENT and self.consent_purpose == "local_intake"
             ):
                 actions.append("back")
@@ -956,8 +1009,20 @@ class KioskFlow:
                 "options": [
                     {"value": "clinical", "label": t("hub_clinical", self.language)},
                     {"value": "prakriti", "label": t("hub_prakriti", self.language)},
+                    {"value": "vitals", "label": t("hub_vitals", self.language)},
                 ],
             }
+        if self.stage is Stage.VITALS:
+            if self.vitals_busy:
+                return {**base, "headline": t("vitals_measuring", self.language)}
+            reading = self.vitals
+            if reading is None:
+                headline = t("vitals", self.language)
+            elif reading.get("bpm") is not None and reading.get("confident"):
+                headline = f"{t('vitals_result', self.language)}: {reading['bpm']:.0f}"
+            else:
+                headline = t("vitals_failed", self.language)
+            return {**base, "headline": headline, "vitals": reading}
         if self.stage is Stage.REVIEW:
             live = [a for a in self.answers if not a.get("superseded")]
             return {

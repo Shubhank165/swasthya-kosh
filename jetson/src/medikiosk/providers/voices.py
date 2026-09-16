@@ -18,11 +18,62 @@ Live engines stay wired up regardless, so text nobody pre-rendered still gets sp
 
 from __future__ import annotations
 
+import array
 import hashlib
+import io
+import wave
 from pathlib import Path
 
 from medikiosk.languages import LanguageProfile, profile
 from medikiosk.providers.local_tts import FliteTTS, PiperTTS
+
+
+# One utterance's target. RMS carries perceived loudness; the ceiling leaves headroom so a peak
+# that lands on a loud syllable does not square off against full scale the way Piper's does.
+TARGET_RMS = 0.12
+PEAK_CEILING = 0.89
+
+
+def level(wav_bytes: bytes) -> bytes:
+    """Rescale one mono 16-bit WAV to a fixed loudness, without clipping it.
+
+    Gain is whatever brings RMS to TARGET_RMS, then capped at whatever keeps the loudest sample
+    under PEAK_CEILING - so a quiet Flite voice is lifted, a hot Piper one is pulled down, and
+    neither is pushed into the ceiling. Silence is returned untouched: there is no level to set.
+    """
+
+    with wave.open(io.BytesIO(wav_bytes)) as handle:
+        if handle.getsampwidth() != 2 or handle.getnchannels() != 1:
+            # Only the 16-bit mono case is understood here; anything else is passed through
+            # rather than corrupted by a gain applied to the wrong sample layout.
+            return wav_bytes
+        rate = handle.getframerate()
+        frames = handle.readframes(handle.getnframes())
+
+    samples = array.array("h")
+    samples.frombytes(frames)
+    if not samples:
+        return wav_bytes
+    peak = max(abs(sample) for sample in samples) / 32768
+    rms = (sum(sample * sample for sample in samples) / len(samples)) ** 0.5 / 32768
+    if peak == 0 or rms == 0:
+        return wav_bytes
+    gain = min(TARGET_RMS / rms, PEAK_CEILING / peak)
+    if 0.99 < gain < 1.01:
+        return wav_bytes
+    limit = int(PEAK_CEILING * 32767)
+    scaled = array.array(
+        "h",
+        (max(-limit, min(limit, int(sample * gain))) for sample in samples),
+    )
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(rate)
+        handle.writeframes(scaled.tobytes())
+    return buffer.getvalue()
 
 
 def normalize(text: str) -> str:
@@ -92,7 +143,7 @@ class VoiceBank:
     def synthesize(self, text: str, language: str) -> bytes:
         cached = self.prerendered(text, language)
         if cached is not None:
-            return cached
+            return level(cached)
 
         spec = profile(language)
         engine = self._engines.get(language)
@@ -107,8 +158,8 @@ class VoiceBank:
             )
             self._engines[language] = engine
         if isinstance(engine, FliteTTS):
-            return engine.synthesize(text, duration_stretch=spec.duration_stretch)
-        return engine.synthesize(text)
+            return level(engine.synthesize(text, duration_stretch=spec.duration_stretch))
+        return level(engine.synthesize(text))
 
     def _voice_path(self, spec: LanguageProfile) -> Path:
         root = self.voice_dir if spec.engine == "piper" else self.flite_voice_dir
