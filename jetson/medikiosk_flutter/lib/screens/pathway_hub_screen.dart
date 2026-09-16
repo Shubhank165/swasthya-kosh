@@ -6,6 +6,8 @@ class PathwayHubScreen extends StatelessWidget {
   final PatientProfile? profile;
   final VoidCallback onSelectSymptoms;
   final VoidCallback onSelectPrakriti;
+  /// Null when this kiosk's backend does not offer a camera measurement.
+  final VoidCallback? onSelectVitals;
   final VoidCallback onBackToRegistration;
 
   const PathwayHubScreen({
@@ -13,6 +15,7 @@ class PathwayHubScreen extends StatelessWidget {
     this.profile,
     required this.onSelectSymptoms,
     required this.onSelectPrakriti,
+    this.onSelectVitals,
     required this.onBackToRegistration,
   });
 
@@ -113,6 +116,11 @@ class PathwayHubScreen extends StatelessWidget {
                         Expanded(child: _buildPrakritiCard(isNarrow)),
                       ],
                     ),
+                  ],
+                  // Full width under the pair, so one card does not have to fit a half column.
+                  if (onSelectVitals != null) ...[
+                    const SizedBox(height: 16),
+                    _buildVitalsCard(isNarrow),
                   ],
                 ],
               );
@@ -292,6 +300,69 @@ class PathwayHubScreen extends StatelessWidget {
                   label: const Text('प्रकृति जानें (Start Prakriti)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVitalsCard(bool isNarrow) {
+    return Material(
+      color: AppTheme.surface,
+      elevation: 2,
+      shadowColor: Colors.black12,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        onTap: onSelectVitals,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: EdgeInsets.all(isNarrow ? 18 : 24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppTheme.primaryBlue.withAlpha(120), width: 2),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryBlue.withAlpha(25),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.favorite_rounded, color: AppTheme.primaryBlue, size: 28),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryBlue.withAlpha(20),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'CAMERA MEASUREMENT',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'हृदय गति जाँच',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Check my heart rate',
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              _buildBullet(Icons.videocam_rounded, 'Look at the camera, sit still for twenty seconds'),
+              const SizedBox(height: 6),
+              _buildBullet(Icons.info_outline_rounded, 'An estimate for staff to review, not a diagnosis'),
             ],
           ),
         ),

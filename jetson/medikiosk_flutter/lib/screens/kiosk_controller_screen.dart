@@ -331,6 +331,9 @@ class _WorkflowBodyState extends State<WorkflowBody> {
         PathwayHubScreen(
           onSelectSymptoms: () { if (!_blocked) client.action('choose', 'clinical'); },
           onSelectPrakriti: () { if (!_blocked) client.action('choose', 'prakriti'); },
+          onSelectVitals: optionValues.contains('vitals')
+              ? () { if (!_blocked) client.action('choose', 'vitals'); }
+              : null,
           onBackToRegistration: () => client.action('back')),
         Wrap(alignment: WrapAlignment.center, children: [
           for (final action in actions.where((a) => !{'answer', 'choose', 'back'}.contains(a))) button(_label(action), action),

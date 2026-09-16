@@ -284,6 +284,19 @@ class AudioService extends ChangeNotifier {
         if (!completed.isCompleted) completed.complete();
       });
       var stopped = true;
+      // An open capture session is what routes this prompt through the device's voice path, so
+      // the microphone goes away for the duration rather than merely being ignored.
+      final wasCapturing = _isCapturing;
+      if (wasCapturing) {
+        try {
+          await _micSubscription?.cancel();
+          _micSubscription = null;
+          if (await _recorder.isRecording()) await _recorder.stop();
+        } catch (_) {
+          // A recorder that will not stop is not a reason to withhold the prompt.
+        }
+        _isCapturing = false;
+      }
       try {
         await _player.setAudioContext(AudioContext(
           android: const AudioContextAndroid(
@@ -323,6 +336,10 @@ class AudioService extends ChangeNotifier {
         if (!_disposed && generation == _playbackGeneration && stopped) {
           _playing = false;
           pauseTemporarily(const Duration(milliseconds: 250));
+        }
+        // Reopen only what was open before, and only if the session still wants to listen.
+        if (wasCapturing && _wantsCapture && !_disposed) {
+          await startListening();
         }
       }
     });
