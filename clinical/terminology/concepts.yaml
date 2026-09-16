@@ -459,6 +459,17 @@ screen_speech_difficulty:
   display: Difficulty speaking (screening question)
   section: red_flag_screen
   synonyms: ["bolne mein dikkat", "बोलने में दिक्कत"]
+heart_rate_bpm:
+  display: Heart rate (camera estimate)
+  section: red_flag_screen
+  needs_clinical_review: true
+  # The kiosk reads this off a video of the patient's face (rPPG), not off a
+  # pulse oximeter or a finger. "Camera estimate" is load-bearing and must stay
+  # in the display name: a line reading plain "Heart rate: 92" is a measured
+  # vital sign, and a physician acting on one of those has been told something
+  # this device cannot support. The kiosk already refuses to send a reading its
+  # own signal maths will not vouch for — it files those `unresolved` — and
+  # this label is the second half of that same restraint.
 
 # --- Dashavidha parameters the kiosk asks the patient about -------------------------
 # Patient-reported capacities from the kiosk's Dashavidha Pariksha module. Each

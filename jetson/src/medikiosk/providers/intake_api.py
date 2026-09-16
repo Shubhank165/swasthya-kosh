@@ -74,6 +74,11 @@ FIELD_IDS: dict[str, str] = {
     "altered_consciousness": "altered_sensorium",
     "one_sided_weakness": "screen_one_sided_weakness",
     "speech_difficulty": "screen_speech_difficulty",
+    # The camera heart rate already names the backend's id, so this row is an identity mapping
+    # rather than a translation. It is here because `_bound_field` resolves through this table:
+    # without the row the reading files as a turn bound to nothing, and the physician gets a
+    # transcript line with no field on the sheet to hang it from.
+    "heart_rate_bpm": "heart_rate_bpm",
 }
 
 # What the patient never answered. `unresolved` is the contract's word for it, and a field in
@@ -136,6 +141,31 @@ def _ayurveda_fields(report: dict[str, Any], language: str | None) -> dict[str, 
             fields["prakriti_self_report"] = entry
         else:
             fields["prakriti_self_report"] = {"status": UNRESOLVED}
+    return fields
+
+
+def _vitals_fields(report: dict[str, Any], language: str | None) -> dict[str, dict[str, Any]]:
+    """The camera heart rate, if one was attempted.
+
+    Read from the answers rather than from a `vitals` block, because that is where the flow
+    already put it: `record_vitals` files it through `record_answer` precisely so it travels as
+    an ordinary answer and not as a privileged vital sign.
+
+    An attempt the signal maths would not vouch for is sent `unresolved`, not omitted. A patient
+    who sat through the measurement and a patient who never tried it are different facts, and a
+    record that drops the first cannot be told from one of the second.
+    """
+
+    fields: dict[str, dict[str, Any]] = {}
+    for entry in report.get("accepted_answers") or []:
+        if entry.get("field") != "heart_rate_bpm":
+            continue
+        if entry.get("status") == ANSWERED and entry.get("value") is not None:
+            outcome = _outcome(round(float(entry["value"])), language)
+            outcome["unit"] = "bpm"
+            fields["heart_rate_bpm"] = outcome
+        else:
+            fields["heart_rate_bpm"] = {"status": UNRESOLVED}
     return fields
 
 
@@ -244,6 +274,7 @@ def kiosk_envelope(
     if patient.get("reported_by"):
         fields["reporter"] = _outcome(patient["reported_by"], language)
     fields.update(_ayurveda_fields(report, language))
+    fields.update(_vitals_fields(report, language))
     for name in clinical.get("not_established") or []:
         fields.setdefault(FIELD_IDS.get(name, name), {"status": UNRESOLVED})
 
