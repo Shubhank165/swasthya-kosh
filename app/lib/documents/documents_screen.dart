@@ -8,6 +8,14 @@
 ///
 /// So the states here are `sending` / `being read` / `received` / `take it
 /// again`. There is no state that shows what the reading said.
+///
+/// **The progress checklist is about the transfer, not the paper.** The
+/// reference design for this screen ticks off "Text detected", "Medicines
+/// identified", "Dates identified" — which is the forbidden thing wearing a
+/// progress bar, because a patient reading "medicines identified" has been told
+/// the machine understood their prescription. The three steps here are sending,
+/// being read, received: true statements about where the file is, and they are
+/// the strings this app already had.
 library;
 
 import 'dart:io';
@@ -15,6 +23,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
+import '../core/ui.dart';
 import '../l10n/strings.dart';
 import 'prepare.dart';
 
@@ -55,33 +64,48 @@ class DocumentsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = Strings.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(strings.documentsTitle)),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(Sizes.gutter),
-          children: [
-            for (final page in pages) _pageCard(context, page),
-            const SizedBox(height: Sizes.gap),
-            OutlinedButton.icon(
-              key: const Key('documents.camera'),
-              onPressed: onTakePhoto,
-              icon: const Icon(Icons.photo_camera_outlined),
-              label: Text(strings.takePhoto),
+      appBar: AppBar(),
+      body: Garnish(
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              Sizes.gutter,
+              0,
+              Sizes.gutter,
+              Sizes.gutter,
             ),
-            const SizedBox(height: Sizes.gap),
-            OutlinedButton.icon(
-              key: const Key('documents.gallery'),
-              onPressed: onChooseFromGallery,
-              icon: const Icon(Icons.photo_library_outlined),
-              label: Text(strings.chooseFromGallery),
-            ),
-            const SizedBox(height: Sizes.gutter),
-            FilledButton(
-              key: const Key('documents.continue'),
-              onPressed: onContinue,
-              child: Text(strings.continueLabel),
-            ),
-          ],
+            children: [
+              ScreenIntro(title: strings.documentsTitle),
+              const SizedBox(height: Sizes.gutter),
+              if (pages.isEmpty) ...[
+                const Center(
+                  child: EmblemMark(icon: Icons.document_scanner_outlined, size: 124),
+                ),
+                const SizedBox(height: Sizes.gutter),
+              ],
+              for (final page in pages) _pageCard(context, page),
+              const SizedBox(height: Sizes.gap),
+              _AddRow(
+                rowKey: const Key('documents.camera'),
+                icon: Icons.photo_camera_outlined,
+                label: strings.takePhoto,
+                onTap: onTakePhoto,
+              ),
+              const SizedBox(height: Sizes.gap),
+              _AddRow(
+                rowKey: const Key('documents.gallery'),
+                icon: Icons.photo_library_outlined,
+                label: strings.chooseFromGallery,
+                onTap: onChooseFromGallery,
+              ),
+              const SizedBox(height: Sizes.gutter),
+              FilledButton(
+                key: const Key('documents.continue'),
+                onPressed: onContinue,
+                child: Text(strings.continueLabel),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -108,15 +132,16 @@ class DocumentsScreen extends StatelessWidget {
         ),
     };
 
-    return Card(
-      key: Key('document.${page.documentId}'),
-      margin: const EdgeInsets.only(bottom: Sizes.gap),
-      child: Padding(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sizes.gap),
+      child: SoftCard(
+        key: Key('document.${page.documentId}'),
         padding: const EdgeInsets.all(Sizes.gap),
+        borderColor: isProblem ? scheme.error : null,
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
               child: Image.file(
                 page.file,
                 width: 72,
@@ -127,11 +152,22 @@ class DocumentsScreen extends StatelessWidget {
             ),
             const SizedBox(width: Sizes.gap),
             Expanded(
-              child: Text(
-                message,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isProblem ? scheme.error : null,
-                    ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    message,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: isProblem ? scheme.error : null,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  if (!isProblem) ...[
+                    const SizedBox(height: Sizes.gap),
+                    _TransferSteps(status: page.status),
+                  ],
+                ],
               ),
             ),
             IconButton(
@@ -145,4 +181,84 @@ class DocumentsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Where this page has got to, as three ticks.
+///
+/// Says only where the file is. See the note at the top of this file for why it
+/// says nothing about what is on the page.
+class _TransferSteps extends StatelessWidget {
+  const _TransferSteps({required this.status});
+
+  final UploadStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    final reached = switch (status) {
+      UploadStatus.pending || UploadStatus.uploading => 0,
+      UploadStatus.processing => 1,
+      UploadStatus.done => 2,
+      UploadStatus.failed => 0,
+    };
+    final labels = [
+      strings.statusUploading,
+      strings.statusProcessing,
+      strings.statusDone,
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < labels.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  i <= reached ? Icons.check_circle : Icons.circle_outlined,
+                  size: 16,
+                  color: i <= reached
+                      ? Theme.of(context).colorScheme.primary
+                      : Palette.tintStrong,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  labels[i],
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// One way of adding a page: an icon chip, a label, and the whole row tappable.
+class _AddRow extends StatelessWidget {
+  const _AddRow({
+    required this.rowKey,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final Key rowKey;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ActionTile(
+        // Not a `ChoiceRow`: these are two ways of doing the same thing, not
+        // two options one of which is currently chosen, and a radio circle on
+        // the end would say otherwise.
+        tileKey: rowKey,
+        icon: icon,
+        title: label,
+        onTap: onTap,
+      );
 }

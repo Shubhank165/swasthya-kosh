@@ -18,6 +18,12 @@
 /// as the patient's own words, the same as every other self-report in this
 /// app.
 ///
+/// **The progress bar is why this screen was restyled.** Sixty-two questions
+/// behind a bare `Question 3 of 62` in an app bar is a wall a patient abandons
+/// at question five. The bar does not make it shorter; it makes the length
+/// legible, which is the difference between a long form and an endless one.
+/// Nothing about what is asked, in what order, or how it is stored changed.
+///
 /// **Storage, for now.** These answers are saved on the device only, under a
 /// fixed id (`_ayushProfileId`) in the same encrypted local store a visit's
 /// draft uses — never queued, never submitted, never purged by
@@ -41,6 +47,7 @@ import '../content/answer.dart';
 import '../content/bundle.dart';
 import '../core/providers.dart';
 import '../core/theme.dart';
+import '../core/ui.dart';
 import '../intake/widgets/answer_actions.dart';
 import '../intake/widgets/answer_widgets.dart';
 import '../l10n/strings.dart';
@@ -61,6 +68,12 @@ class AyushScreen extends ConsumerStatefulWidget {
 }
 
 class _AyushScreenState extends ConsumerState<AyushScreen> {
+  /// The confirm button the current question's answer widget has published.
+  ///
+  /// Null on a tap-to-answer question, where the tap *is* the answer and a
+  /// footer would be a permanent grey band under most of the assessment.
+  final _confirm = ValueNotifier<ConfirmAction?>(null);
+
   bool _loading = true;
   Draft? _existing;
   bool _redoing = false;
@@ -72,6 +85,12 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
   void initState() {
     super.initState();
     _loadExisting();
+  }
+
+  @override
+  void dispose() {
+    _confirm.dispose();
+    super.dispose();
   }
 
   Future<void> _loadExisting() async {
@@ -113,23 +132,70 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
     }
 
     final question = bundle.questions[ids[_index]]!;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(strings.ayushProgress(_index + 1, ids.length)),
+    return AnswerConfirmScope(
+      notifier: _confirm,
+      child: Scaffold(
+      appBar: AppBar(title: Text(strings.ayushTitle)),
+      bottomNavigationBar: ValueListenableBuilder<ConfirmAction?>(
+        valueListenable: _confirm,
+        builder: (context, action, _) {
+          if (action == null) return const SizedBox.shrink();
+          return DecoratedBox(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x141B5E4A),
+                  blurRadius: 20,
+                  offset: Offset(0, -6),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(Sizes.gutter),
+                child: FilledButton(
+                  key: const Key('answer.confirm'),
+                  onPressed: action.onPressed,
+                  child: Text(action.label),
+                ),
+              ),
+            ),
+          );
+        },
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(Sizes.gutter),
+          padding: const EdgeInsets.fromLTRB(
+            Sizes.gutter,
+            0,
+            Sizes.gutter,
+            Sizes.gutter,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              StepProgress(
+                label: strings.ayushProgress(_index + 1, ids.length),
+                done: _index + 1,
+                total: ids.length,
+              ),
+              const SizedBox(height: Sizes.gutter),
               if (_index == 0) ...[
-                Text(strings.ayurvedaTitle, style: Theme.of(context).textTheme.titleLarge),
+                Text(
+                  strings.ayurvedaTitle,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
                 const SizedBox(height: Sizes.gap),
-                Text(strings.ayushIntro, style: Theme.of(context).textTheme.bodyMedium),
+                TintPanel(
+                  padding: const EdgeInsets.all(Sizes.gap + 4),
+                  child: Text(
+                    strings.ayushIntro,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
                 const SizedBox(height: Sizes.gutter),
-                const Divider(),
-                const SizedBox(height: Sizes.gap),
               ],
               Semantics(
                 header: true,
@@ -148,7 +214,7 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
                   const SizedBox.shrink(),
               const SizedBox(height: Sizes.gutter),
               const Divider(),
-              const SizedBox(height: Sizes.gap),
+              const SizedBox(height: Sizes.gutter),
               AnswerActions(
                 allowUnknown: question.allowUnknown,
                 allowSkip: question.allowSkip,
@@ -158,6 +224,7 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -180,6 +247,9 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
     );
     final bundle = ref.read(currentBundleProvider)!;
     final atEnd = _index + 1 >= bundle.ayurveda.length;
+    // The next question's widget publishes after the next frame; until then the
+    // footer must not still offer the previous question's Continue.
+    _confirm.value = null;
     setState(() => _index++);
     if (atEnd) {
       unawaited(_save(bundle, language));
@@ -209,7 +279,21 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
     setState(() => _finished = true);
   }
 
-  Widget _placeholder(BuildContext context, Strings strings) => Scaffold(
+  /// The three end states share a shape: an emblem, a line, and at most one
+  /// action. They are separate methods because they mean different things —
+  /// "this build has no content", "you have already done this", "you have just
+  /// finished" — and collapsing them into one parameterised widget is how the
+  /// second of those quietly starts claiming the third.
+  Widget _endState(
+    BuildContext context,
+    Strings strings, {
+    required IconData icon,
+    required String title,
+    Key? titleKey,
+    String? body,
+    Widget? action,
+  }) =>
+      Scaffold(
         appBar: AppBar(title: Text(strings.ayushTitle)),
         body: SafeArea(
           child: Padding(
@@ -218,96 +302,69 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.spa_outlined,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+                Center(child: EmblemMark(icon: icon, size: 116)),
                 const SizedBox(height: Sizes.gutter),
                 Text(
-                  strings.notAvailableYet,
-                  key: const Key('ayush.notAvailable'),
+                  title,
+                  key: titleKey,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
+                if (body != null) ...[
+                  const SizedBox(height: Sizes.gap),
+                  Text(
+                    body,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+                if (action != null) ...[
+                  const SizedBox(height: Sizes.gutter * 1.5),
+                  action,
+                ],
               ],
             ),
           ),
         ),
       );
 
-  Widget _completed(BuildContext context, Strings strings) => Scaffold(
-        appBar: AppBar(title: Text(strings.ayushTitle)),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(Sizes.gutter),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(height: Sizes.gutter),
-                Text(
-                  strings.ayushCompletedTitle,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: Sizes.gap),
-                Text(
-                  strings.ayushCompletedBody,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: Sizes.gutter),
-                OutlinedButton(
-                  key: const Key('ayush.redo'),
-                  onPressed: () => setState(() {
-                    _redoing = true;
-                    _finished = false;
-                    _index = 0;
-                    _answers.clear();
-                  }),
-                  child: Text(strings.ayushRedo),
-                ),
-              ],
-            ),
-          ),
+  Widget _placeholder(BuildContext context, Strings strings) => _endState(
+        context,
+        strings,
+        icon: Icons.spa_outlined,
+        title: strings.notAvailableYet,
+        titleKey: const Key('ayush.notAvailable'),
+      );
+
+  Widget _completed(BuildContext context, Strings strings) => _endState(
+        context,
+        strings,
+        icon: Icons.verified_outlined,
+        title: strings.ayushCompletedTitle,
+        body: strings.ayushCompletedBody,
+        action: OutlinedButton(
+          key: const Key('ayush.redo'),
+          onPressed: () => setState(() {
+            _redoing = true;
+            _finished = false;
+            _index = 0;
+            _answers.clear();
+          }),
+          child: Text(strings.ayushRedo),
         ),
       );
 
-  Widget _thanks(BuildContext context, Strings strings) => Scaffold(
-        appBar: AppBar(title: Text(strings.ayushTitle)),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(Sizes.gutter),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(height: Sizes.gutter),
-                Text(
-                  strings.ayushCompletedTitle,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: Sizes.gutter),
-                FilledButton(
-                  key: const Key('ayush.done'),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(strings.doneLabel),
-                ),
-              ],
-            ),
-          ),
+  Widget _thanks(BuildContext context, Strings strings) => _endState(
+        context,
+        strings,
+        icon: Icons.check_rounded,
+        title: strings.ayushCompletedTitle,
+        action: FilledButton(
+          key: const Key('ayush.done'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.doneLabel),
         ),
       );
 }

@@ -7,6 +7,12 @@
 ///
 /// Nothing clinical appears here. What a patient answered belongs to the visit
 /// it was answered in, which is the Visits tab.
+///
+/// **The destructive action keeps its own group, below a gap.** Erasure and
+/// sign-out do very different things and a patient reaching for "leave this
+/// phone" must not land on "destroy my medical record"; the styling here makes
+/// that separation visible rather than relying on the reader noticing which
+/// word is red.
 library;
 
 import 'package:flutter/material.dart';
@@ -14,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers.dart';
 import '../core/theme.dart';
+import '../core/ui.dart';
 import '../identity/abha_screen.dart';
 import '../intake/screens/start_screen.dart';
 import '../l10n/strings.dart';
@@ -24,18 +31,27 @@ class ProfileTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = Strings.of(context);
+    final colors = Theme.of(context).colorScheme;
     final language = ref.watch(languageProvider);
 
-    return ListView(
+    return Garnish(
+      child: ListView(
       padding: const EdgeInsets.all(Sizes.gutter),
       children: [
-        const SizedBox(height: Sizes.gutter),
+        const SizedBox(height: Sizes.gap),
         Semantics(
           header: true,
           child: Text(
             strings.profileTab,
-            style: Theme.of(context).textTheme.titleLarge,
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          strings.profileSubtitle,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
         ),
         const SizedBox(height: Sizes.gutter),
 
@@ -46,19 +62,31 @@ class ProfileTab extends ConsumerWidget {
         // back from the server: what the backend stores is a peppered HMAC of
         // the number (§7.1) and it could not send the digits back if it wanted
         // to.
-        ListTile(
-          key: const Key('profile.phone'),
-          leading: const Icon(Icons.phone_outlined),
-          title: Text(strings.profilePhone),
-          subtitle: Text(ref.watch(signedInPhoneProvider).valueOrNull ?? '—'),
+        _ProfileRow(
+          rowKey: const Key('profile.name'),
+          icon: Icons.person_outline,
+          label: strings.profileName,
+          // The name itself when set; otherwise the sentence that says why it
+          // is safe to set one. Never a placeholder that looks like a value.
+          value: ref.watch(displayNameProvider).valueOrNull ??
+              strings.profileNameOnDevice,
+          onTap: () => _editName(context, ref, strings),
         ),
+        const SizedBox(height: Sizes.gap),
 
-        ListTile(
-          key: const Key('profile.language'),
-          leading: const Icon(Icons.translate_outlined),
-          title: Text(strings.profileLanguage),
-          subtitle: Text(languageNames[language] ?? language),
-          trailing: const Icon(Icons.chevron_right),
+        _ProfileRow(
+          rowKey: const Key('profile.phone'),
+          icon: Icons.phone_outlined,
+          label: strings.profilePhone,
+          value: ref.watch(signedInPhoneProvider).valueOrNull ?? '—',
+        ),
+        const SizedBox(height: Sizes.gap),
+
+        _ProfileRow(
+          rowKey: const Key('profile.language'),
+          icon: Icons.translate_outlined,
+          label: strings.profileLanguage,
+          value: languageNames[language] ?? language,
           // The chooser it opens is the same screen the first launch shows —
           // one list of endonyms, one place it is defined. A second copy would
           // drift, and the copy a patient sees on day one is the one that has
@@ -69,13 +97,13 @@ class ProfileTab extends ConsumerWidget {
             ),
           ),
         ),
+        const SizedBox(height: Sizes.gap),
 
-        ListTile(
-          key: const Key('profile.abha'),
-          leading: const Icon(Icons.badge_outlined),
-          title: Text(strings.profileAbha),
-          subtitle: Text(strings.notLinked),
-          trailing: const Icon(Icons.chevron_right),
+        _ProfileRow(
+          rowKey: const Key('profile.abha'),
+          icon: Icons.badge_outlined,
+          label: strings.profileAbha,
+          value: strings.notLinked,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               // Linked or not, the only way out of that screen is back to
@@ -85,7 +113,7 @@ class ProfileTab extends ConsumerWidget {
           ),
         ),
 
-        const Divider(height: Sizes.gutter * 2),
+        const SizedBox(height: Sizes.gutter * 2),
 
         // Erasure — `consent_v1.yaml` promises every patient "you can ask us to
         // delete what we recorded, at any time". This is that, without the walk
@@ -95,17 +123,12 @@ class ProfileTab extends ConsumerWidget {
         // buttons do very different things and a patient reaching for "leave
         // this phone" must not land on "destroy my medical record". Sign-out is
         // the one people press often, so it keeps the position they expect.
-        ListTile(
-          key: const Key('profile.deleteHistory'),
-          leading: Icon(
-            Icons.delete_forever_outlined,
-            color: Theme.of(context).colorScheme.error,
-          ),
-          title: Text(
-            strings.profileDeleteHistory,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-          subtitle: Text(strings.profileDeleteSubtitle),
+        _ProfileRow(
+          rowKey: const Key('profile.deleteHistory'),
+          icon: Icons.delete_forever_outlined,
+          label: strings.profileDeleteHistory,
+          value: strings.profileDeleteSubtitle,
+          tone: colors.error,
           onTap: () => _confirmErasure(context, ref, strings),
         ),
 
@@ -116,10 +139,12 @@ class ProfileTab extends ConsumerWidget {
           // borrowed phone must be able to leave nothing behind.
           onPressed: () async {
             await ref.read(authProvider).signOut();
+            await ref.read(displayNameStoreProvider).clear();
             await ref.read(languageStoreProvider).clear();
             await ref.read(hospitalStoreProvider).clear();
             ref.read(selectedHospitalProvider.notifier).state = null;
             ref
+              ..invalidate(displayNameProvider)
               ..invalidate(signedInProvider)
               ..invalidate(storedLanguageProvider)
               ..invalidate(resumableDraftProvider)
@@ -130,8 +155,32 @@ class ProfileTab extends ConsumerWidget {
           },
           child: Text(strings.signOut),
         ),
+        const SizedBox(height: Sizes.gutter),
+        PrivacyNote(text: strings.dataProtected),
       ],
+      ),
     );
+  }
+
+  /// Set or change the greeting name.
+  ///
+  /// **Nothing here reaches the backend.** The store is device-local and the
+  /// intake payload has no field for a name; this is what the home screen says
+  /// good morning to and nothing else. Clearing the box removes it.
+  Future<void> _editName(
+    BuildContext context,
+    WidgetRef ref,
+    Strings strings,
+  ) async {
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (_) => _NameDialog(
+        initial: ref.read(displayNameProvider).valueOrNull ?? '',
+      ),
+    );
+    if (saved == null) return;
+    await ref.read(displayNameStoreProvider).write(saved);
+    ref.invalidate(displayNameProvider);
   }
 
   /// Ask, then erase, then say what happened.
@@ -199,5 +248,163 @@ class ProfileTab extends ConsumerWidget {
       ..invalidate(patientDocumentsProvider)
       ..invalidate(carryForwardProvider)
       ..invalidate(resumableDraftProvider);
+  }
+}
+
+/// One setting: what it is, what it currently says, and a chevron if it opens.
+///
+/// A row with no `onTap` gets no chevron. A chevron that leads nowhere is a
+/// promise the screen does not keep, and on this screen the only rows that lead
+/// nowhere are the ones showing something the patient cannot change here.
+class _ProfileRow extends StatelessWidget {
+  const _ProfileRow({
+    required this.rowKey,
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.onTap,
+    this.tone,
+  });
+
+  final Key rowKey;
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback? onTap;
+
+  /// Non-null only for the destructive row.
+  final Color? tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final accent = tone ?? colors.onSurface;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(Sizes.radius),
+        boxShadow: softShadow,
+      ),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(Sizes.radius),
+        child: InkWell(
+          key: rowKey,
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(Sizes.radius),
+          child: Padding(
+            padding: const EdgeInsets.all(Sizes.gap + 2),
+            child: Row(
+              children: [
+                IconChip(
+                  icon: icon,
+                  background: tone == null ? Palette.tint : Palette.urgentSurface,
+                  foreground: tone ?? colors.primary,
+                ),
+                const SizedBox(width: Sizes.gap + 2),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        style: text.titleMedium?.copyWith(color: accent),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        value,
+                        style: text.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onTap != null)
+                  Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// The name dialog, which owns its controller.
+///
+/// **The controller has to live and die with the dialog.** It used to be built
+/// beside `showDialog` and disposed the moment that future completed — but that
+/// future completes when the route is *popped*, not when it is gone. The dialog
+/// keeps building through its exit animation, and a `TextField` rebuilding
+/// against a disposed controller tears down the subtree mid-frame, which
+/// surfaces as a framework assertion a long way from the cause.
+///
+/// A `StatefulWidget` disposes in `dispose`, which runs when the route is
+/// actually finished. That is the whole fix, and it is why this is a widget
+/// rather than four lines in a method.
+class _NameDialog extends StatefulWidget {
+  const _NameDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _save() => Navigator.of(context).pop(_controller.text);
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    return AlertDialog(
+      title: Text(strings.profileName),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            key: const Key('profile.nameField'),
+            controller: _controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.done,
+            style: Theme.of(context).textTheme.bodyLarge,
+            decoration: InputDecoration(labelText: strings.profileName),
+            // Enter saves, so the patient never has to find the button.
+            onSubmitted: (_) => _save(),
+          ),
+          const SizedBox(height: Sizes.gap),
+          Text(
+            strings.profileNameOnDevice,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.cancelLabel),
+        ),
+        TextButton(
+          key: const Key('profile.nameSave'),
+          onPressed: _save,
+          child: Text(strings.saveLabel),
+        ),
+      ],
+    );
   }
 }

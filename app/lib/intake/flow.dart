@@ -155,6 +155,11 @@ class IntakeFlow extends ChangeNotifier {
       clock: clock,
     );
     await flow._saveDraft();
+    // Pages the patient photographed from the Documents tab, before there was a
+    // visit to attach them to, become this visit's. Done here rather than at
+    // submit so the review screen's document count is right and the patient can
+    // still remove one.
+    await documents.adopt(flow.intakeId);
     return flow;
   }
 

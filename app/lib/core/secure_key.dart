@@ -227,3 +227,55 @@ class ReadAloudPrefStore {
     } on Object {/* best effort */}
   }
 }
+
+
+/// What the patient would like to be called, on this device and nowhere else.
+///
+/// **The backend has no name column and this does not give it one.** §7.1 holds
+/// a peppered HMAC of a phone number and nothing else; `PatientRecord` has no
+/// `display_name` the app can write to, and `profile_tab.dart` says out loud
+/// that a profile screen which looks like it should hold a name is an
+/// invitation to start collecting them. So this is a greeting, not an
+/// identifier: it is never sent, never submitted with an intake, never used to
+/// match a patient, and it is cleared on sign-out with everything else.
+///
+/// A patient who sets nothing gets a greeting without a name, which is the
+/// default and is fine. Nothing anywhere invents one.
+class DisplayNameStore {
+  DisplayNameStore({FlutterSecureStorage? storage})
+      : _storage = storage ??
+            const FlutterSecureStorage(
+              aOptions: AndroidOptions(encryptedSharedPreferences: true),
+            );
+
+  static const _key = 'medikiosk.session.display_name';
+
+  final FlutterSecureStorage _storage;
+
+  Future<String?> read() async {
+    try {
+      final value = await _storage.read(key: _key);
+      final trimmed = value?.trim();
+      return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> write(String name) async {
+    final trimmed = name.trim();
+    try {
+      if (trimmed.isEmpty) {
+        await _storage.delete(key: _key);
+      } else {
+        await _storage.write(key: _key, value: trimmed);
+      }
+    } on Object {/* best effort — a greeting is not worth failing a screen */}
+  }
+
+  Future<void> clear() async {
+    try {
+      await _storage.delete(key: _key);
+    } on Object {/* nothing to clear */}
+  }
+}

@@ -80,6 +80,24 @@ class PageUnreadable extends AddPageResult {
   const PageUnreadable();
 }
 
+/// Where a page lives before it belongs to a visit.
+///
+/// **Not a real intake, and deliberately not a hidden one.** `DocumentRecord`
+/// on the backend has a NOT NULL `intake_id` and the only upload endpoint is
+/// `POST /intakes/{intake_id}/documents`, so a document cannot reach the
+/// hospital without a visit. The tempting fix — mint a throwaway intake so the
+/// upload has something to point at — would put a phantom visit on the
+/// worklist, in the metrics and in the purge path, which is the same trade
+/// `ayush_profile` refused for the same reason.
+///
+/// So a page photographed from the Documents tab waits here, on the phone,
+/// encrypted, and `IntakeFlow.begin` adopts it into the next real visit. The
+/// patient is told that in as many words; nothing pretends it has been sent.
+///
+/// `purgeIntake` only ever runs against a real intake id, so these survive a
+/// completed visit. `purgeEverything` (sign-out) takes them.
+const kUnattachedIntakeId = 'unattached';
+
 class DocumentStore {
   DocumentStore({
     required LocalDatabase database,
@@ -137,6 +155,16 @@ class DocumentStore {
       quality: prepared.quality,
     ));
   }
+
+  /// Pages photographed outside a visit, still waiting for one.
+  Future<List<CapturedPage>> unattached() => pagesFor(kUnattachedIntakeId);
+
+  /// Give every waiting page to the visit that has just started.
+  ///
+  /// Called once, from `IntakeFlow.begin`. Re-keying rather than copying: there
+  /// is one JPEG per page on disk and it does not move.
+  Future<void> adopt(String intakeId) =>
+      _db.adoptDocuments(from: kUnattachedIntakeId, to: intakeId);
 
   Future<List<CapturedPage>> pagesFor(String intakeId) async {
     final rows = await _db.documentsFor(intakeId);

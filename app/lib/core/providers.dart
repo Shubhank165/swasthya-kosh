@@ -6,6 +6,7 @@
 library;
 
 import 'dart:io';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +24,7 @@ import '../identity/erasure_repository.dart';
 import '../identity/auth_repository.dart';
 import '../identity/history_repository.dart';
 import '../identity/hospital_repository.dart';
+import '../l10n/strings.dart';
 import '../storage/database.dart';
 import '../submit/queue.dart';
 import '../submit/record.dart';
@@ -130,6 +132,24 @@ final patientRefProvider = FutureProvider<PatientRef>((ref) async {
 });
 
 final hospitalStoreProvider = Provider<HospitalStore>((ref) => HospitalStore());
+
+/// The greeting name, kept on this device only — see [DisplayNameStore].
+/// Which of the four tabs the home shell is showing.
+///
+/// Held here rather than in `_HomeShellState` so a card on one tab can send the
+/// patient to another — "Upload documents" on the home screen is the Documents
+/// tab, not a second copy of the camera. The shell still owns the bar; this is
+/// only where the answer lives.
+final homeTabIndexProvider = StateProvider<int>((ref) => 0);
+
+final displayNameStoreProvider =
+    Provider<DisplayNameStore>((ref) => DisplayNameStore());
+
+/// Null until the patient sets one, and null again after sign-out. Every
+/// caller must handle that: nothing in this app invents a name.
+final displayNameProvider = FutureProvider<String?>(
+  (ref) => ref.watch(displayNameStoreProvider).read(),
+);
 
 /// The hospital id remembered from the patient's last visit, or null.
 final storedHospitalIdProvider = FutureProvider<String?>(
@@ -259,7 +279,29 @@ final signedInProvider = FutureProvider<bool>((ref) async {
 /// differ in coverage — the UI speaks nine languages and the bundle two — and
 /// where the bundle has no prompt the walker records `not_asked` rather than
 /// falling back.
-final languageProvider = StateProvider<String>((ref) => 'en');
+/// The handset's own language, when this app speaks it — otherwise English.
+///
+/// Only ever the *initial* value of [languageProvider], and it only matters on
+/// a first run: the welcome screen is shown before any language has been
+/// chosen, and on a phone set to Tamil it would otherwise open in English.
+///
+/// **A guess, and it stays one.** Nothing is written to `LanguageStore`, so
+/// `storedLanguageProvider` is still null, `Root` still shows the welcome
+/// screen, and the chooser still appears. A remembered choice always wins:
+/// `main.dart` copies the stored value over this one as soon as it resolves.
+///
+/// **Read here, at provider creation, and not assigned from a widget's
+/// `initState`.** Writing provider state while the `ProviderScope` is still
+/// mounting marks the scope dirty during its own first build, which trips
+/// `!_dirty` in the framework and takes the whole tree down before the first
+/// frame. An initial value has no such problem because nothing has listened
+/// yet.
+String _initialLanguage() {
+  final code = PlatformDispatcher.instance.locale.languageCode;
+  return uiLanguages.contains(code) ? code : 'en';
+}
+
+final languageProvider = StateProvider<String>((ref) => _initialLanguage());
 
 /// Where the chosen language is remembered between launches.
 final languageStoreProvider = Provider<LanguageStore>((ref) => LanguageStore());

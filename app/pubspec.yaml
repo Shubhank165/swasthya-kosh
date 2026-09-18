@@ -86,6 +86,9 @@ flutter:
   generate: true
   assets:
     - assets/bundle/
+    # Decorative only. Nothing here is read, measured or shown to a
+    # clinician; a missing file costs a picture and nothing else.
+    - assets/illustrations/
     # The offline ASR models — shipped in the APK so voice input works on
     # first launch with no download, and never fetched. ~103 MB of
     # Whisper-tiny int8 for English, ~140 MB of IndicConformer int8 for Hindi;

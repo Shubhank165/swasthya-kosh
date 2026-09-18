@@ -42,9 +42,17 @@ class FakeTranscriber extends Transcriber {
 }
 
 /// Tap the mic twice — start, then stop — and let the result land.
+///
+/// **`pump`, not `pumpAndSettle`, between the taps.** While the microphone is
+/// open the button animates a repeating ring, which is the recording
+/// indicator: it is meant to run until the patient stops it, and
+/// `pumpAndSettle` waits for a frame queue that by design never empties, so it
+/// times out rather than failing on anything real. Fixed frames are enough —
+/// nothing here depends on where the ring got to.
 Future<void> speak(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('question.listen')));
-  await tester.pumpAndSettle();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 200));
   await tester.tap(find.byKey(const Key('question.listen')));
   await tester.pumpAndSettle();
 }

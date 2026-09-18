@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme.dart';
+import '../../core/ui.dart';
 import '../../identity/auth_repository.dart';
 import '../../l10n/strings.dart';
 
@@ -61,6 +62,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final result = await ref.read(authProvider).verify(
           challengeId: _challenge!.challengeId,
           code: _code.text.trim(),
+          // Passed so the Profile tab can show the number the session was
+          // issued against. The backend stores a peppered HMAC (§7.1) and
+          // could not send the digits back if it wanted to, so this screen is
+          // the only place they can be kept.
+          phone: _phone.text.trim(),
         );
     if (!mounted) return;
     if (result.ok) {
@@ -86,62 +92,145 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     final strings = Strings.of(context);
+    final colors = Theme.of(context).colorScheme;
+    final awaitingCode = _challenge != null;
+
     return Scaffold(
-      appBar: AppBar(title: Text(strings.signInTitle)),
-      body: SafeArea(
-        child: ListView(
+      body: Garnish(
+        child: SafeArea(
+          child: ListView(
           padding: const EdgeInsets.all(Sizes.gutter),
           children: [
+            const SizedBox(height: Sizes.gutter),
+            const Center(child: EmblemMark(icon: Icons.sms_outlined, size: 108)),
+            const SizedBox(height: Sizes.gutter),
+            ScreenIntro(
+              title: strings.signInTitle,
+              // Two sentences, and which one shows depends on where the patient
+              // is. "We sent a code" before it has been sent is the kind of
+              // small lie that makes someone wait for an SMS that is not
+              // coming.
+              body: awaitingCode ? strings.signInCodeSent : strings.signInSubtitle,
+            ),
+            const SizedBox(height: Sizes.gutter),
             TextField(
               key: const Key('signin.phone'),
               controller: _phone,
               enabled: _challenge == null,
               keyboardType: TextInputType.phone,
               style: Theme.of(context).textTheme.bodyLarge,
-              decoration: InputDecoration(labelText: strings.phoneLabel),
+              decoration: InputDecoration(
+                labelText: strings.phoneLabel,
+                prefixIcon: const Icon(Icons.phone_outlined),
+              ),
             ),
             const SizedBox(height: Sizes.gutter),
             if (_challenge == null)
               FilledButton(
                 key: const Key('signin.send'),
                 onPressed: _busy ? null : _request,
-                child: Text(strings.sendCode),
+                child: _busy
+                    ? const _ButtonSpinner()
+                    : Text(strings.sendCode),
               )
             else ...[
               if (_challenge!.isMocked)
                 Padding(
                   padding: const EdgeInsets.only(bottom: Sizes.gap),
-                  child: Text(
-                    key: const Key('signin.mock_notice'),
-                    strings.mockNotice,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  child: _Notice(
+                    noticeKey: const Key('signin.mock_notice'),
+                    icon: Icons.info_outline,
+                    text: strings.mockNotice,
+                    tone: colors.error,
                   ),
                 ),
               TextField(
                 key: const Key('signin.code'),
                 controller: _code,
                 keyboardType: TextInputType.number,
-                style: Theme.of(context).textTheme.bodyLarge,
-                decoration: InputDecoration(labelText: strings.codeLabel),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      letterSpacing: 6,
+                      fontWeight: FontWeight.w600,
+                    ),
+                decoration: InputDecoration(
+                  labelText: strings.codeLabel,
+                  prefixIcon: const Icon(Icons.lock_outline),
+                ),
               ),
               const SizedBox(height: Sizes.gutter),
               FilledButton(
                 key: const Key('signin.verify'),
                 onPressed: _busy ? null : _verify,
-                child: Text(strings.verifyCode),
+                child: _busy
+                    ? const _ButtonSpinner()
+                    : Text(strings.verifyCode),
               ),
             ],
             if (_error != null) ...[
               const SizedBox(height: Sizes.gap),
-              Text(
-                key: const Key('signin.error'),
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              _Notice(
+                noticeKey: const Key('signin.error'),
+                icon: Icons.error_outline,
+                text: _error!,
+                tone: colors.error,
               ),
             ],
+            const SizedBox(height: Sizes.gutter),
+            PrivacyNote(text: strings.dataProtected),
           ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// A short coloured line with an icon, for the two things this screen has to
+/// say that are not labels: the demo-mode notice and an error.
+///
+/// The key is passed through to the *text*, because both notices are asserted
+/// on by key in `screens_test.dart` and a key on a wrapper would still be found
+/// but would no longer point at the string being checked.
+class _Notice extends StatelessWidget {
+  const _Notice({
+    required this.noticeKey,
+    required this.icon,
+    required this.text,
+    required this.tone,
+  });
+
+  final Key noticeKey;
+  final IconData icon;
+  final String text;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: tone),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              key: noticeKey,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: tone),
+            ),
+          ),
+        ],
+      );
+}
+
+class _ButtonSpinner extends StatelessWidget {
+  const _ButtonSpinner();
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 22,
+        height: 22,
+        child: CircularProgressIndicator(
+          strokeWidth: 2.5,
+          color: Theme.of(context).colorScheme.onPrimary,
+        ),
+      );
 }

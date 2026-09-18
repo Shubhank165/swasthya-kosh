@@ -237,6 +237,16 @@ class LocalDatabase extends _$LocalDatabase {
   Future<void> dropDocument(String documentId) =>
       (delete(pendingDocuments)..where((d) => d.documentId.equals(documentId))).go();
 
+  /// Hand every page captured outside a visit to the visit that just started.
+  ///
+  /// A row's `intake_id` is what decides where the page uploads and what
+  /// `purgeIntake` will later delete, so moving the page *is* re-keying the
+  /// row. Nothing about the file changes — it was already prepared, stripped
+  /// and downscaled on the way in.
+  Future<void> adoptDocuments({required String from, required String to}) =>
+      (update(pendingDocuments)..where((d) => d.intakeId.equals(from)))
+          .write(PendingDocumentsCompanion(intakeId: Value(to)));
+
   Future<void> noteDocumentAttempt(String documentId, int attempts) =>
       (update(pendingDocuments)..where((d) => d.documentId.equals(documentId)))
           .write(PendingDocumentsCompanion(attempts: Value(attempts)));

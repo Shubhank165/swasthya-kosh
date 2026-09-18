@@ -158,7 +158,18 @@ void main() {
     // 1. Language, before anything else is shown. Tapping it *is* the answer
     // — the Continue button that used to sit under the list confirmed which of
     // nine buttons you had just pressed, and is gone (stage 4).
+    // 0. The welcome screen, which is everything the app shows before a
+    // language exists. One control, and it opens the chooser.
+    await tester.tap(find.byKey(const Key('welcome.start')));
+    await settle(tester);
+
     await tester.tap(find.byKey(const Key('language.en')));
+    await settle(tester);
+
+    // 1a. Tapping selects; Continue commits. The extra tap is the undo for a
+    // mistap that would otherwise re-render the whole app in a script the
+    // patient cannot read — see `start_screen.dart`.
+    await tester.tap(find.byKey(const Key('language.continue')));
     await settle(tester);
 
     // 1b. The home screen, which is new. The app no longer drops a signed-in

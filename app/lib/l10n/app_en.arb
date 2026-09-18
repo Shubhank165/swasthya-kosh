@@ -446,5 +446,188 @@
   "deleteHistoryFailed": "Nothing was deleted. Check your connection and try again.",
   "@deleteHistoryFailed": {
     "description": "Shown when the request could not be made at all"
+  },
+  "welcomeHeadline": "Your health story, understood better.",
+  "@welcomeHeadline": {
+    "description": "Welcome screen headline, shown before the language chooser."
+  },
+  "welcomeBody": "Share your health information through a simple conversation, add your earlier records, and be ready before you see the doctor.",
+  "@welcomeBody": {
+    "description": "Welcome screen paragraph: what the app is for."
+  },
+  "welcomeStepTalk": "Tell us",
+  "@welcomeStepTalk": {
+    "description": "Welcome screen: short label under the 'tell us' icon."
+  },
+  "welcomeStepRecords": "Add records",
+  "@welcomeStepRecords": {
+    "description": "Welcome screen: short label under the 'add records' icon."
+  },
+  "welcomeStepVisit": "See the doctor",
+  "@welcomeStepVisit": {
+    "description": "Welcome screen: short label under the 'see the doctor' icon."
+  },
+  "getStarted": "Get started",
+  "@getStarted": {
+    "description": "The welcome screen's only button; it opens the language chooser."
+  },
+  "dataProtected": "Your health information is protected.",
+  "@dataProtected": {
+    "description": "Reassurance line beside a padlock. Deliberately not a claim about any specific law."
+  },
+  "chooseLanguage": "Choose your language",
+  "@chooseLanguage": {
+    "description": "Heading on the language chooser."
+  },
+  "changeLanguageAnytime": "You can change this at any time.",
+  "@changeLanguageAnytime": {
+    "description": "Sub-line on the language chooser: the choice is not final."
+  },
+  "signInSubtitle": "Enter your mobile number. We will send a six-digit code.",
+  "@signInSubtitle": {
+    "description": "Sign-in, before a code has been requested."
+  },
+  "signInCodeSent": "Enter the six-digit code sent to your phone.",
+  "@signInCodeSent": {
+    "description": "Sign-in, after a code has been requested. Never says an SMS arrived — the mock notice handles that case."
+  },
+  "homeHeadline": "Prepare before you see the doctor.",
+  "@homeHeadline": {
+    "description": "The home tab's heading."
+  },
+  "appTagline": "Your AI health assistant",
+  "@appTagline": {
+    "description": "One line under the app name on the welcome screen. Marketing, never a clinical claim."
+  },
+  "profileSubtitle": "What this app knows about you.",
+  "@profileSubtitle": {
+    "description": "Sub-line under the Profile heading."
+  },
+  "greetingHi": "Hi, {name}",
+  "@greetingHi": {
+    "description": "Greeting when the patient has set a display name on this device.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "greetingNoName": "Welcome back",
+  "@greetingNoName": {
+    "description": "Greeting when no display name has been set. Never invents one."
+  },
+  "greetingSubtitle": "Let's make your visit easier.",
+  "@greetingSubtitle": {
+    "description": "The quiet second line under the greeting."
+  },
+  "documentsIntro": "Add your old prescriptions, lab reports and discharge summaries.",
+  "@documentsIntro": {
+    "description": "What the Documents tab is for."
+  },
+  "scanOrUpload": "Scan or upload",
+  "@scanOrUpload": {
+    "description": "The Documents tab's primary action."
+  },
+  "whyItHelps": "Why it helps",
+  "@whyItHelps": {
+    "description": "Heading over the three-benefit row."
+  },
+  "helpsRead": "Your doctor has them before you walk in",
+  "@helpsRead": {
+    "description": "Benefit 1. Describes when the doctor gets the papers, never what was read off them."
+  },
+  "helpsTimeline": "Kept in date order",
+  "@helpsTimeline": {
+    "description": "Benefit 2. About ordering, not content."
+  },
+  "helpsChecked": "Checked that the photo is readable",
+  "@helpsChecked": {
+    "description": "Benefit 3. About the photograph's legibility, never about clinical values."
+  },
+  "documentsWaiting": "{count} ready to send with your next visit",
+  "@documentsWaiting": {
+    "description": "Count of pages captured but not yet attached to a visit.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileName": "Name",
+  "@profileName": {
+    "description": "Profile row label for the display name."
+  },
+  "profileNameOnDevice": "Kept on this phone only",
+  "@profileNameOnDevice": {
+    "description": "Sub-line making clear the name never leaves the phone."
+  },
+  "saveLabel": "Save",
+  "@saveLabel": {
+    "description": "Confirm button in the name dialog."
+  },
+  "quickActions": "Quick actions",
+  "@quickActions": {
+    "description": "Heading over the two-tile action grid on the home tab."
+  },
+  "recentActivity": "Recent activity",
+  "@recentActivity": {
+    "description": "Heading over the recent-activity list on the home tab."
+  },
+  "uploadDocuments": "Upload documents",
+  "@uploadDocuments": {
+    "description": "Quick-action tile: go to the Documents tab and add a page."
+  },
+  "nothingRecent": "Nothing yet. Your visits and documents will appear here.",
+  "@nothingRecent": {
+    "description": "Shown under Recent activity when the patient has done nothing yet."
+  },
+  "searchLanguage": "Search language",
+  "@searchLanguage": {
+    "description": "Placeholder in the language chooser's search box."
+  },
+  "languageOnThisPhone": "Your phone",
+  "@languageOnThisPhone": {
+    "description": "Badge on the row matching the phone's own language. Never 'most used' — this app collects no usage figures."
+  },
+  "visitsCount": "{count} visits",
+  "@visitsCount": {
+    "description": "Summary line above the visit list.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "visitSeen": "Seen",
+  "@visitSeen": {
+    "description": "Pill on a visit a physician has opened."
+  },
+  "visitAwaiting": "With the doctor",
+  "@visitAwaiting": {
+    "description": "Pill on a visit submitted but not yet opened. Says nothing about queue position or waiting time."
+  },
+  "visitsScopeNote": "Visits recorded at this hospital only.",
+  "@visitsScopeNote": {
+    "description": "Footer under the visit list. Mirrors the backend's own scope_note: retrieval across hospitals needs an ABDM consent artefact and is not implemented."
+  },
+  "copyCode": "Copy code",
+  "@copyCode": {
+    "description": "Tooltip and label on the button that copies the reference code."
+  },
+  "codeCopied": "Code copied",
+  "@codeCopied": {
+    "description": "Confirmation after the reference code is copied."
+  },
+  "newIntakeBrief": "Answer health questions",
+  "@newIntakeBrief": {
+    "description": "Subtitle on the half-width home tile. A short form of newIntakeSubtitle — the full sentence does not fit two-up without truncating."
+  },
+  "uploadDocumentsBrief": "Prescriptions, reports",
+  "@uploadDocumentsBrief": {
+    "description": "Subtitle on the half-width home tile. A short form of documentsIntro."
+  },
+  "cancelLabel": "Cancel",
+  "@cancelLabel": {
+    "description": "Dismiss a dialog without doing anything. Generic — never reuse a destructive dialog's wording here."
   }
 }

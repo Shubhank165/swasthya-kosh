@@ -9,6 +9,12 @@
 /// a diagnosis surface), it does not show contradictions the backend found, and
 /// it does not interpret anything. Every line here is something the patient
 /// typed or tapped.
+///
+/// **The answer is the loud line, not the question.** A patient checking thirty
+/// rows is scanning for the one that is wrong, and the question is the thing
+/// they already read a minute ago. So the prompt sits above in grey and the
+/// answer below it in body size, which is the opposite of what a `ListTile`
+/// does by default and the reason this stopped being one.
 library;
 
 import 'package:flutter/material.dart';
@@ -16,6 +22,7 @@ import 'package:flutter/material.dart';
 import '../../content/answer.dart';
 import '../../content/bundle.dart';
 import '../../core/theme.dart';
+import '../../core/ui.dart';
 import '../../l10n/strings.dart';
 
 class ReviewScreen extends StatelessWidget {
@@ -53,6 +60,7 @@ class ReviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = Strings.of(context);
+    final colors = Theme.of(context).colorScheme;
 
     // Only what the patient actually settled. Showing a wall of "not asked"
     // rows would bury the answers they need to check.
@@ -69,7 +77,7 @@ class ReviewScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: Text(strings.reviewTitle)),
+      appBar: AppBar(),
       // Submit is pinned, not parked at the end of the list. A patient with
       // thirty answers had to scroll past all of them to find out the button
       // existed, which reads as a screen with no way forward.
@@ -80,47 +88,82 @@ class ReviewScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(Sizes.gutter),
+          padding: const EdgeInsets.fromLTRB(
+            Sizes.gutter,
+            0,
+            Sizes.gutter,
+            Sizes.gutter,
+          ),
           children: [
+            ScreenIntro(title: strings.reviewTitle),
+            const SizedBox(height: Sizes.gutter),
             for (final section in ordered) ...[
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: Sizes.gap),
+                padding: const EdgeInsets.only(
+                  top: Sizes.gap,
+                  bottom: Sizes.gap,
+                ),
                 child: Semantics(
                   header: true,
                   child: Text(
                     // Section keys are content, not UI strings, and the bundle
                     // carries no translations for them. De-underscored rather
                     // than machine-translated — §16.
-                    section.replaceAll('_', ' '),
-                    style: Theme.of(context).textTheme.labelLarge,
+                    section.replaceAll('_', ' ').toUpperCase(),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.1,
+                          color: colors.onSurfaceVariant,
+                        ),
                   ),
                 ),
               ),
               for (final answer in sections[section]!)
-                Card(
-                  margin: const EdgeInsets.only(bottom: Sizes.gap),
-                  child: ListTile(
-                    key: Key('review.${answer.questionId}'),
-                    title: Text(
-                      bundle.questions[answer.questionId]?.promptFor(language) ??
-                          answer.fieldId,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: Sizes.gap),
+                  child: SoftCard(
+                    padding: const EdgeInsets.fromLTRB(
+                      Sizes.gap + 4,
+                      Sizes.gap + 2,
+                      Sizes.gap,
+                      Sizes.gap + 2,
                     ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        // The patient's own words, as they were shown. Not the
-                        // normalised code — a patient checking their answer
-                        // needs to recognise it.
-                        answer.originalText ?? '',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
+                    child: Row(
+                      key: Key('review.${answer.questionId}'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                bundle.questions[answer.questionId]
+                                        ?.promptFor(language) ??
+                                    answer.fieldId,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: colors.onSurfaceVariant),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                // The patient's own words, as they were shown.
+                                // Not the normalised code — a patient checking
+                                // their answer needs to recognise it.
+                                answer.originalText ?? '',
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: Sizes.gap),
+                        TextButton(
+                          onPressed: () => onEdit(answer.questionId),
+                          child: Text(strings.editAnswer),
+                        ),
+                      ],
                     ),
-                    trailing: TextButton(
-                      onPressed: () => onEdit(answer.questionId),
-                      child: Text(strings.editAnswer),
-                    ),
-                    isThreeLine: true,
                   ),
                 ),
             ],
@@ -151,9 +194,13 @@ class _Footer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = Strings.of(context);
-    return Material(
-      elevation: 8,
-      color: Theme.of(context).colorScheme.surface,
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(color: Color(0x141B5E4A), blurRadius: 20, offset: Offset(0, -6)),
+        ],
+      ),
       child: SafeArea(
         top: false,
         child: Padding(

@@ -55,8 +55,17 @@ List<Override> edges({
 
 void main() {
   group('Root sends the patient to the right screen', () {
-    testWidgets('a first run asks for a language', (tester) async {
+    testWidgets('a first run welcomes, then asks for a language',
+        (tester) async {
+      // Stage 5 put a welcome screen in front of the chooser. It is not a
+      // second question: its only control opens the chooser, and the chooser
+      // is still the first thing the patient *answers*.
       await tester.pumpWidget(wrap(const Root(), edges(storedLanguage: null)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('welcome.start')), findsOneWidget);
+      expect(find.byKey(const Key('language.hi')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('welcome.start')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('language.hi')), findsOneWidget);
     });

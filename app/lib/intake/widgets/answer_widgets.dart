@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import '../../content/answer.dart';
 import '../../content/bundle.dart';
 import '../../core/theme.dart';
+import '../../core/ui.dart';
 import '../../l10n/strings.dart';
 import '../../voice/listen_button.dart';
 import '../../voice/option_match.dart';
@@ -131,6 +132,189 @@ Widget? buildAnswerWidget({
 /// A full-width card rather than a radio button: 48dp is the floor, and a
 /// radio's hit area is the dot unless you are careful. The whole row is the
 /// target.
+/// A confirm button an answer widget wants shown in the screen's footer.
+///
+/// Compared by [label] and by whether it is enabled, never by the callback:
+/// a closure is a new object on every build and equality on it would mean the
+/// notifier fired every frame.
+@immutable
+class ConfirmAction {
+  const ConfirmAction({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  bool get enabled => onPressed != null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ConfirmAction && other.label == label && other.enabled == enabled;
+
+  @override
+  int get hashCode => Object.hash(label, enabled);
+}
+
+/// Lets an answer widget hand its confirm button to whatever is drawing the
+/// footer.
+///
+/// **A screen that does not provide this keeps the old behaviour**, with the
+/// button rendered inline where it always was. That fallback is the whole
+/// safety of this mechanism: a screen someone forgets to wrap still shows a way
+/// forward, rather than stranding a patient on a question with no button.
+class AnswerConfirmScope extends InheritedWidget {
+  const AnswerConfirmScope({
+    super.key,
+    required this.notifier,
+    required super.child,
+  });
+
+  final ValueNotifier<ConfirmAction?> notifier;
+
+  static ValueNotifier<ConfirmAction?>? of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<AnswerConfirmScope>()
+      ?.notifier;
+
+  @override
+  bool updateShouldNotify(AnswerConfirmScope oldWidget) =>
+      oldWidget.notifier != notifier;
+}
+
+/// The "Continue" under an answer, wherever the screen wants it drawn.
+///
+/// Inside an [AnswerConfirmScope] it publishes itself and occupies no space;
+/// outside one it is an ordinary button in the flow. The key goes on the real
+/// button only, so exactly one widget carries it either way.
+class ConfirmButton extends StatefulWidget {
+  const ConfirmButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.buttonKey,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final Key? buttonKey;
+
+  @override
+  State<ConfirmButton> createState() => _ConfirmButtonState();
+}
+
+class _ConfirmButtonState extends State<ConfirmButton> {
+  ValueNotifier<ConfirmAction?>? _notifier;
+
+  @override
+  void dispose() {
+    // Cleared after the frame: the screen above is being torn down too, and
+    // writing to a notifier it is still listening to mid-teardown rebuilds a
+    // widget that is on its way out.
+    final notifier = _notifier;
+    if (notifier != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => notifier.value = null);
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notifier = AnswerConfirmScope.of(context);
+    _notifier = notifier;
+    if (notifier == null) {
+      return FilledButton(
+        key: widget.buttonKey,
+        onPressed: widget.onPressed,
+        child: Text(widget.label),
+      );
+    }
+    // Published after the frame, never during it: assigning here would mark the
+    // footer dirty while this subtree is still building.
+    final action = ConfirmAction(label: widget.label, onPressed: widget.onPressed);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) notifier.value = action;
+    });
+    return const SizedBox.shrink();
+  }
+}
+
+/// The option code that means "none of the above, let me say it".
+///
+/// A convention, not a guess: the question bank writes `other` for exactly this
+/// and nothing else uses the code. A question whose content never offers it
+/// simply never shows the box.
+const kOtherOptionCode = 'other';
+
+/// What appears when the patient picks "Something else".
+///
+/// **The code stays `other`; the words become `original_text`.** That split is
+/// Decision #3 — `original_text` travels with every fact, forever — and it is
+/// what keeps this honest: the branching logic still sees an option it
+/// understands, and the Vaidya still reads what the patient actually wrote.
+/// Coercing the typed words into a coded value would be the app inventing a
+/// clinical term nobody said.
+///
+/// Confirm is disabled until something is typed. "Something else" with an empty
+/// box is not an answer, and recording one would claim the patient described
+/// something when they described nothing — "I don't know" is the honest button
+/// for that and it is right there.
+class OtherEntry extends StatefulWidget {
+  const OtherEntry({super.key, required this.onSubmitted, this.label});
+
+  final void Function(String text) onSubmitted;
+  final String? label;
+
+  @override
+  State<OtherEntry> createState() => _OtherEntryState();
+}
+
+class _OtherEntryState extends State<OtherEntry> {
+  final _controller = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    final ready = _controller.text.trim().isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sizes.gap),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            key: const Key('answer.other_text'),
+            controller: _controller,
+            autofocus: true,
+            maxLines: 3,
+            minLines: 1,
+            textCapitalization: TextCapitalization.sentences,
+            style: Theme.of(context).textTheme.bodyLarge,
+            decoration: InputDecoration(
+              labelText: widget.label ?? strings.somethingElse,
+            ),
+          ),
+          const SizedBox(height: Sizes.gap),
+          FilledButton(
+            key: const Key('answer.other_confirm'),
+            onPressed:
+                ready ? () => widget.onSubmitted(_controller.text.trim()) : null,
+            child: Text(strings.continueLabel),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class OptionTile extends StatelessWidget {
   const OptionTile({
     super.key,
@@ -154,32 +338,51 @@ class OptionTile extends StatelessWidget {
       label: label,
       child: Padding(
         padding: const EdgeInsets.only(bottom: Sizes.gap),
-        child: Material(
-          color: selected ? scheme.secondaryContainer : scheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: selected ? scheme.primary : scheme.outlineVariant,
-              width: selected ? 2 : 1,
-            ),
+        child: Container(
+          // The shadow is dropped when selected: a chosen row is pressed *in*,
+          // and a raised one that is also tinted reads as two states at once.
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Sizes.radius),
+            boxShadow: selected ? null : softShadow,
           ),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 56),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 28),
-                    const SizedBox(width: 14),
-                  ],
-                  Expanded(
-                    child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
+          child: Material(
+            color: selected ? Palette.tint : Colors.white,
+            borderRadius: BorderRadius.circular(Sizes.radius),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(Sizes.radius),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 60),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(Sizes.radius),
+                  border: Border.all(
+                    color: selected ? scheme.primary : Colors.transparent,
+                    width: 2,
                   ),
-                  if (selected) Icon(Icons.check, color: scheme.primary),
-                ],
+                ),
+                child: Row(
+                  children: [
+                    if (icon != null) ...[
+                      IconChip(
+                        icon: icon!,
+                        background: selected ? Colors.white : Palette.tint,
+                      ),
+                      const SizedBox(width: 14),
+                    ],
+                    Expanded(
+                      child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
+                    ),
+                    const SizedBox(width: 8),
+                    // The indicator is always present, so the row does not
+                    // change width on selection and the unchosen options say
+                    // out loud that they are choosable.
+                    Icon(
+                      selected ? Icons.check_circle : Icons.circle_outlined,
+                      color: selected ? scheme.primary : Palette.tintStrong,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -245,7 +448,7 @@ class SuggestionBadge extends StatelessWidget {
   }
 }
 
-class SingleChoiceAnswer extends StatelessWidget {
+class SingleChoiceAnswer extends StatefulWidget {
   const SingleChoiceAnswer({
     super.key,
     required this.question,
@@ -266,9 +469,22 @@ class SingleChoiceAnswer extends StatelessWidget {
   final AnswerValue? suggestion;
 
   @override
+  State<SingleChoiceAnswer> createState() => _SingleChoiceAnswerState();
+}
+
+class _SingleChoiceAnswerState extends State<SingleChoiceAnswer> {
+  /// True once "Something else" has been tapped and the box is open.
+  ///
+  /// Nothing is recorded at that moment: picking the option is the patient
+  /// saying "not one of these", and the answer is what they then write.
+  bool _writingOther = false;
+
+  @override
   Widget build(BuildContext context) {
+    final question = widget.question;
+    final language = widget.language;
     final options = question.options ?? const [];
-    final suggested = suggestion;
+    final suggested = widget.suggestion;
     final suggestedCode =
         suggested is CodedValue && options.contains(suggested.code) ? suggested.code : null;
     return Column(
@@ -284,19 +500,30 @@ class SingleChoiceAnswer extends StatelessWidget {
             language: language,
           ),
           onMatch: (m) =>
-              onAnswered(CodedValue(m.optionCode ?? ''), m.heardLabel ?? ''),
-          onDontKnow: onDontKnow,
+              widget.onAnswered(CodedValue(m.optionCode ?? ''), m.heardLabel ?? ''),
+          onDontKnow: widget.onDontKnow,
         ),
-        for (final option in options)
+        for (final option in options) ...[
           OptionTile(
             key: Key('option.$option'),
             label: labelFor(question, option, language),
-            selected: option == suggestedCode,
+            selected: option == kOtherOptionCode
+                ? _writingOther
+                : option == suggestedCode,
             // The label recorded is the text the patient actually read (§9),
             // which is why it is the localised one and not the code.
-            onTap: () => onAnswered(
-                CodedValue(option), labelFor(question, option, language)),
+            onTap: option == kOtherOptionCode
+                ? () => setState(() => _writingOther = true)
+                : () => widget.onAnswered(
+                    CodedValue(option), labelFor(question, option, language)),
           ),
+          if (option == kOtherOptionCode && _writingOther)
+            OtherEntry(
+              label: labelFor(question, option, language),
+              onSubmitted: (written) =>
+                  widget.onAnswered(const CodedValue(kOtherOptionCode), written),
+            ),
+        ],
       ],
     );
   }
@@ -366,6 +593,13 @@ class MultiChoiceAnswer extends StatefulWidget {
 class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
   final _chosen = <String>{};
 
+  /// What the patient wrote beside "Something else", or null.
+  ///
+  /// Not held in `_chosen`: the codes there are the question's own vocabulary
+  /// and free text is not one of them. It rides out as part of the recorded
+  /// `original_text` instead — Decision #3.
+  String? _otherText;
+
   /// True once the patient has touched a voice match or a tile. A suggestion
   /// that arrives after that point must not silently rewrite their own
   /// selection.
@@ -426,19 +660,47 @@ class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
           }),
           onDontKnow: widget.onDontKnow,
         ),
-        for (final option in options)
+        for (final option in options) ...[
           OptionTile(
             key: Key('option.$option'),
             label: labelFor(widget.question, option, widget.language),
             selected: _chosen.contains(option),
             onTap: () => setState(() {
               _touchedByPatient = true;
-              if (!_chosen.remove(option)) _chosen.add(option);
+              if (!_chosen.remove(option)) {
+                _chosen.add(option);
+              } else if (option == kOtherOptionCode) {
+                // Unticking "Something else" throws away what was written with
+                // it. Keeping the text after the option is gone would submit a
+                // description the patient has just withdrawn.
+                _otherText = null;
+              }
             }),
           ),
+          // Multi-select already has a Continue at the bottom, so this box has
+          // no button of its own: what is typed is held and travels with the
+          // rest of the selection when the patient confirms the lot.
+          if (option == kOtherOptionCode && _chosen.contains(option))
+            Padding(
+              padding: const EdgeInsets.only(bottom: Sizes.gap),
+              child: TextField(
+                key: const Key('answer.other_text'),
+                autofocus: true,
+                maxLines: 3,
+                minLines: 1,
+                textCapitalization: TextCapitalization.sentences,
+                style: Theme.of(context).textTheme.bodyLarge,
+                decoration: InputDecoration(
+                  labelText: labelFor(widget.question, option, widget.language),
+                ),
+                onChanged: (value) => _otherText = value.trim(),
+              ),
+            ),
+        ],
         const SizedBox(height: Sizes.gap),
-        FilledButton(
-          key: const Key('answer.confirm'),
+        ConfirmButton(
+          buttonKey: const Key('answer.confirm'),
+          label: strings.continueLabel,
           // Disabled while nothing is chosen. An empty multi-select submitted
           // as an answer would record "none of these" — which is a clinical
           // claim the patient did not make. If they mean none, the content
@@ -447,15 +709,24 @@ class _MultiChoiceAnswerState extends State<MultiChoiceAnswer> {
               ? null
               : () {
                   final chosen = _chosen.toList()..sort();
+                  // The patient's own words replace the word "Something else"
+                  // in the recorded text, and only there — the code list is
+                  // untouched, so nothing downstream sees a term the question
+                  // bank does not define.
+                  final written = _otherText;
+                  final labels = chosen.map((c) {
+                    final label = labelFor(widget.question, c, widget.language);
+                    return c == kOtherOptionCode &&
+                            written != null &&
+                            written.isNotEmpty
+                        ? written
+                        : label;
+                  });
                   widget.onAnswered(
                     CodedListValue(chosen),
-                    chosen
-                        .map((c) =>
-                            labelFor(widget.question, c, widget.language))
-                        .join(', '),
+                    labels.join(', '),
                   );
                 },
-          child: Text(strings.continueLabel),
         ),
       ],
     );
@@ -649,8 +920,9 @@ class _NumberAnswerState extends State<NumberAnswer> {
             ),
         ],
         const SizedBox(height: Sizes.gap),
-        FilledButton(
-          key: const Key('answer.confirm'),
+        ConfirmButton(
+          buttonKey: const Key('answer.confirm'),
+          label: strings.continueLabel,
           onPressed: _value == null
               ? null
               : () => widget.onAnswered(
@@ -662,7 +934,6 @@ class _NumberAnswerState extends State<NumberAnswer> {
                         ? _controller.text.trim()
                         : '${_controller.text.trim()} $_unit',
                   ),
-          child: Text(strings.continueLabel),
         ),
       ],
     );
@@ -868,15 +1139,15 @@ class _DurationAnswerState extends State<DurationAnswer> {
             }),
           ),
         const SizedBox(height: Sizes.gap),
-        FilledButton(
-          key: const Key('answer.confirm'),
+        ConfirmButton(
+          buttonKey: const Key('answer.confirm'),
+          label: strings.continueLabel,
           onPressed: n == null
               ? null
               : () => widget.onAnswered(
                     DurationValue(n: n, unit: _unit),
                     '${_controller.text.trim()} $_unit',
                   ),
-          child: Text(strings.continueLabel),
         ),
       ],
     );
@@ -933,15 +1204,15 @@ class _DateAnswerState extends State<DateAnswer> {
               : _chosen!.toIso8601String().split('T').first),
         ),
         const SizedBox(height: Sizes.gap),
-        FilledButton(
-          key: const Key('answer.confirm'),
+        ConfirmButton(
+          buttonKey: const Key('answer.confirm'),
+          label: strings.continueLabel,
           onPressed: _chosen == null
               ? null
               : () {
                   final iso = _chosen!.toIso8601String().split('T').first;
                   widget.onAnswered(DateValue(iso), iso);
                 },
-          child: Text(strings.continueLabel),
         ),
       ],
     );
@@ -1013,15 +1284,15 @@ class _FreeTextAnswerState extends State<FreeTextAnswer> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: Sizes.gap),
-        FilledButton(
-          key: const Key('answer.confirm'),
+        ConfirmButton(
+          buttonKey: const Key('answer.confirm'),
+          label: strings.continueLabel,
           onPressed: _controller.text.trim().isEmpty
               ? null
               : () {
                   final text = _controller.text.trim();
                   widget.onAnswered(TextValue(text), text);
                 },
-          child: Text(strings.continueLabel),
         ),
       ],
     );

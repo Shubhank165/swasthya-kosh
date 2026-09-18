@@ -11,12 +11,19 @@
 /// literate app user may still be an elderly relative filling the form for
 /// someone else, and consent is the screen where not understanding matters
 /// most.
+///
+/// **One switch per purpose, and it stays a switch.** The reference designs put
+/// a single tick at the bottom of a list of things being collected, which reads
+/// well and is exactly the pattern §11 rules out: the patient could not then
+/// agree to treatment while refusing research. The styling here follows the
+/// reference; the structure does not, and that difference is the decision.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 import '../core/theme.dart';
+import '../core/ui.dart';
 import '../l10n/strings.dart';
 
 /// One thing the patient is being asked to agree to.
@@ -101,25 +108,36 @@ class _ConsentScreenState extends State<ConsentScreen> {
     final optional = widget.purposes.where((p) => !p.required).toList();
 
     return Scaffold(
-      appBar: AppBar(title: Text(strings.consentTitle)),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(Sizes.gutter),
-          children: [
-            _heading(context, strings.consentRequiredHeading),
-            for (final purpose in required) _tile(purpose),
-            const SizedBox(height: Sizes.gutter),
-            _heading(context, strings.consentOptionalHeading),
-            for (final purpose in optional) _tile(purpose),
-            const SizedBox(height: Sizes.gutter),
-            FilledButton(
-              key: const Key('consent.continue'),
-              onPressed: _canProceed
-                  ? () => widget.onGranted(Set.unmodifiable(_granted))
-                  : null,
-              child: Text(strings.continueLabel),
+      appBar: AppBar(),
+      body: Garnish(
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              Sizes.gutter,
+              0,
+              Sizes.gutter,
+              Sizes.gutter,
             ),
-          ],
+            children: [
+              ScreenIntro(title: strings.consentTitle),
+              const SizedBox(height: Sizes.gutter),
+              _heading(context, strings.consentRequiredHeading),
+              for (final purpose in required) _tile(purpose, required: true),
+              const SizedBox(height: Sizes.gutter),
+              _heading(context, strings.consentOptionalHeading),
+              for (final purpose in optional) _tile(purpose, required: false),
+              const SizedBox(height: Sizes.gutter),
+              FilledButton(
+                key: const Key('consent.continue'),
+                onPressed: _canProceed
+                    ? () => widget.onGranted(Set.unmodifiable(_granted))
+                    : null,
+                child: Text(strings.continueLabel),
+              ),
+              const SizedBox(height: Sizes.gutter),
+              PrivacyNote(text: strings.dataProtected),
+            ],
+          ),
         ),
       ),
     );
@@ -129,20 +147,48 @@ class _ConsentScreenState extends State<ConsentScreen> {
         padding: const EdgeInsets.only(bottom: Sizes.gap),
         child: Semantics(
           header: true,
-          child: Text(text, style: Theme.of(context).textTheme.labelLarge),
+          child: Text(
+            text.toUpperCase(),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.1,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
         ),
       );
 
-  Widget _tile(ConsentPurpose purpose) {
+  Widget _tile(ConsentPurpose purpose, {required bool required}) {
     final strings = Strings.of(context);
-    return Card(
-      margin: const EdgeInsets.only(bottom: Sizes.gap),
-      child: Padding(
-        padding: const EdgeInsets.all(Sizes.gap),
+    final colors = Theme.of(context).colorScheme;
+    final granted = _granted.contains(purpose.code);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sizes.gap),
+      child: SoftCard(
+        padding: const EdgeInsets.all(Sizes.gap + 4),
+        // A granted purpose is outlined as well as tinted. Colour alone is not
+        // an acceptable way to show somebody what they have agreed to.
+        borderColor: granted ? colors.primary : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(purpose.text, style: Theme.of(context).textTheme.bodyLarge),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconChip(
+                  icon: required ? Icons.shield_outlined : Icons.science_outlined,
+                  size: 40,
+                ),
+                const SizedBox(width: Sizes.gap),
+                Expanded(
+                  child: Text(
+                    purpose.text,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: Sizes.gap),
             Row(
               children: [
@@ -156,7 +202,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
                 const Spacer(),
                 Switch(
                   key: Key('consent.switch.${purpose.code}'),
-                  value: _granted.contains(purpose.code),
+                  value: granted,
                   onChanged: (on) => setState(() {
                     if (on) {
                       _granted.add(purpose.code);

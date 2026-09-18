@@ -14,6 +14,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/providers.dart';
 import '../core/theme.dart';
 import '../l10n/strings.dart';
 import 'documents_tab.dart';
@@ -29,11 +30,13 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  int _index = 0;
-
   @override
   Widget build(BuildContext context) {
     final strings = Strings.of(context);
+    // Read from a provider, not a field: a card on the home tab can send the
+    // patient to Documents, and a tab bar that only its own taps could move
+    // made that impossible without duplicating the destination.
+    final index = ref.watch(homeTabIndexProvider);
     return Scaffold(
       // `IndexedStack`, not a rebuild per tap: a half-scrolled document list
       // should still be half-scrolled when the patient comes back to it, and
@@ -41,7 +44,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       // profile.
       body: SafeArea(
         child: IndexedStack(
-          index: _index,
+          index: index,
           children: const [
             HomeTab(),
             DocumentsTab(),
@@ -51,8 +54,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         ),
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        selectedIndex: index,
+        onDestinationSelected: (i) =>
+            ref.read(homeTabIndexProvider.notifier).state = i,
         // Labels always shown. §14: an icon alone is a guess for a patient who
         // reads Devanagari and has never used this app before, and the tab bar
         // is the one control on screen at all times.

@@ -84,10 +84,42 @@ class _MediKioskAppState extends ConsumerState<MediKioskApp> {
       locale: Locale(language),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      // No bounce, no stretch — see [_StillScrollBehavior].
+      scrollBehavior: const _StillScrollBehavior(),
       // The OS text-scale setting is respected up to 200% (§14). Clamped at the
       // top so the "I don't know" affordance cannot be pushed off screen.
       builder: (context, child) => withClampedTextScale(context, child!),
       home: const Root(),
     );
   }
+}
+
+
+/// Scrolling that stays still at the ends.
+///
+/// Android's Material 3 default is `StretchingOverscrollIndicator`: drag past
+/// the end of a list and the whole page visibly squashes and springs back. On a
+/// screen holding a clinical question that reads as the app glitching, and on
+/// the AYUSH assessment — sixty-two questions, each one a short list that sits
+/// just under the fold — it fires on almost every swipe.
+///
+/// So: clamped physics, and no overscroll indicator at all. The trade is that
+/// there is no longer a visual signal for "this is the end of the list". That
+/// is acceptable here because no list in this app is long enough for the end to
+/// be a surprise, and because the alternative moves the question the patient is
+/// reading.
+class _StillScrollBehavior extends MaterialScrollBehavior {
+  const _StillScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const ClampingScrollPhysics();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) =>
+      child;
 }
