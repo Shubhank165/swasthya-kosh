@@ -302,6 +302,18 @@ class IntakeFlow extends ChangeNotifier {
 
   (int, int) get sectionProgress => walker.sectionProgress;
 
+  /// The fraction the progress bar fills to — see [IntakeWalker.questionFraction].
+  ///
+  /// Separate from [sectionProgress] on purpose: the label counts sections
+  /// because that is a number a patient can verify, and the bar measures
+  /// questions because that is what makes it move.
+  double get questionFraction => walker.questionFraction;
+
+  /// Where [questionId] sits in its section — see [IntakeWalker.sectionStepFor].
+  ({String section, int position, int total, bool stable})? sectionStepFor(
+          String questionId) =>
+      walker.sectionStepFor(questionId);
+
   /// Whether back is offered — §5, "back always available".
   ///
   /// Except after a red flag, where the walker refuses to retract and this is

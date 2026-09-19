@@ -270,4 +270,72 @@ void main() {
       expect(m.intent, SpokenIntent.none);
     });
   });
+
+  group('confidence decides whether the patient is asked', () {
+    // The gate that stands between "the recogniser produced something" and
+    // "a clinician reads this as what the patient said".
+    test('an exact option is certain and goes straight in', () {
+      final m = matchOption(
+        transcript: 'burning pain',
+        optionCodes: const ['burning', 'stabbing'],
+        labelFor: labels({'burning': 'Burning pain', 'stabbing': 'Stabbing pain'}),
+        language: 'en',
+      );
+      expect(m.intent, SpokenIntent.option);
+      expect(m.optionCode, 'burning');
+      expect(m.certain, isTrue);
+    });
+
+    test('a match over the floor but under the bar asks first', () {
+      // The whole reason the gate exists: a real candidate, not a safe one.
+      final m = matchOption(
+        transcript: 'burning',
+        optionCodes: const ['burning', 'stabbing'],
+        labelFor: labels({
+          'burning': 'Burning pain that comes and goes',
+          'stabbing': 'Stabbing pain',
+        }),
+        language: 'en',
+      );
+      expect(m.intent, SpokenIntent.option);
+      expect(m.confidence, isNotNull);
+      expect(m.confidence, greaterThanOrEqualTo(kMatchFloor));
+      expect(m.certain, m.confidence! >= kMatchConfident);
+    });
+
+    test('a parsed number makes no claim, so it is never certain', () {
+      // Parsing is not hearing. "sixteen" clipped to "six" parses perfectly.
+      final m = matchNumber(
+        transcript: 'six',
+        language: 'en',
+        minimum: 1,
+        maximum: 10,
+      );
+      expect(m.intent, SpokenIntent.option);
+      expect(m.number, 6);
+      expect(m.confidence, isNull);
+      expect(m.certain, isFalse,
+          reason: 'no score is not the same statement as no doubt');
+    });
+
+    test('yes and no are certain — containment, not similarity', () {
+      for (final word in ['yes', 'no']) {
+        final m = matchYesNo(transcript: word, language: 'en');
+        expect(m.certain, isTrue, reason: word);
+      }
+    });
+
+    test('dictation is certain because the text box is the confirmation', () {
+      final m = matchDictation(transcript: 'it started two days ago', language: 'en');
+      expect(m.certain, isTrue);
+      expect(m.heardLabel, 'it started two days ago');
+    });
+
+    test('the bar sits above the floor', () {
+      // If these ever cross, every match is either discarded or waved through
+      // and the confirmation step silently stops existing.
+      expect(kMatchConfident, greaterThan(kMatchFloor));
+      expect(kMatchConfident, lessThanOrEqualTo(1.0));
+    });
+  });
 }

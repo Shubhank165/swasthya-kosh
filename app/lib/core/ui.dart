@@ -357,41 +357,106 @@ class ActionTile extends StatelessWidget {
 
 /// How far through a run of questions the patient is.
 ///
-/// **Sections and counts, never a percentage.** A percentage implies a
-/// precision the branching does not have: answering "chest pain" adds twenty
-/// questions and would make progress go backwards. The bar is a rough shape;
-/// the label beside it is the honest number, and it is the one a patient reads.
-class StepProgress extends StatelessWidget {
+/// **The label counts, the bar estimates, and they are allowed to disagree.**
+/// The label is a number the patient can check against the screen — "Section 2
+/// of 3" — so it stays a count and never becomes a percentage: the branching
+/// has no percentage in it to be honest about. The bar is a shape, and a shape
+/// that only changes when a section closes stands still through eight
+/// questions and then jumps, which reads as a frozen app. So [value] lets the
+/// caller drive the fill from something finer-grained than the label, and the
+/// interview does exactly that.
+///
+/// **[monotonic] is the safety catch.** The intake plan grows when the chief
+/// complaint picks a branch, and it shrinks again if the patient goes back and
+/// changes it. Neither is something a progress bar may show. With the flag set
+/// this widget remembers the fullest it has ever drawn for this run and
+/// refuses to draw less; the worst it will do is pause.
+class StepProgress extends StatefulWidget {
   const StepProgress({
     super.key,
     required this.label,
     required this.done,
     required this.total,
+    this.value,
+    this.monotonic = false,
   });
 
+  /// The sentence under the bar, and the only thing a screen reader announces.
   final String label;
+
   final int done;
   final int total;
 
+  /// Fill fraction, 0-1, overriding `done / total` for the bar alone. Null for
+  /// a run of fixed length, where the count *is* the progress.
+  final double? value;
+
+  /// Never draw less than has already been drawn. See the class docstring.
+  final bool monotonic;
+
+  @override
+  State<StepProgress> createState() => _StepProgressState();
+}
+
+class _StepProgressState extends State<StepProgress> {
+  /// The high-water mark. Only ever assigned the larger of itself and the
+  /// incoming target, which is the whole of the monotonic guarantee.
+  late double _shown = _target;
+
+  double get _target {
+    final raw = widget.value ??
+        (widget.total <= 0 ? 0.0 : widget.done / widget.total);
+    return raw.clamp(0.0, 1.0);
+  }
+
+  @override
+  void didUpdateWidget(StepProgress old) {
+    super.didUpdateWidget(old);
+    _shown = widget.monotonic ? math.max(_shown, _target) : _target;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final value = total <= 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
+    final colors = Theme.of(context).colorScheme;
+    // Someone who has asked the system to stop animating has asked for a
+    // reason, and a bar sliding under a question they are trying to read is
+    // exactly the kind of movement they turned off (2/3 s14).
+    final still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
+    Widget bar(double value) => ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: value,
+            minHeight: 10,
+            backgroundColor: Palette.tintStrong,
+            valueColor: AlwaysStoppedAnimation(colors.primary),
+          ),
+        );
+
     return Semantics(
       // The bar is decoration; this sentence is what a screen reader announces.
-      label: label,
+      label: widget.label,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(value: value),
-          ),
+          if (still)
+            bar(_shown)
+          else
+            // Eases from wherever it currently sits to the new value - the
+            // movement is what tells the patient the tap registered, so it is
+            // slow enough to notice and short enough not to be in the way.
+            TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: _shown),
+              duration: const Duration(milliseconds: 420),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, _) => bar(value),
+            ),
           const SizedBox(height: 8),
           ExcludeSemantics(
             child: Text(
-              label,
+              widget.label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                   ),
             ),
           ),

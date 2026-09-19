@@ -355,4 +355,29 @@ class ContentBundle {
   bool get isUsable =>
       supportedSchemaVersions.contains(schemaVersion) &&
       supportedBundleFormats.contains(bundleFormat);
+
+  /// Whether every question tagged with [section] is in [core] — i.e. every
+  /// patient who reaches this section sees the same number of questions in it,
+  /// regardless of which chief complaint sent them there.
+  ///
+  /// **A section can carry both core and branch-only questions at once,** and
+  /// when it does, how many questions it holds is a fact about the branch, not
+  /// about the section. "Where is the pain" and its five follow-ups belong to
+  /// `symptoms` the same as three fixed screening questions do, so the section
+  /// the walker's `plan` builds for a chest-pain complaint can be many times
+  /// the length of the one it builds for a sore throat. A label reading
+  /// "Your symptoms · 44/63" is true for exactly the complaint that produced
+  /// it and wrong, by a wide margin, for the next patient — the same
+  /// dishonesty §5 already rules out for a bare percentage, arrived at a
+  /// different way. Callers building a position-out-of-total label for a
+  /// section check here first, and show the section name alone when this is
+  /// false: the count is not a number this app can stand behind.
+  bool sectionCountIsStable(String section) {
+    final inCore = core.toSet();
+    for (final entry in questions.entries) {
+      if (entry.value.section != section) continue;
+      if (!inCore.contains(entry.key)) return false;
+    }
+    return true;
+  }
 }

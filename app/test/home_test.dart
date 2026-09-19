@@ -38,15 +38,22 @@ Widget wrap(Widget child, List<Override> overrides) => ProviderScope(
     );
 
 /// The three things `Root` reads, plus the two tabs that fetch.
+///
+/// `onboardingSeen` defaults to `true` — "already seen the first-run demo" —
+/// so every test written before that demo existed keeps landing straight on
+/// the language screen it always expected, and only the tests that are
+/// actually about the demo need to say otherwise.
 List<Override> edges({
   String? storedLanguage = 'en',
   bool signedIn = true,
+  bool onboardingSeen = true,
   List<Visit> visits = const [],
   List<PatientDocument> documents = const [],
 }) =>
     [
       storedLanguageProvider.overrideWith((ref) async => storedLanguage),
       signedInProvider.overrideWith((ref) async => signedIn),
+      onboardingSeenProvider.overrideWith((ref) async => onboardingSeen),
       visitsProvider.overrideWith((ref) async => visits),
       patientDocumentsProvider.overrideWith((ref) async => documents),
       resumableDraftProvider.overrideWith((ref) async => null),
@@ -55,17 +62,63 @@ List<Override> edges({
 
 void main() {
   group('Root sends the patient to the right screen', () {
-    testWidgets('a first run welcomes, then asks for a language',
+    testWidgets(
+        'a first run welcomes, then demos, then asks for a language',
         (tester) async {
       // Stage 5 put a welcome screen in front of the chooser. It is not a
       // second question: its only control opens the chooser, and the chooser
-      // is still the first thing the patient *answers*.
-      await tester.pumpWidget(wrap(const Root(), edges(storedLanguage: null)));
+      // is still the first thing the patient *answers*. A genuine first run
+      // — no language stored, and the first-run demo never shown either —
+      // now opens the demo screen in between, exactly once.
+      await tester.pumpWidget(wrap(
+        const Root(),
+        edges(storedLanguage: null, onboardingSeen: false),
+      ));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('welcome.start')), findsOneWidget);
       expect(find.byKey(const Key('language.hi')), findsNothing);
 
       await tester.tap(find.byKey(const Key('welcome.start')));
+      await tester.pumpAndSettle();
+      // The demo, not the chooser, is what a genuine first run sees next.
+      expect(find.byKey(const Key('onboarding.getStarted')), findsOneWidget);
+      expect(find.byKey(const Key('language.hi')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('onboarding.getStarted')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('language.hi')), findsOneWidget);
+    });
+
+    testWidgets(
+        'a device that has already seen the demo goes straight to the '
+        'language screen',
+        (tester) async {
+      // No language stored yet — a patient can reach this screen without
+      // ever finishing the chooser — but the demo has already played once on
+      // this device. It must not play a second time.
+      await tester.pumpWidget(wrap(
+        const Root(),
+        edges(storedLanguage: null, onboardingSeen: true),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('welcome.start')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('language.hi')), findsOneWidget);
+      expect(find.byKey(const Key('onboarding.getStarted')), findsNothing);
+    });
+
+    testWidgets('skipping the demo reaches the language screen just the same',
+        (tester) async {
+      await tester.pumpWidget(wrap(
+        const Root(),
+        edges(storedLanguage: null, onboardingSeen: false),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('welcome.start')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('onboarding.skip')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('language.hi')), findsOneWidget);
     });

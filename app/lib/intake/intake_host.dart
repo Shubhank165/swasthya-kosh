@@ -16,7 +16,9 @@ import '../documents/documents_screen.dart';
 import '../documents/prepare.dart';
 import '../l10n/strings.dart';
 import 'flow.dart';
+import 'widgets/interview_ui.dart';
 import 'screens/complaint_screen.dart';
+import 'screens/intro_screen.dart';
 import 'screens/question_screen.dart';
 import 'screens/review_screen.dart';
 import 'screens/submitted_screen.dart';
@@ -32,6 +34,13 @@ class IntakeHost extends ConsumerStatefulWidget {
 }
 
 class _IntakeHostState extends ConsumerState<IntakeHost> {
+  // Shown once, before the first question this flow ever offers — see
+  // `IntakeGreetingScreen`. A field rather than anything on `IntakeFlow`
+  // itself: it is purely which screen to draw, never a fact about the
+  // interview's progress, and does not belong in the state §15's tests
+  // exercise with no widget tree at all.
+  bool _greetingShown = false;
+
   @override
   Widget build(BuildContext context) {
     final flow = widget.flow;
@@ -105,8 +114,44 @@ class _IntakeHostState extends ConsumerState<IntakeHost> {
   }
 
   Widget _question(IntakeFlow flow) {
+    // Said once, on a screen of its own, before any question — including the
+    // chief-complaint screen, whichever shape that turns out to be. `!flow
+    // .canGoBack` is the same "nowhere to go back to" test the walker already
+    // uses to mean "the first question"; reusing it here is what keeps this
+    // screen from disagreeing with `flow` about which question that is.
+    if (!flow.canGoBack && !_greetingShown) {
+      return IntakeGreetingScreen(
+        language: flow.language,
+        // Only ever used to greet them. It is held on the device and never
+        // travels with the intake — see `DisplayNameStore`.
+        patientName: ref.watch(displayNameProvider).valueOrNull,
+        onContinue: () => setState(() => _greetingShown = true),
+      );
+    }
+
+    final strings = Strings.of(context);
     final question = flow.question!;
     final (done, total) = flow.sectionProgress;
+
+    // "Health history · 3/8", when this app has a name for the section *and*
+    // the section's count is stable — see `ContentBundle.sectionCountIsStable`.
+    // `symptoms` is not: it carries both a fixed screening set and whatever
+    // follow-ups the chosen complaint adds, so its total is a fact about the
+    // branch, not the section, and swings widely between patients. There the
+    // label is the section name alone — "Your symptoms", no count — and the
+    // bar above it (driven by `questionFraction`, not this label) is still
+    // doing its job. A bundle can also carry a section id nobody has written a
+    // name for yet, and in that case the label stays the plain section count
+    // rather than showing a patient an internal identifier.
+    String? stepLabel;
+    final step = flow.sectionStepFor(question.questionId);
+    if (step != null) {
+      final name = sectionDisplayName(strings, step.section);
+      if (name != null) {
+        stepLabel =
+            step.stable ? strings.sectionStep(name, step.position, step.total) : name;
+      }
+    }
 
     // The chief complaint gets the icon grid (§5 screen 6) — it is the first
     // clinical question and the one that decides the branch, so it is the one
@@ -127,6 +172,8 @@ class _IntakeHostState extends ConsumerState<IntakeHost> {
       onSkip: flow.skip,
       sectionsDone: done,
       sectionsTotal: total,
+      progress: flow.questionFraction,
+      stepLabel: stepLabel,
       onBack: flow.canGoBack ? flow.back : null,
       suggestion: flow.suggestionFor(question.fieldId),
     );

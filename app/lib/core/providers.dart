@@ -330,6 +330,20 @@ final storedReadAloudProvider = FutureProvider<bool?>(
   (ref) => ref.watch(readAloudPrefStoreProvider).read(),
 );
 
+/// Where whether the first-run demo has already been shown is remembered
+/// between launches — see `home/onboarding_demo_screen.dart` and
+/// `OnboardingStore`.
+final onboardingStoreProvider =
+    Provider<OnboardingStore>((ref) => OnboardingStore());
+
+/// `false` until the demo has actually been shown once, on this device.
+/// `Root` does not read this directly — the demo sits between the existing
+/// Welcome and Language screens, not in `Root`'s own dispatch, so
+/// `welcome_screen.dart` is what checks it.
+final onboardingSeenProvider = FutureProvider<bool>(
+  (ref) => ref.watch(onboardingStoreProvider).read(),
+);
+
 /// The hospital the patient picked (§5 screen 2).
 final selectedHospitalProvider = StateProvider<Hospital?>((ref) => null);
 

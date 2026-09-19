@@ -229,6 +229,47 @@ class ReadAloudPrefStore {
 }
 
 
+/// Whether the first-run demo has been shown, on this device and nowhere
+/// else — see `home/onboarding_demo_screen.dart`.
+///
+/// Deliberately its own flag rather than reusing "a language has been
+/// stored" the way the welcome screen does. The demo sits between Welcome and
+/// Language, and a patient who backs out of it partway through, or who signs
+/// out and back in, must still not be shown it a second time — the flag has
+/// to survive both, which "no language chosen yet" and "no session" do not.
+///
+/// Like [ReadAloudPrefStore], this is a device preference, not patient data:
+/// it is **not** cleared on sign-out. A demo shown once on a shared kiosk
+/// phone has done its job for every patient who picks that phone up next.
+class OnboardingStore {
+  OnboardingStore({FlutterSecureStorage? storage})
+      : _storage = storage ??
+            const FlutterSecureStorage(
+              aOptions: AndroidOptions(encryptedSharedPreferences: true),
+            );
+
+  static const _key = 'medikiosk.ui.onboarding_seen';
+
+  final FlutterSecureStorage _storage;
+
+  /// `false` for a genuine first run and for a keystore that could not be
+  /// read — an unreadable preference must fail toward showing the demo once
+  /// more, never toward silently skipping it forever.
+  Future<bool> read() async {
+    try {
+      return await _storage.read(key: _key) == 'true';
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<void> markSeen() async {
+    try {
+      await _storage.write(key: _key, value: 'true');
+    } on Object {/* best effort — worst case the demo shows again */}
+  }
+}
+
 /// What the patient would like to be called, on this device and nowhere else.
 ///
 /// **The backend has no name column and this does not give it one.** §7.1 holds

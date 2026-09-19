@@ -29,6 +29,7 @@ class SpokenMatch {
     this.heardLabel,
     this.number,
     this.unit,
+    this.confidence,
   });
 
   final SpokenIntent intent;
@@ -48,6 +49,22 @@ class SpokenMatch {
   /// who says "hundred and one" on a screen already set to Fahrenheit has not
   /// changed their mind about the scale.
   final String? unit;
+
+  /// How well the transcript matched, 0-1, or **null when there is no score to
+  /// report** — a parsed number either parsed or it did not, and a "don't know"
+  /// phrase either appeared or it did not.
+  ///
+  /// Null is not "perfect". It means the matcher has no basis for a claim, and
+  /// [certain] reads it that way on purpose.
+  final double? confidence;
+
+  /// Whether this match is good enough to record without asking.
+  ///
+  /// **Null confidence is not certain.** The alternative — treating "no score"
+  /// as "no doubt" — would let a pain score of 6 heard as 10 go straight into
+  /// the record with nothing on screen for the patient to catch it on. A
+  /// matcher that cannot score itself gets the confirmation step.
+  bool get certain => confidence != null && confidence! >= kMatchConfident;
 
   static const none = SpokenMatch(SpokenIntent.none);
 }
@@ -169,6 +186,18 @@ int _levenshtein(String a, String b) {
 /// onto the nearest option.
 const double kMatchFloor = 0.6;
 
+/// Above this, a match is recorded on the spot; between here and [kMatchFloor]
+/// the patient is shown what was understood first.
+///
+/// The gap between the two thresholds is the whole point. Below the floor the
+/// app says it did not catch that, which a patient reads as the app's failure
+/// and simply repeats. In the band above it the app has a real candidate but
+/// not a safe one, and the honest thing is neither to discard it nor to record
+/// it — it is to show it: "I heard: burning pain. Correct?" One tap either way,
+/// and a wrong guess costs the patient a second rather than reaching a
+/// clinician as a fact.
+const double kMatchConfident = 0.82;
+
 /// Resolve [transcript] against a choice question's options.
 ///
 /// [labelFor] returns the displayed label for an option code in the patient's
@@ -200,7 +229,7 @@ SpokenMatch matchOption({
 
   if (bestCode != null && bestScore >= kMatchFloor) {
     return SpokenMatch(SpokenIntent.option,
-        optionCode: bestCode, heardLabel: bestLabel);
+        optionCode: bestCode, heardLabel: bestLabel, confidence: bestScore);
   }
   return SpokenMatch.none;
 }
@@ -218,7 +247,11 @@ SpokenMatch matchDictation({
   if (_containsPhrase(transcript, _dontKnowPhrases[language] ?? const [])) {
     return const SpokenMatch(SpokenIntent.dontKnow);
   }
-  return SpokenMatch(SpokenIntent.option, heardLabel: text);
+  // Confidence 1.0, and it is not a lie: there is nothing here the matcher
+  // could have got wrong, because it did not decide anything. The words go into
+  // a text box the patient reads and edits before Continue, which is a better
+  // confirmation than a card asking them to agree with a sentence.
+  return SpokenMatch(SpokenIntent.option, heardLabel: text, confidence: 1);
 }
 
 // --- numbers -----------------------------------------------------------------
@@ -402,6 +435,10 @@ SpokenMatch matchNumber({
   for (final candidate in _numbersIn(transcript)) {
     if (minimum != null && candidate < minimum) continue;
     if (maximum != null && candidate > maximum) continue;
+    // **No confidence, deliberately.** Parsing succeeded, but parsing is not
+    // hearing: "sixteen" clipped to "six" parses perfectly and is a different
+    // pain score. There is no similarity to measure here, so the matcher makes
+    // no claim and the patient is shown what was understood.
     return SpokenMatch(
       SpokenIntent.option,
       number: candidate,
@@ -446,12 +483,18 @@ SpokenMatch matchYesNo({required String transcript, required String language}) {
   if (_containsPhrase(transcript, _dontKnowPhrases[language] ?? const [])) {
     return const SpokenMatch(SpokenIntent.dontKnow);
   }
+  // Confidence 1.0: this is whole-word containment against a short literal
+  // table, not a similarity score. Either the word "no" was in the transcript
+  // or it was not — there is no near-miss to warn the patient about, and making
+  // them confirm a yes would be asking them to answer the same question twice.
   final table = _yesNo[language] ?? _yesNo['en']!;
   if (_containsPhrase(transcript, table[false] ?? const [])) {
-    return const SpokenMatch(SpokenIntent.option, optionCode: 'no', heardLabel: 'no');
+    return const SpokenMatch(SpokenIntent.option,
+        optionCode: 'no', heardLabel: 'no', confidence: 1);
   }
   if (_containsPhrase(transcript, table[true] ?? const [])) {
-    return const SpokenMatch(SpokenIntent.option, optionCode: 'yes', heardLabel: 'yes');
+    return const SpokenMatch(SpokenIntent.option,
+        optionCode: 'yes', heardLabel: 'yes', confidence: 1);
   }
   return SpokenMatch.none;
 }

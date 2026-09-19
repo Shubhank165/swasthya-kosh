@@ -27,6 +27,7 @@ import '../../core/ui.dart';
 import '../../l10n/strings.dart';
 import '../../voice/listen_button.dart';
 import '../../voice/option_match.dart';
+import 'interview_ui.dart';
 
 /// What a renderer hands back when the patient answers.
 typedef OnAnswered = void Function(AnswerValue value, String originalText);
@@ -529,15 +530,28 @@ class _SingleChoiceAnswerState extends State<SingleChoiceAnswer> {
   }
 }
 
-/// The [ListenButton] plus the glue that turns a [SpokenMatch] into the same
-/// callbacks a tap would fire. Renders nothing at all when voice is
-/// unavailable, so a choice question looks exactly as it did before.
-class _VoiceRow extends StatelessWidget {
+/// The [ListenButton], plus the gate between hearing something and recording
+/// it. Renders nothing at all when voice is unavailable, so a choice question
+/// looks exactly as it did before.
+///
+/// **A confident match is recorded on the spot; anything less is shown first.**
+/// Before this, every match above [kMatchFloor] became a clinical answer the
+/// instant the recogniser returned, and the screen moved on — so a patient who
+/// said "burning pain" and was heard as "back pain" had no moment in which to
+/// notice, and a clinician read the wrong symptom as though the patient had
+/// typed it. The band between [kMatchFloor] and [kMatchConfident] is exactly
+/// the set of guesses good enough to offer and not good enough to assume, and
+/// that band now costs one tap instead of a wrong record.
+///
+/// A [SpokenMatch] with no confidence at all — a parsed number, a duration —
+/// lands in the same place, because "I did not measure" is not "I am sure".
+class _VoiceRow extends StatefulWidget {
   const _VoiceRow({
     required this.language,
     required this.matcher,
     required this.onMatch,
     this.onDontKnow,
+    this.selfConfirming = false,
   });
 
   final String language;
@@ -548,21 +562,94 @@ class _VoiceRow extends StatelessWidget {
   final void Function(SpokenMatch match) onMatch;
   final VoidCallback? onDontKnow;
 
+  /// True when [onMatch] does not itself record an answer — it fills an
+  /// editable field the patient still has to read, correct if needed, and
+  /// press Continue on. [NumberAnswer] and [DurationAnswer] are built this way
+  /// on purpose: "voice fills the box; it does not answer the question" is
+  /// the comment on that widget, and it predates this gate.
+  ///
+  /// With this true, [onMatch] fires on every match regardless of
+  /// [SpokenMatch.certain] — the box-and-Continue *is* the confirmation, and a
+  /// card on top of it would ask the patient to confirm the same figure twice.
+  /// [ScaleAnswer] leaves this false: it records straight from the match with
+  /// no field in between, which is exactly the case the heard card exists for.
+  final bool selfConfirming;
+
   @override
-  Widget build(BuildContext context) => ListenButton(
-        language: language,
-        matcher: matcher,
-        onResult: (match) {
-          switch (match.intent) {
-            case SpokenIntent.option:
-              onMatch(match);
-            case SpokenIntent.dontKnow:
-              onDontKnow?.call();
-            case SpokenIntent.none:
-              break;
-          }
-        },
-      );
+  State<_VoiceRow> createState() => _VoiceRowState();
+}
+
+class _VoiceRowState extends State<_VoiceRow> {
+  /// A match heard but not yet accepted. Non-null exactly while the heard card
+  /// is on screen.
+  SpokenMatch? _pending;
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = _pending;
+    // Set by the question screen — every question now, not only the first.
+    final prominent = ProminentVoice.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ListenButton(
+          language: widget.language,
+          prominent: prominent,
+          matcher: widget.matcher,
+          onResult: (match) {
+            switch (match.intent) {
+              case SpokenIntent.option:
+                if (widget.selfConfirming || match.certain) {
+                  widget.onMatch(match);
+                } else {
+                  setState(() => _pending = match);
+                }
+              case SpokenIntent.dontKnow:
+                // Not gated. "I don't know" is matched by literal containment,
+                // and it records an absence rather than a finding — the two
+                // reasons the gate exists do not apply.
+                widget.onDontKnow?.call();
+              case SpokenIntent.none:
+                break;
+            }
+          },
+        ),
+        // Sits between the hero microphone and the options it is offered
+        // alongside, so the patient reads "or" before they read the first
+        // option. Without it a screen with a 112dp microphone at the top looks
+        // like a screen that wants to be spoken to.
+        if (prominent && pending == null) ...[
+          const SizedBox(height: Sizes.gap + 2),
+          Text(
+            Strings.of(context).voiceOrChoose,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: Sizes.gap),
+        ],
+        if (pending != null) ...[
+          const SizedBox(height: Sizes.gap),
+          HeardCard(
+            key: const Key('voice.heard'),
+            heard: pending.heardLabel ?? '',
+            language: widget.language,
+            onCorrect: () {
+              setState(() => _pending = null);
+              widget.onMatch(pending);
+            },
+            // Clearing is the whole of "Change". The options are still on the
+            // screen underneath and the microphone is still there, so the
+            // patient's next move — tap or speak — is the correction. Opening a
+            // text box here would make changing a misheard word harder than
+            // saying it again.
+            onChange: () => setState(() => _pending = null),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 class MultiChoiceAnswer extends StatefulWidget {
@@ -882,6 +969,8 @@ class _NumberAnswerState extends State<NumberAnswer> {
             maximum: widget.question.maximum,
             units: widget.question.units ?? const [],
           ),
+          // The box below is the confirmation — see [_VoiceRow.selfConfirming].
+          selfConfirming: true,
           onMatch: (m) => setState(() {
             _touchedByPatient = true;
             final n = m.number!;
@@ -981,9 +1070,11 @@ class _ScaleAnswerState extends State<ScaleAnswer> {
       children: [
         if (suggestedValue != null && suggestedValue >= min && suggestedValue <= max)
           const SuggestionBadge(),
-        // A spoken score answers outright, unlike the free-figure questions:
-        // the scale is bounded and whole, so "six" either lands on a button
-        // that is on screen or is not a match at all.
+        // Unlike the free-figure questions above, there is no text field here
+        // for the patient to read a spoken score back from before Continue —
+        // this records straight from the match. `matchNumber` never claims
+        // confidence (see its docstring), so a spoken score always goes
+        // through the heard card first; a tap on Correct is what answers it.
         _VoiceRow(
           language: widget.language,
           matcher: (t) => matchNumber(
@@ -1026,6 +1117,15 @@ class _ScaleAnswerState extends State<ScaleAnswer> {
                 ),
               ),
           ],
+        ),
+        const SizedBox(height: Sizes.gap + 2),
+        // Why a 1-10 question is being asked at all. A number with no stated
+        // purpose reads as a test the patient can fail; saying who reads it and
+        // what for is the difference between a form and a conversation. The
+        // sentence is about the form, never about what the number means (§8).
+        QuietNote(
+          icon: Icons.lightbulb_outline,
+          text: Strings.of(context).scaleWhyThisHelps,
         ),
       ],
     );
@@ -1113,6 +1213,8 @@ class _DurationAnswerState extends State<DurationAnswer> {
             language: widget.language,
             units: _units,
           ),
+          // The box below is the confirmation — see [_VoiceRow.selfConfirming].
+          selfConfirming: true,
           onMatch: (m) => setState(() {
             _touchedByPatient = true;
             _controller.text = m.number!.round().toString();

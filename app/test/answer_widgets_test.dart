@@ -578,14 +578,24 @@ void main() {
       expect(find.text('fahrenheit'), findsWidgets);
     });
 
-    testWidgets('a spoken score answers a scale outright', (tester) async {
+    testWidgets(
+        'a spoken score is offered back, then answers the scale outright',
+        (tester) async {
+      // Scale has no text field to edit, unlike its numeric siblings above —
+      // it records straight from the match, which is exactly the case
+      // `_VoiceRow`'s heard-card gate exists for. `matchNumber` never claims
+      // confidence (see its docstring), so this always asks first; the
+      // gated-versus-immediate distinction is covered from the gate's side in
+      // "an unsure voice match is offered before it is recorded" below.
       await pumpWithVoice(tester, q('scale', min: 0, max: 10), 'about six');
       expect(find.byKey(const Key('question.listen')), findsOneWidget);
       expect(captured, isNull, reason: 'nothing recorded before the mic ran');
       await speak(tester);
-      // A bounded whole-number scale is the one numeric question where a
-      // spoken value either lands on a button that is on screen or is not a
-      // match — so it answers, rather than filling a box to confirm.
+      expect(captured, isNull, reason: 'offered back before it is recorded');
+      expect(find.byKey(const Key('voice.heard')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('heard.correct')));
+      await tester.pumpAndSettle();
       expect((captured! as ScaleValue).value, 6);
       expect(capturedText, '6');
     });
@@ -643,4 +653,112 @@ Future<(AnswerValue?, String?)> pumpAnswerWith(
   await tester.tap(find.byKey(const Key('answer.confirm')));
   await tester.pumpAndSettle();
   return (captured, capturedText);
+
+  group('an unsure voice match is offered before it is recorded', () {
+    // Before the gate, any match over the floor became an answer the instant
+    // the recogniser returned and the screen moved on. A patient heard wrongly
+    // had no moment in which to notice.
+    testWidgets('a scale heard by voice waits for Correct', (tester) async {
+      AnswerValue? captured;
+      await tester.pumpWidget(ProviderScope(
+        overrides: [transcriberProvider.overrideWithValue(FakeTranscriber('six'))],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildTheme(),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: buildAnswerWidget(
+                question: q('scale', min: 1, max: 10),
+                onAnswered: (value, _) => captured = value,
+              )!,
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await speak(tester);
+
+      // Heard, shown, and *not* recorded.
+      expect(find.byKey(const Key('voice.heard')), findsOneWidget);
+      expect(captured, isNull,
+          reason: 'a number the matcher cannot score must not self-record');
+
+      await tester.tap(find.byKey(const Key('heard.correct')));
+      await tester.pumpAndSettle();
+      expect(captured, isA<ScaleValue>());
+      expect((captured! as ScaleValue).value, 6);
+    });
+
+    testWidgets('Change discards it and records nothing', (tester) async {
+      AnswerValue? captured;
+      await tester.pumpWidget(ProviderScope(
+        overrides: [transcriberProvider.overrideWithValue(FakeTranscriber('six'))],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildTheme(),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: buildAnswerWidget(
+                question: q('scale', min: 1, max: 10),
+                onAnswered: (value, _) => captured = value,
+              )!,
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await speak(tester);
+      await tester.tap(find.byKey(const Key('heard.change')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('voice.heard')), findsNothing);
+      expect(captured, isNull);
+      // The numbers are still there — changing an answer means tapping one, not
+      // being sent somewhere else.
+      expect(find.byKey(const Key('scale.6')), findsOneWidget);
+    });
+
+    testWidgets('a confident choice still records without asking',
+        (tester) async {
+      AnswerValue? captured;
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          transcriberProvider.overrideWithValue(FakeTranscriber('burning pain')),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildTheme(),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: buildAnswerWidget(
+                question: Question(
+                  questionId: 'q',
+                  fieldId: 'f',
+                  section: 'hpi',
+                  answerType: AnswerType.singleChoice,
+                  prompts: const {'en': 'A question'},
+                  options: const ['burning', 'stabbing'],
+                  optionLabels: const {
+                    'burning': {'en': 'Burning pain'},
+                    'stabbing': {'en': 'Stabbing pain'},
+                  },
+                ),
+                onAnswered: (value, _) => captured = value,
+              )!,
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await speak(tester);
+
+      expect(find.byKey(const Key('voice.heard')), findsNothing,
+          reason: 'an exact match must not cost the patient an extra tap');
+      expect(captured, isA<CodedValue>());
+      expect((captured! as CodedValue).code, 'burning');
+    });
+  });
 }

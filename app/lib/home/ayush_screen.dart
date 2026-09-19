@@ -50,6 +50,7 @@ import '../core/theme.dart';
 import '../core/ui.dart';
 import '../intake/widgets/answer_actions.dart';
 import '../intake/widgets/answer_widgets.dart';
+import '../intake/widgets/interview_ui.dart';
 import '../l10n/strings.dart';
 import '../storage/database.dart';
 
@@ -78,6 +79,7 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
   Draft? _existing;
   bool _redoing = false;
   bool _finished = false;
+  bool _introShown = false;
   int _index = 0;
   final Map<String, Answer> _answers = {};
 
@@ -131,6 +133,14 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
       return _thanks(context, strings);
     }
 
+    // What is about to be asked and why, said once, on a screen of its
+    // own — not stacked above question one, where a patient who has
+    // already started reading a question skims straight past it. The
+    // question screens that follow show nothing but the question.
+    if (!_introShown) {
+      return _intro(context, strings);
+    }
+
     final question = bundle.questions[ids[_index]]!;
     return AnswerConfirmScope(
       notifier: _confirm,
@@ -182,21 +192,6 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
                 total: ids.length,
               ),
               const SizedBox(height: Sizes.gutter),
-              if (_index == 0) ...[
-                Text(
-                  strings.ayurvedaTitle,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: Sizes.gap),
-                TintPanel(
-                  padding: const EdgeInsets.all(Sizes.gap + 4),
-                  child: Text(
-                    strings.ayushIntro,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-                const SizedBox(height: Sizes.gutter),
-              ],
               Semantics(
                 header: true,
                 child: Text(
@@ -205,13 +200,22 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
                 ),
               ),
               const SizedBox(height: Sizes.gutter),
-              buildAnswerWidget(
-                    question: question,
-                    language: language,
-                    onAnswered: (value, originalText) =>
-                        _record(question, language, FieldStatus.answered, value: value, originalText: originalText),
-                  ) ??
-                  const SizedBox.shrink(),
+              // Prominent here too — this used to be the one screen in the
+              // app where voice quietly stopped being the lead interaction,
+              // which a patient moving between this and the symptom
+              // interview would have felt as the mic getting smaller for no
+              // reason.
+              ProminentVoice(
+                prominent: true,
+                child: buildAnswerWidget(
+                      question: question,
+                      language: language,
+                      onAnswered: (value, originalText) => _record(
+                          question, language, FieldStatus.answered,
+                          value: value, originalText: originalText),
+                    ) ??
+                    const SizedBox.shrink(),
+              ),
               const SizedBox(height: Sizes.gutter),
               const Divider(),
               const SizedBox(height: Sizes.gutter),
@@ -278,6 +282,51 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
     if (!mounted) return;
     setState(() => _finished = true);
   }
+
+  /// What this module asks and why, said once, before question one.
+  ///
+  /// It used to sit stacked above the marital-status question, which put a
+  /// paragraph about "not about today's problem" in the same glance as the
+  /// first thing being asked — read once, then never again, but taking up
+  /// the same space at the top of every later question if it had stayed
+  /// there keyed to `_index == 0`. A screen of its own says it once and gets
+  /// out of the way; every question after this is nothing but the question.
+  Widget _intro(BuildContext context, Strings strings) => Scaffold(
+        appBar: AppBar(title: Text(strings.ayushTitle)),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(Sizes.gutter),
+            child: FilledButton(
+              key: const Key('ayush.introContinue'),
+              onPressed: () => setState(() => _introShown = true),
+              child: Text(strings.continueLabel),
+            ),
+          ),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(Sizes.gutter),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  strings.ayurvedaTitle,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: Sizes.gap + 4),
+                TintPanel(
+                  padding: const EdgeInsets.all(Sizes.gap + 4),
+                  child: Text(
+                    strings.ayushIntro,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 
   /// The three end states share a shape: an emblem, a line, and at most one
   /// action. They are separate methods because they mean different things —
@@ -349,6 +398,7 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
           onPressed: () => setState(() {
             _redoing = true;
             _finished = false;
+            _introShown = false;
             _index = 0;
             _answers.clear();
           }),

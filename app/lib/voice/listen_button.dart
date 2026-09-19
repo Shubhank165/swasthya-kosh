@@ -44,9 +44,26 @@ class ListenButton extends ConsumerStatefulWidget {
     required this.language,
     required this.matcher,
     required this.onResult,
+    this.prominent = false,
   });
 
   final String language;
+
+  /// Draw the large centred microphone instead of the pill.
+  ///
+  /// **Used on every question.** Voice is now this app's lead interaction, not
+  /// an alternative introduced once and then demoted — a deliberate reversal of
+  /// the smaller-after-question-one design this button started with. What that
+  /// earlier design was guarding against has not gone away: a patient who
+  /// cannot pronounce a symptom must still be able to answer with no cost, so
+  /// every option tile stays on the same screen, unshrunk, un-demoted, with
+  /// its own full-height touch target — the microphone leads, it does not
+  /// replace.
+  ///
+  /// The caption under the microphone ("or choose from options") says this on
+  /// every question now too, for the same reason it said it on the first: the
+  /// biggest control on the screen must not be read as the only way through it.
+  final bool prominent;
 
   /// How a raw transcript becomes an intent: a choice question matches against
   /// its option labels, a yes/no question against a yes/no table, a descriptive
@@ -149,34 +166,139 @@ class _ListenButtonState extends ConsumerState<ListenButton>
     final strings = Strings.of(context);
     switch (_phase) {
       case _Phase.checking:
-        // Holds the pill's height while the model check runs. Returning nothing
-        // here and the control a frame later shifts every option below it
-        // downwards just as the patient is reaching for one — and on a list
+        // Holds the control's height while the model check runs. Returning
+        // nothing here and the control a frame later shifts every option below
+        // it downwards just as the patient is reaching for one — and on a list
         // that sits near the fold, the whole page appears to jump.
-        return const SizedBox(height: 60);
+        return SizedBox(height: widget.prominent ? 158 : 60);
       case _Phase.unsupported:
         // Genuinely absent: the device cannot transcribe this language, and
         // reserving space for a control that will never appear leaves a hole.
         return const SizedBox.shrink();
       case _Phase.preparing:
       case _Phase.recognising:
-        return _Pill(
-          busy: true,
-          label: _phase == _Phase.preparing
-              ? strings.voicePreparing
-              : strings.voiceRecognising,
-          onTap: null,
-        );
+        final label = _phase == _Phase.preparing
+            ? strings.voicePreparing
+            : strings.voiceRecognising;
+        return widget.prominent
+            ? _Hero(busy: true, label: label, onTap: null)
+            : _Pill(busy: true, label: label, onTap: null);
       case _Phase.ready:
       case _Phase.listening:
         final listening = _phase == _Phase.listening;
+        final pulse = listening ? _pulse : null;
+        if (widget.prominent) {
+          return _Hero(
+            listening: listening,
+            pulse: pulse,
+            // "Tap to speak" rather than "Speak the answer": on the hero the
+            // label is an instruction for the control under it, and the pill's
+            // wording reads as a demand when it is the biggest thing on screen.
+            label: listening ? strings.voiceListening : strings.voiceTapToSpeak,
+            onTap: _toggleListening,
+          );
+        }
         return _Pill(
           listening: listening,
-          pulse: listening ? _pulse : null,
-          label: listening ? strings.voiceListening : strings.voiceSpeak,
+          pulse: pulse,
+          // Optional, said in the label itself. The one word is what keeps a
+          // patient who cannot pronounce their symptom from reading the mic as
+          // the expected path (§16).
+          label: listening ? strings.voiceListening : strings.voiceOptional,
           onTap: _toggleListening,
         );
     }
+  }
+}
+
+/// The large centred microphone — the lead control on every question.
+///
+/// Same states as [_Pill] and the same disc inside it, at a size that reads
+/// from arm's length. It is a circle rather than a full-width bar on purpose:
+/// a bar is the shape of this app's primary action and would make speaking look
+/// like the way to proceed, where a disc reads as an instrument offered.
+class _Hero extends StatelessWidget {
+  const _Hero({
+    required this.label,
+    required this.onTap,
+    this.listening = false,
+    this.busy = false,
+    this.pulse,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final bool listening;
+  final bool busy;
+  final Animation<double>? pulse;
+
+  // Sized to read from arm's length while still leaving the options below it
+  // mostly on screen on a typical phone — the first build of this control was
+  // 148/112/68 and, now that it shows on every question rather than only the
+  // first, that pushed a two-option question's second tile to the very bottom
+  // edge, with nothing visibly below it and no cue that scrolling would help.
+  static const _outer = 122.0;
+  static const _inner = 92.0;
+  static const _iconDisc = 54.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final background = listening ? colors.primary : Palette.tint;
+    final foreground = listening ? colors.onPrimary : colors.primary;
+
+    return Column(
+      children: [
+        SizedBox(
+          width: _outer,
+          height: _outer,
+          child: Center(
+            child: Material(
+              color: background,
+              shape: const CircleBorder(),
+              child: InkWell(
+                key: const Key('question.listen'),
+                onTap: onTap,
+                customBorder: const CircleBorder(),
+                child: SizedBox(
+                  width: _inner,
+                  height: _inner,
+                  child: busy
+                      ? Center(
+                          child: SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: foreground,
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: _MicDisc(
+                            listening: listening,
+                            pulse: pulse,
+                            foreground: foreground,
+                            background:
+                                listening ? colors.onPrimary : colors.primary,
+                            size: _iconDisc,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+        ),
+      ],
+    );
   }
 }
 
@@ -260,18 +382,20 @@ class _MicDisc extends StatelessWidget {
     required this.pulse,
     required this.foreground,
     required this.background,
+    this.size = 44,
   });
 
   final bool listening;
   final Animation<double>? pulse;
   final Color foreground;
   final Color background;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final disc = Container(
-      width: 44,
-      height: 44,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: listening ? background.withAlpha(48) : background.withAlpha(36),
@@ -282,7 +406,7 @@ class _MicDisc extends StatelessWidget {
         // invitation to tap it again expecting something new.
         listening ? Icons.stop_rounded : Icons.mic_rounded,
         color: foreground,
-        size: 24,
+        size: size * 0.55,
       ),
     );
 
@@ -299,6 +423,7 @@ class _MicDisc extends StatelessWidget {
             _Ring(
               progress: (animation.value + offset) % 1.0,
               color: background,
+              base: size,
             ),
           child!,
         ],
@@ -309,16 +434,24 @@ class _MicDisc extends StatelessWidget {
 }
 
 class _Ring extends StatelessWidget {
-  const _Ring({required this.progress, required this.color});
+  const _Ring({
+    required this.progress,
+    required this.color,
+    this.base = 44,
+  });
 
   final double progress;
   final Color color;
+
+  /// The disc the ring starts from. The rings grow proportionally, so the hero
+  /// and the pill read as the same animation at two sizes.
+  final double base;
 
   @override
   Widget build(BuildContext context) {
     // Fades as it grows, so two rings half a cycle apart read as one outward
     // motion rather than two circles.
-    final size = 44 + (progress * 26);
+    final size = base + (progress * base * 0.6);
     final alpha = ((1 - progress) * 90).round().clamp(0, 255);
     return IgnorePointer(
       child: Container(

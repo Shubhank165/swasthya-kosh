@@ -477,4 +477,122 @@ class IntakeWalker {
     final ordered = bundle.sections.where(sections.contains).toList();
     return (touched.length, ordered.length);
   }
+
+  /// How far through the questions the patient is, as a fraction — the number
+  /// the bar draws.
+  ///
+  /// [sectionProgress] is the honest *label*; this is the honest *shape*. They
+  /// are deliberately different measures. A bar driven by sections sits
+  /// perfectly still for eight questions and then leaps a third of the way
+  /// across, which a patient reads as an app that has stopped responding.
+  ///
+  /// The hard part is that [plan] is not a fixed length: it is `core` until the
+  /// chief complaint is settled and `core + branch` afterwards. So the naive
+  /// `answered / plan.length` would climb to nearly full during core and then
+  /// fall off a cliff the moment the patient says "chest pain" — progress
+  /// running *backwards*, for exactly the patients with the most left to
+  /// answer and the least patience for it.
+  ///
+  /// The fix is to put a branch in the denominator before we know which branch
+  /// it is: the longest one this bundle carries. That is an over-estimate on
+  /// purpose. When the real branch turns out shorter, the denominator shrinks
+  /// and the bar jumps *forward* — which reads as good news. Backwards is the
+  /// one direction it must never move, and `StepProgress` clamps monotonically
+  /// on top of this so that a retracted answer cannot walk it back either.
+  ///
+  /// Every planned question that has an entry in the answer map counts as
+  /// behind us, including the `not_applicable` and `not_asked` ones [next]
+  /// writes as it scans ahead. Those are questions the patient will never see,
+  /// so counting them is what keeps the bar in step with what is on screen.
+  double get questionFraction {
+    final planned = plan;
+    if (planned.isEmpty) return 0;
+    var answered = 0;
+    for (final id in planned) {
+      if (_answers.containsKey(id)) answered++;
+    }
+    final total = _selectedComplaint == null
+        ? planned.length + _longestBranch
+        : planned.length;
+    if (total <= 0) return 0;
+    return (answered / total).clamp(0.0, 1.0);
+  }
+
+  /// Where one question sits inside its own section — "3 of 8", for the label
+  /// beside the bar.
+  ///
+  /// **Section-relative, not interview-relative.** "Question 41 of 77" is true
+  /// and useless: it is a number nobody wants to see at the start of a medical
+  /// form, and it is the number that moves most when a branch opens. Counting
+  /// within the section keeps it small and keeps it meaningful — these eight
+  /// questions really are one subject.
+  ///
+  /// **It does not, on its own, keep the count still.** A section can hold
+  /// both core and branch-only questions — `symptoms` carries three screening
+  /// questions every patient sees and then whatever follow-ups the chosen
+  /// complaint adds, which can be five or can be fifty. [total] here is
+  /// therefore only ever honest for the complaint that produced it; a
+  /// different one can produce a wildly different number for the very same
+  /// section. [stable] is what tells the caller whether this section happens
+  /// to be one where that cannot happen — see
+  /// [ContentBundle.sectionCountIsStable] — and a caller building a patient-
+  /// facing label checks it before showing [position]/[total] at all.
+  ///
+  /// **Only counts screens the patient can actually land on.** The compiled
+  /// content puts every domain's follow-up questions in `symptoms` — one
+  /// precondition per question, checked against what was ticked on the "what
+  /// brought you in" screen — rather than a hand-picked branch per complaint.
+  /// A patient who reported only a headache will never see the fever or
+  /// bowel questions also filed under `symptoms`; [next] rules every one of
+  /// them out — correctly — the moment the complaint is known, in the same
+  /// pass, and records that with no screen shown ([Answer.wasPut] false).
+  /// Counting those in [total]/[position] anyway is what used to make the
+  /// label leap from a small number straight to something like "27 of 63" on
+  /// the very next screen — every question in between was real to the
+  /// bundle and invisible to the patient, which reads as the interview
+  /// skipping ahead even though nothing was skipped. So this only counts a
+  /// question that was actually put, or that has not been resolved either
+  /// way yet — never one already ruled out silently.
+  ///
+  /// Returns null for a question this bundle does not carry or that is not in
+  /// the plan. The caller then shows the section count instead; a progress
+  /// label is not worth a crash.
+  ({String section, int position, int total, bool stable})? sectionStepFor(
+      String questionId) {
+    final section = bundle.questions[questionId]?.section;
+    if (section == null) return null;
+    var position = 0;
+    var total = 0;
+    for (final id in plan) {
+      if (bundle.questions[id]?.section != section) continue;
+      final resolved = _answers[id];
+      // Ruled out with no screen shown — §4's `not_applicable`/`not_asked`,
+      // written by [next] as it scans past questions this patient will never
+      // see. Those never counted as a step for this patient and must not
+      // inflate [total] or make [position] jump past them.
+      if (resolved != null && !resolved.wasPut) continue;
+      total++;
+      if (id == questionId) position = total;
+    }
+    if (position == 0) return null;
+    return (
+      section: section,
+      position: position,
+      total: total,
+      stable: bundle.sectionCountIsStable(section),
+    );
+  }
+
+  /// The most questions any one branch in this bundle can add.
+  ///
+  /// The pessimistic guess, not the average: guessing the average would leave
+  /// the bar retreating for every patient whose branch is longer than typical,
+  /// and that set is not random — it is the sicker half.
+  int get _longestBranch {
+    var longest = 0;
+    for (final branch in bundle.branches.values) {
+      if (branch.length > longest) longest = branch.length;
+    }
+    return longest;
+  }
 }

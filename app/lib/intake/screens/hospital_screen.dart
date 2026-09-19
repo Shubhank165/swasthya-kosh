@@ -9,6 +9,7 @@ import '../../core/theme.dart';
 import '../../core/ui.dart';
 import '../../l10n/strings.dart';
 import '../../identity/abha_screen.dart';
+import '../../identity/hospital_repository.dart';
 import '../begin.dart';
 import '../widgets/answer_widgets.dart';
 import '../../voice/read_aloud_button.dart';
@@ -26,7 +27,9 @@ import '../../voice/read_aloud_button.dart';
 /// beside it.
 const _departmentIcons = <String, IconData>{
   'opd': Icons.local_hospital_outlined,
-  'general': Icons.local_hospital_outlined,
+  // Not a department; the row that says "I don't know". A hospital cross on
+  // it made it look like one more specialty to rule out.
+  'general': Icons.support_agent,
   'general_medicine': Icons.local_hospital_outlined,
   'ayush': Icons.spa_outlined,
   'ayurveda': Icons.spa_outlined,
@@ -47,8 +50,25 @@ const _departmentIcons = <String, IconData>{
   'dental': Icons.medical_services_outlined,
   'ophthalmology': Icons.visibility_outlined,
   'cardiology': Icons.monitor_heart_outlined,
-  'other': Icons.more_horiz,
-  'others': Icons.more_horiz,
+  'other': Icons.support_agent,
+  'others': Icons.support_agent,
+};
+
+/// Department codes that mean "I do not know", not the name of a department.
+///
+/// `general` is in here and `kayachikitsa` is not, which looks backwards until
+/// you read what the backend sends: at an AYUSH institute general medicine *is*
+/// Kayachikitsa, and `general` is the escape hatch it has always been — the
+/// server renders it "Not sure — the staff will guide me". Matching on the code
+/// rather than on the display text is what keeps this working in nine
+/// languages.
+const _catchAllDepartments = <String>{
+  'general',
+  'other',
+  'others',
+  'not_sure',
+  'unsure',
+  'dont_know',
 };
 
 IconData _iconFor(String code) =>
@@ -65,6 +85,28 @@ class HospitalScreen extends ConsumerWidget {
     final department = ref.watch(selectedDepartmentProvider);
     final language = ref.watch(languageProvider);
     final heading = chosen == null ? strings.chooseHospital : strings.chooseDepartment;
+
+    // **The escape hatch goes first.** At an AYUSH OPD, not knowing whether you
+    // want Shalya or Shalakya is the ordinary case, not the edge one — and the
+    // row that says so was sitting eighth, below the fold, underneath seven
+    // Sanskrit names a patient had to rule out one at a time before reaching
+    // the one telling them they never had to. The answer most people give
+    // should cost the least to find.
+    //
+    // Everything else keeps the hospital's own order. This lifts one row out;
+    // it does not sort a clinical list by a rule this screen invented.
+    final List<Department> departments = chosen?.departments ?? const [];
+    final unsure = [
+      for (final department in departments)
+        if (_catchAllDepartments.contains(department.code.toLowerCase()))
+          department,
+    ];
+    final named = [
+      for (final department in departments)
+        if (!_catchAllDepartments.contains(department.code.toLowerCase()))
+          department,
+    ];
+    final ordered = [...unsure, ...named];
 
     return Scaffold(
       // Continue appears only once both are picked, and leads to consent —
@@ -162,8 +204,10 @@ class HospitalScreen extends ConsumerWidget {
                       if (chosen == null)
                         for (final hospital in list) hospital.displayName
                       else
-                        for (final department in chosen.departments)
-                          department.display,
+                        // Read in the order they are drawn in. A voice that
+                        // lists them differently from the screen is a voice the
+                        // patient has to reconcile against it.
+                        for (final department in ordered) department.display,
                     ].join('. '),
                     language: language,
                   ),
@@ -197,22 +241,76 @@ class HospitalScreen extends ConsumerWidget {
                           ),
                       ]
                     : [
-                        for (final department in chosen.departments)
-                          OptionTile(
-                            key: Key('department.${department.code}'),
-                            icon: _iconFor(department.code),
-                            label: department.display,
-                            selected: ref.watch(selectedDepartmentProvider) ==
-                                department.code,
-                            onTap: () => ref
-                                .read(selectedDepartmentProvider.notifier)
-                                .state = department.code,
-                          ),
+                        for (final department in unsure)
+                          _DepartmentTile(department: department),
+                        // Only drawn when there is something on both sides of
+                        // it. A rule under a single row separates it from
+                        // nothing.
+                        if (unsure.isNotEmpty && named.isNotEmpty)
+                          _OrRule(label: strings.orChooseDepartment),
+                        for (final department in named)
+                          _DepartmentTile(department: department),
                       ],
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// One department row.
+///
+/// Its own widget so the two halves of the list — the escape hatch and the
+/// named departments — cannot drift into looking different from each other.
+class _DepartmentTile extends ConsumerWidget {
+  const _DepartmentTile({required this.department});
+
+  final Department department;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => OptionTile(
+        key: Key('department.${department.code}'),
+        icon: _iconFor(department.code),
+        label: department.display,
+        selected: ref.watch(selectedDepartmentProvider) == department.code,
+        onTap: () =>
+            ref.read(selectedDepartmentProvider.notifier).state =
+                department.code,
+      );
+}
+
+/// A labelled rule between the escape hatch and the departments proper.
+///
+/// The label is doing the work, not the line: "Or choose a department" is what
+/// tells a patient that the rows underneath are the alternative to the row
+/// above, rather than a continuation of one list whose first item happens to be
+/// odd.
+class _OrRule extends StatelessWidget {
+  const _OrRule({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: Sizes.gap + 4),
+      child: Row(
+        children: [
+          const Expanded(child: Divider(height: 1)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+            ),
+          ),
+          const Expanded(child: Divider(height: 1)),
+        ],
       ),
     );
   }

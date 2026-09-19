@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:medikiosk_app/content/bundle.dart';
 import 'package:medikiosk_app/core/theme.dart';
 import 'package:medikiosk_app/intake/screens/question_screen.dart';
+import 'package:medikiosk_app/intake/widgets/interview_ui.dart';
 import 'package:medikiosk_app/intake/screens/urgent_care_screen.dart';
 
 Widget wrap(Widget child, {Locale locale = const Locale('en'), double scale = 1}) =>
@@ -42,6 +43,7 @@ QuestionScreen screen({
   String language = 'en',
   VoidCallback? onBack,
   Map<String, String>? prompts,
+  double? progress,
 }) =>
     QuestionScreen(
       question: sample(allowSkip: allowSkip, prompts: prompts),
@@ -51,6 +53,7 @@ QuestionScreen screen({
       onSkip: () {},
       sectionsDone: 3,
       sectionsTotal: 7,
+      progress: progress,
       onBack: onBack,
     );
 
@@ -62,10 +65,12 @@ void main() {
       expect(find.text('Are you short of breath?'), findsNothing);
     });
 
-    testWidgets('progress is sections, not a percentage', (tester) async {
-      // A percentage implies precision the branching does not have: choosing
-      // "chest pain" adds twenty questions and would make progress go backwards.
-      await tester.pumpWidget(wrap(screen()));
+    testWidgets('the number the patient reads is sections, not a percentage',
+        (tester) async {
+      // The bar moves per question so it does not look frozen, but the number
+      // under it stays a count. A percentage would imply a precision the
+      // branching does not have, and it is the number a patient quotes back.
+      await tester.pumpWidget(wrap(screen(progress: 0.42)));
       expect(find.text('Section 3 of 7'), findsOneWidget);
       expect(find.textContaining('%'), findsNothing);
     });
@@ -117,6 +122,70 @@ void main() {
       ));
       expect(find.text('Only English'), findsNothing);
       expect(find.text('severity'), findsOneWidget);
+    });
+  });
+
+  group('the more-below hint', () {
+    // The hero mic (§16 — voice on every question now) is the single biggest
+    // thing on this screen, and on a short viewport that leaves the option
+    // tiles right at the bottom edge with nothing visibly cueing that more of
+    // the question exists. This is the affordance that fixes it.
+    testWidgets('shows while content is cut off, hides once scrolled to the end',
+        (tester) async {
+      // Short enough that a yes/no question — mic, two options, don't-know,
+      // skip — does not fit without scrolling.
+      tester.view.physicalSize = const Size(400, 500);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(wrap(screen()));
+      await tester.pumpAndSettle();
+
+      double opacity() => tester
+          .widget<AnimatedOpacity>(find.descendant(
+            of: find.byType(MoreBelowFade),
+            matching: find.byType(AnimatedOpacity),
+          ))
+          .opacity;
+
+      expect(opacity(), 1,
+          reason: 'the options do not fit a 500px-tall screen');
+
+      await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -2000));
+      await tester.pumpAndSettle();
+
+      expect(opacity(), 0,
+          reason: 'nothing left below once scrolled all the way down');
+    });
+
+    testWidgets('never blocks a tap on what is underneath it', (tester) async {
+      tester.view.physicalSize = const Size(400, 500);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      String? recorded;
+      await tester.pumpWidget(wrap(QuestionScreen(
+        question: sample(),
+        language: 'en',
+        onAnswered: (_, text) => recorded = text,
+        onDontKnow: () {},
+        onSkip: () {},
+        sectionsDone: 3,
+        sectionsTotal: 7,
+      )));
+      await tester.pumpAndSettle();
+
+      // Scroll the "no" option into the same screen region the fade sits
+      // over, then tap it there — decoration must never win a hit test
+      // against the option it is drawn on top of.
+      await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -300));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('option.no')));
+      await tester.pumpAndSettle();
+
+      expect(recorded, isNotNull);
     });
   });
 

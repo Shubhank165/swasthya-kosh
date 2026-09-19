@@ -480,4 +480,193 @@ void main() {
       expect(walker.answers.containsKey('vihara'), isFalse);
     });
   });
+
+  group('the progress bar never goes backwards', () {
+    // The bar is driven by `questionFraction`, not by `sectionProgress`: a bar
+    // that only moves when a section closes stands still for eight questions.
+    // The price of the finer measure is that the denominator is a guess while
+    // the branch is unknown, and these tests are about that guess being wrong
+    // in the safe direction.
+    ContentBundle branching() => bundleWith(
+          questions: [
+            question('chief_complaint',
+                type: 'single_choice',
+                options: ['chest_pain', 'sore_throat'],
+                section: 'chief_complaint'),
+            question('c1'),
+            question('c2'),
+            for (var i = 0; i < 10; i++) question('chest$i'),
+            question('throat0'),
+          ],
+          core: ['chief_complaint', 'c1', 'c2'],
+          branches: {
+            'chest_pain': [for (var i = 0; i < 10; i++) 'chest$i'],
+            'sore_throat': ['throat0'],
+          },
+        );
+
+    test('the unknown branch is costed at the longest one', () {
+      final walker = IntakeWalker(bundle: branching(), language: 'en');
+      // Nothing answered: 0 of (3 core + 10 for the longest branch).
+      expect(walker.questionFraction, 0);
+      walker.record(answered('chief_complaint', const CodedValue('chest_pain')));
+      // 1 of 13 — the plan is now genuinely 13 long, and the fraction did not
+      // move because it was already being measured against 13.
+      expect(walker.questionFraction, closeTo(1 / 13, 1e-9));
+    });
+
+    test('choosing the long branch does not push the bar back', () {
+      final walker = IntakeWalker(bundle: branching(), language: 'en');
+      final before = walker.questionFraction;
+      walker.record(answered('chief_complaint', const CodedValue('chest_pain')));
+      expect(walker.questionFraction, greaterThanOrEqualTo(before));
+    });
+
+    test('choosing a short branch jumps the bar forwards', () {
+      // The over-estimate resolving downwards is the one direction a surprise
+      // is welcome in.
+      final walker = IntakeWalker(bundle: branching(), language: 'en');
+      walker.record(answered('chief_complaint', const CodedValue('sore_throat')));
+      // 1 of 4, not 1 of 13.
+      expect(walker.questionFraction, closeTo(1 / 4, 1e-9));
+    });
+
+    test('it climbs monotonically all the way through an interview', () {
+      final walker = IntakeWalker(bundle: branching(), language: 'en');
+      var last = walker.questionFraction;
+      walker.record(answered('chief_complaint', const CodedValue('chest_pain')));
+      for (var question = walker.next();
+          question != null;
+          question = walker.next()) {
+        final now = walker.questionFraction;
+        expect(now, greaterThanOrEqualTo(last),
+            reason: 'fell back at ${question.questionId}');
+        last = now;
+        walker.record(answered(question.questionId, const BoolValue(true)));
+      }
+      expect(walker.questionFraction, 1);
+    });
+
+    test('a bundle with no branches is simply position over length', () {
+      final walker = IntakeWalker(
+        bundle: bundleWith(
+          questions: [question('a'), question('b'), question('c'), question('d')],
+          core: ['a', 'b', 'c', 'd'],
+        ),
+        language: 'en',
+      );
+      walker.record(answered('a', const BoolValue(true)));
+      expect(walker.questionFraction, closeTo(0.25, 1e-9));
+    });
+  });
+
+  group('a section\'s count is only shown when it cannot mislead', () {
+    // `symptoms` here mixes a core question with two that only exist under one
+    // complaint — the exact shape that produced "Your symptoms · 44/63" for
+    // one patient and would produce a completely different total for another.
+    ContentBundle mixedSectionBundle() => bundleWith(
+          questions: [
+            question('chief_complaint',
+                type: 'single_choice',
+                options: ['chest_pain', 'sore_throat'],
+                section: 'chief_complaint'),
+            question('a1', section: 'symptoms'),
+            question('b1', section: 'symptoms'),
+            question('b2', section: 'symptoms'),
+            question('h1', section: 'history'),
+          ],
+          core: ['chief_complaint', 'a1', 'h1'],
+          branches: {
+            'chest_pain': ['b1', 'b2'],
+          },
+        );
+
+    test('a section holding a branch-only question is not stable', () {
+      final bundle = mixedSectionBundle();
+      expect(bundle.sectionCountIsStable('symptoms'), isFalse);
+    });
+
+    test('a section built entirely from core is stable', () {
+      final bundle = mixedSectionBundle();
+      expect(bundle.sectionCountIsStable('history'), isTrue);
+      expect(bundle.sectionCountIsStable('chief_complaint'), isTrue);
+    });
+
+    test('sectionStepFor carries the same verdict for the label to check', () {
+      final walker =
+          IntakeWalker(bundle: mixedSectionBundle(), language: 'en');
+      walker.record(answered('chief_complaint', const CodedValue('chest_pain')));
+
+      final symptoms = walker.sectionStepFor('a1')!;
+      expect(symptoms.stable, isFalse,
+          reason: 'a different complaint would give this a different total');
+      expect(symptoms.total, 3, reason: 'a1, b1, b2 — this complaint\'s plan');
+
+      final history = walker.sectionStepFor('h1')!;
+      expect(history.stable, isTrue);
+      expect(history.total, 1);
+    });
+
+    test('a shorter branch gives the same section a different total', () {
+      // The concrete case the label must never assert: two patients, one
+      // section name, two honest totals.
+      final chestPain =
+          IntakeWalker(bundle: mixedSectionBundle(), language: 'en');
+      chestPain.record(answered('chief_complaint', const CodedValue('chest_pain')));
+      expect(chestPain.sectionStepFor('a1')!.total, 3);
+
+      final soreThroat =
+          IntakeWalker(bundle: mixedSectionBundle(), language: 'en');
+      soreThroat.record(answered('chief_complaint', const CodedValue('sore_throat')));
+      expect(soreThroat.sectionStepFor('a1')!.total, 1);
+    });
+
+    test('a question ruled out with no screen shown does not inflate the count', () {
+      // The real shape behind "after ques 9 it is going directly to this
+      // ques": the compiled content puts every complaint's follow-ups in one
+      // `core` list (no branches at all — see `bundle.py`'s `_plan`), each
+      // gated by its own precondition on the chief complaint. A patient who
+      // picked "headache" never sees the fever questions filed under the same
+      // `symptoms` section; `next` rules them `not_applicable` in the same
+      // pass that finds the next real question, with no screen shown for
+      // them. The label must count only screens the patient can land on, not
+      // every question the content happens to tag with that section.
+      final bundle = bundleWith(
+        questions: [
+          question('chief_complaint',
+              type: 'single_choice',
+              options: ['headache', 'fever'],
+              section: 'chief_complaint'),
+          question('fever_q1', section: 'symptoms', precondition: {
+            'all': [
+              {'field_id': 'chief_complaint', 'in': ['fever']}
+            ]
+          }),
+          question('fever_q2', section: 'symptoms', precondition: {
+            'all': [
+              {'field_id': 'chief_complaint', 'in': ['fever']}
+            ]
+          }),
+          question('headache_q1', section: 'symptoms', precondition: {
+            'all': [
+              {'field_id': 'chief_complaint', 'in': ['headache']}
+            ]
+          }),
+          question('h1', section: 'history'),
+        ],
+        core: ['chief_complaint', 'fever_q1', 'fever_q2', 'headache_q1', 'h1'],
+      );
+      final walker = IntakeWalker(bundle: bundle, language: 'en');
+      walker.record(answered('chief_complaint', const CodedValue('headache')));
+
+      // fever_q1 and fever_q2 are now recorded not_applicable, never put —
+      // and must not count.
+      expect(walker.answers['fever_q1']!.status, FieldStatus.notApplicable);
+      expect(walker.answers['fever_q1']!.wasPut, isFalse);
+
+      final step = walker.sectionStepFor('headache_q1')!;
+      expect(step.total, 1, reason: 'only the question this patient can see');
+      expect(step.position, 1);
+    });
+  });
 }

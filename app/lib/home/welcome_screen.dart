@@ -22,17 +22,20 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/providers.dart';
 import '../core/theme.dart';
 import '../core/ui.dart';
 import '../intake/screens/start_screen.dart';
 import '../l10n/strings.dart';
+import 'onboarding_demo_screen.dart';
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final strings = Strings.of(context);
     final colors = Theme.of(context).colorScheme;
 
@@ -117,16 +120,7 @@ class WelcomeScreen extends StatelessWidget {
                       const SizedBox(height: Sizes.gutter * 1.4),
                       FilledButton.icon(
                         key: const Key('welcome.start'),
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            // `returnWhenChosen`, because `Root` swaps what is
-                            // underneath this route the moment a language is
-                            // stored. Without the pop the patient would be left
-                            // looking at the chooser they had just answered.
-                            builder: (_) =>
-                                const LanguageScreen(returnWhenChosen: true),
-                          ),
-                        ),
+                        onPressed: () => _onGetStarted(context, ref),
                         icon: const Icon(Icons.arrow_forward),
                         iconAlignment: IconAlignment.end,
                         label: Text(strings.getStarted),
@@ -144,6 +138,24 @@ class WelcomeScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Where the "Get started" tap goes: the first-run demo once, ever, on this
+/// device — see `OnboardingStore` — and the real language chooser every time
+/// after that. Neither screen is told about the other; this is the one place
+/// that decides between them, so the two can never disagree about which a
+/// given launch should show.
+Future<void> _onGetStarted(BuildContext context, WidgetRef ref) async {
+  final seen = await ref.read(onboardingSeenProvider.future);
+  if (!context.mounted) return;
+  Navigator.of(context).push(MaterialPageRoute<void>(
+    // `returnWhenChosen`, because `Root` swaps what is underneath this route
+    // the moment a language is stored. Without the pop the patient would be
+    // left looking at the chooser they had just answered.
+    builder: (_) => seen
+        ? const LanguageScreen(returnWhenChosen: true)
+        : const OnboardingDemoScreen(),
+  ));
 }
 
 /// The illustration.

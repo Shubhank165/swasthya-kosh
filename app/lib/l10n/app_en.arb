@@ -629,5 +629,165 @@
   "cancelLabel": "Cancel",
   "@cancelLabel": {
     "description": "Dismiss a dialog without doing anything. Generic — never reuse a destructive dialog's wording here."
+  },
+  "orChooseDepartment": "Or choose a department",
+  "@orChooseDepartment": {
+    "description": "Separator on the department picker. Sits under the 'Not sure' escape hatch and introduces the named departments below it. Not a heading for the screen — the screen's heading is chooseDepartment."
+  },
+  "heardTitle": "I heard:",
+  "@heardTitle": {
+    "description": "Header of the card that shows what speech recognition understood, before it is recorded."
+  },
+  "heardCorrect": "Correct",
+  "@heardCorrect": {
+    "description": "Accepts what was heard and records it as the answer."
+  },
+  "heardChange": "Change",
+  "@heardChange": {
+    "description": "Rejects what was heard. Clears the card; the patient speaks again or taps an option."
+  },
+  "heardHint": "You can change your answer if needed.",
+  "@heardHint": {
+    "description": "Quiet reassurance under the heard card."
+  },
+  "voiceTapToSpeak": "Tap to speak",
+  "@voiceTapToSpeak": {
+    "description": "Label under the large microphone on the first question."
+  },
+  "voiceOrChoose": "or choose from options",
+  "@voiceOrChoose": {
+    "description": "Sits between the large microphone and the option chips under it."
+  },
+  "voiceOptional": "Tap to speak (optional)",
+  "@voiceOptional": {
+    "description": "Label on the secondary microphone, on every question after the first. The word optional is load-bearing: speaking is never the expected path."
+  },
+  "assistantIntroNamed": "Hi {name}! I'll ask a few questions so the doctor understands what's happening.",
+  "@assistantIntroNamed": {
+    "description": "Spoken by the assistant on the first question of an interview, when the patient has told us their name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "assistantIntro": "I'll ask a few questions so the doctor understands what's happening.",
+  "@assistantIntro": {
+    "description": "The same, for a patient who has not given a name."
+  },
+  "assistantIntroHint": "You can speak naturally or tap an option.",
+  "@assistantIntroHint": {
+    "description": "Second line of the first-question introduction, naming both ways to answer."
+  },
+  "sectionNamePresenting": "Why you're here",
+  "@sectionNamePresenting": {
+    "description": "Display name for the 'presenting' section of the interview."
+  },
+  "sectionNameSymptoms": "Your symptoms",
+  "@sectionNameSymptoms": {
+    "description": "Display name for the 'symptoms' section."
+  },
+  "sectionNameHistory": "Health history",
+  "@sectionNameHistory": {
+    "description": "Display name for the 'history' section."
+  },
+  "sectionNameAyurveda": "Daily habits",
+  "@sectionNameAyurveda": {
+    "description": "Display name for the Ayurveda section. Named for what it asks about — sleep, digestion, routine — not for the system it belongs to."
+  },
+  "sectionStep": "{section} · {done}/{total}",
+  "@sectionStep": {
+    "description": "Progress label: a section name and the patient's position inside it.",
+    "placeholders": {
+      "section": {
+        "type": "String"
+      },
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "scaleWhyThisHelps": "This helps your Vaidya understand how strong the symptom is.",
+  "@scaleWhyThisHelps": {
+    "description": "Aside under a 1-10 severity question. A statement about the form, never about the patient's condition."
+  },
+  "onboardingSkip": "Skip",
+  "@onboardingSkip": {
+    "description": "Button on the first-run demo screens: skips straight to the real Language screen."
+  },
+  "onboardingReplay": "Replay",
+  "@onboardingReplay": {
+    "description": "Button on the first-run demo's final frame: restarts the storyboard from the first frame."
+  },
+  "onboardingStepIndicator": "Step {step} of {total}",
+  "@onboardingStepIndicator": {
+    "description": "Screen-reader label for the dots under the first-run demo, e.g. Step 2 of 7.",
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "onboardingWelcomeTitle": "Welcome to MediKiosk",
+  "@onboardingWelcomeTitle": {
+    "description": "First-run demo, frame 1 title: mirrors the Welcome screen."
+  },
+  "onboardingWelcomeBody": "Your Vaidya has your health history ready before you walk in.",
+  "@onboardingWelcomeBody": {
+    "description": "First-run demo, frame 1 body."
+  },
+  "onboardingLanguageTitle": "Choose your language",
+  "@onboardingLanguageTitle": {
+    "description": "First-run demo, frame 2 title: mirrors the Language screen."
+  },
+  "onboardingLanguageBody": "Pick the language you're comfortable in.",
+  "@onboardingLanguageBody": {
+    "description": "First-run demo, frame 2 body."
+  },
+  "onboardingDepartmentTitle": "Pick your department",
+  "@onboardingDepartmentTitle": {
+    "description": "First-run demo, frame 3 title: mirrors the hospital/department screen."
+  },
+  "onboardingDepartmentBody": "Tell us which department you're here for today.",
+  "@onboardingDepartmentBody": {
+    "description": "First-run demo, frame 3 body."
+  },
+  "onboardingSymptomsTitle": "Speak or tap your symptoms",
+  "@onboardingSymptomsTitle": {
+    "description": "First-run demo, frame 4 title: mirrors the voice/tap symptom screen."
+  },
+  "onboardingSymptomsBody": "Say what's bothering you, or choose from the options.",
+  "@onboardingSymptomsBody": {
+    "description": "First-run demo, frame 4 body."
+  },
+  "onboardingFollowUpTitle": "A few follow-up questions",
+  "@onboardingFollowUpTitle": {
+    "description": "First-run demo, frame 5 title: mirrors the AI follow-up question screen."
+  },
+  "onboardingFollowUpBody": "The app asks what the doctor would ask next.",
+  "@onboardingFollowUpBody": {
+    "description": "First-run demo, frame 5 body."
+  },
+  "onboardingUploadTitle": "Add your medical records",
+  "@onboardingUploadTitle": {
+    "description": "First-run demo, frame 6 title: mirrors the documents/upload screen."
+  },
+  "onboardingUploadBody": "Snap a photo of old prescriptions or reports.",
+  "@onboardingUploadBody": {
+    "description": "First-run demo, frame 6 body."
+  },
+  "onboardingReviewTitle": "Review and submit",
+  "@onboardingReviewTitle": {
+    "description": "First-run demo, frame 7 title: mirrors the review/submit screen."
+  },
+  "onboardingReviewBody": "Check your answers, then send them to your Vaidya.",
+  "@onboardingReviewBody": {
+    "description": "First-run demo, frame 7 body."
   }
 }
