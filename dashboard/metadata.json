@@ -1,0 +1,6 @@
+{
+  "name": "MediKiosk Clinical Dashboard",
+  "description": "Doctor's pre-consultation OPD dashboard presenting patient intake from MediKiosk and mobile app, ABHA verification, camera-extracted vitals, conversational voice triage, OCR lab reports, and Ayurvedic assessments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
