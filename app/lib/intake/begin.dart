@@ -17,7 +17,6 @@ import '../l10n/strings.dart';
 import 'flow.dart';
 import 'intake_host.dart';
 import 'screens/reporter_screen.dart';
-import 'screens/returning_patient_screen.dart';
 
 /// Screen 3 — consent (§11).
 class ConsentGate extends ConsumerWidget {
@@ -141,55 +140,17 @@ class _ReturningPatientGateState extends ConsumerState<ReturningPatientGate> {
   Widget build(BuildContext context) {
     if (_starting) return const _Working();
 
+    // The "is this still correct?" screen (`ReturningPatientScreen`) is
+    // disabled — every patient now answers the interview fresh, carried facts
+    // or not. `_startOnce(const [])` is exactly the safe fallback this screen
+    // already used when there was nothing to confirm or the history failed to
+    // load, so this simply takes that path unconditionally rather than ever
+    // reaching the confirmation UI.
     final carried = ref.watch(carryForwardProvider);
     return carried.when(
       loading: () => const _Working(),
-      // A history that will not load is a history that is skipped: the intake
-      // asks everything from scratch, which is slower and completely safe. It
-      // must never block.
       error: (_, __) => _startOnce(const []),
-      data: (facts) {
-        if (facts.isEmpty) return _startOnce(const []);
-        return ReturningPatientScreen(
-          items: [
-            for (final fact in facts)
-              CarriedItem(
-                fieldId: fact.fieldId,
-                label: '${fact.label}: ${fact.value}',
-                // The date the hospital last had it confirmed. Rendered as a
-                // plain date rather than "3 months ago": "still correct?" is
-                // only a fair question if the patient can see how old the
-                // record is, and a relative phrase in nine languages is a
-                // translation problem for no gain.
-                recordedOn: fact.verifiedAt == null
-                    ? ''
-                    : fact.verifiedAt!.toIso8601String().substring(0, 10),
-              ),
-          ],
-          onDone: (decisions) => _begin([
-            // Only a Yes stops the question being asked again. "No longer
-            // correct" and "not sure" both fall through to the interview,
-            // because a fact the patient doubts is not a fact — and it is
-            // certainly not a `no`.
-            for (final fact in facts)
-              if (decisions[fact.fieldId] == CarryDecision.stillCorrect)
-                ConfirmedFact(
-                  fieldId: fact.fieldId,
-                  label: fact.label,
-                  value: fact.value,
-                  fromIntakeId: fact.intakeId,
-                  // The date the hospital's record was last confirmed by a
-                  // physician, which is the date the patient was just shown and
-                  // asked about. The app is not told when the fact was first
-                  // written down; verification is the older date it does know,
-                  // and claiming a more precise one would be inventing it.
-                  originallyRecorded: fact.verifiedAt == null
-                      ? ''
-                      : fact.verifiedAt!.toIso8601String().substring(0, 10),
-                ),
-          ]),
-        );
-      },
+      data: (facts) => _startOnce(const []),
     );
   }
 

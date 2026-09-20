@@ -236,5 +236,18 @@
   "onboardingUploadTitle": "আপনার মেডিকেল রেকর্ড যোগ করুন",
   "onboardingUploadBody": "পুরনো প্রেসক্রিপশন বা রিপোর্টের ছবি তুলুন।",
   "onboardingReviewTitle": "যাচাই করে জমা দিন",
-  "onboardingReviewBody": "আপনার উত্তর যাচাই করুন, তারপর বৈদ্যকে পাঠান।"
+  "onboardingReviewBody": "আপনার উত্তর যাচাই করুন, তারপর বৈদ্যকে পাঠান।",
+  "durationUnitHour": "ঘণ্টা",
+  "durationUnitDay": "দিন",
+  "durationUnitWeek": "সপ্তাহ",
+  "durationUnitMonth": "মাস",
+  "durationUnitYear": "বছর",
+  "departmentKayachikitsa": "কায়চিকিৎসা (সাধারণ চিকিৎসা)",
+  "departmentPanchakarma": "পঞ্চকর্ম (শোধন চিকিৎসা)",
+  "departmentShalya": "শল্য (সার্জারি)",
+  "departmentShalakya": "শালাক্য (ইএনটি ও চক্ষুরোগ)",
+  "departmentPrasuti": "প্রসূতি ও স্ত্রী রোগ (মাতৃত্ব ও স্ত্রীরোগ চিকিৎসা)",
+  "departmentKaumarbhritya": "কৌমারভৃত্য (শিশুরোগ চিকিৎসা)",
+  "departmentSwasthavritta": "স্বাস্থ্যবৃত্ত (প্রতিরোধমূলক চিকিৎসা)",
+  "departmentGeneralNotSure": "নিশ্চিত নই — কর্মী সাহায্য করবেন"
 }

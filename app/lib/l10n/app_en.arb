@@ -789,5 +789,57 @@
   "onboardingReviewBody": "Check your answers, then send them to your Vaidya.",
   "@onboardingReviewBody": {
     "description": "First-run demo, frame 7 body."
+  },
+  "durationUnitHour": "Hour",
+  "@durationUnitHour": {
+    "description": "Unit option for a duration question: hour(s)"
+  },
+  "durationUnitDay": "Day",
+  "@durationUnitDay": {
+    "description": "Unit option for a duration question: day(s)"
+  },
+  "durationUnitWeek": "Week",
+  "@durationUnitWeek": {
+    "description": "Unit option for a duration question: week(s)"
+  },
+  "durationUnitMonth": "Month",
+  "@durationUnitMonth": {
+    "description": "Unit option for a duration question: month(s)"
+  },
+  "durationUnitYear": "Year",
+  "@durationUnitYear": {
+    "description": "Unit option for a duration question: year(s)"
+  },
+  "departmentKayachikitsa": "Kayachikitsa (General medicine)",
+  "@departmentKayachikitsa": {
+    "description": "AYUSH department option: Kayachikitsa (general medicine)"
+  },
+  "departmentPanchakarma": "Panchakarma (cleansing therapies)",
+  "@departmentPanchakarma": {
+    "description": "AYUSH department option: Panchakarma (cleansing therapies)"
+  },
+  "departmentShalya": "Shalya (Surgery)",
+  "@departmentShalya": {
+    "description": "AYUSH department option: Shalya (surgery)"
+  },
+  "departmentShalakya": "Shalakya (ENT and Ophthalmology)",
+  "@departmentShalakya": {
+    "description": "AYUSH department option: Shalakya (ENT and ophthalmology)"
+  },
+  "departmentPrasuti": "Prasuti and Stri Roga (Maternity and gynaecology)",
+  "@departmentPrasuti": {
+    "description": "AYUSH department option: Prasuti and Stri Roga (maternity and gynaecology)"
+  },
+  "departmentKaumarbhritya": "Kaumarbhritya (Paediatrics)",
+  "@departmentKaumarbhritya": {
+    "description": "AYUSH department option: Kaumarbhritya (paediatrics)"
+  },
+  "departmentSwasthavritta": "Swasthavritta (Preventive medicine)",
+  "@departmentSwasthavritta": {
+    "description": "AYUSH department option: Swasthavritta (preventive medicine)"
+  },
+  "departmentGeneralNotSure": "Not sure — the staff will guide me",
+  "@departmentGeneralNotSure": {
+    "description": "AYUSH department escape hatch: not sure which department, staff will guide"
   }
 }

@@ -236,5 +236,18 @@
   "onboardingUploadTitle": "ನಿಮ್ಮ ವೈದ್ಯಕೀಯ ದಾಖಲೆಗಳನ್ನು ಸೇರಿಸಿ",
   "onboardingUploadBody": "ಹಳೆಯ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಅಥವಾ ವರದಿಯ ಫೋಟೋ ತೆಗೆಯಿರಿ.",
   "onboardingReviewTitle": "ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಕಳುಹಿಸಿ",
-  "onboardingReviewBody": "ನಿಮ್ಮ ಉತ್ತರಗಳನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ವೈದ್ಯರಿಗೆ ಕಳುಹಿಸಿ."
+  "onboardingReviewBody": "ನಿಮ್ಮ ಉತ್ತರಗಳನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ವೈದ್ಯರಿಗೆ ಕಳುಹಿಸಿ.",
+  "durationUnitHour": "ಗಂಟೆ",
+  "durationUnitDay": "ದಿನ",
+  "durationUnitWeek": "ವಾರ",
+  "durationUnitMonth": "ತಿಂಗಳು",
+  "durationUnitYear": "ವರ್ಷ",
+  "departmentKayachikitsa": "ಕಾಯಚಿಕಿತ್ಸಾ (ಸಾಮಾನ್ಯ ವೈದ್ಯಕೀಯ ಚಿಕಿತ್ಸೆ)",
+  "departmentPanchakarma": "ಪಂಚಕರ್ಮ (ಶುದ್ಧೀಕರಣ ಚಿಕಿತ್ಸೆ)",
+  "departmentShalya": "ಶಲ್ಯ (ಶಸ್ತ್ರಚಿಕಿತ್ಸೆ)",
+  "departmentShalakya": "ಶಾಲಾಕ್ಯ (ಇಎನ್‌ಟಿ ಮತ್ತು ನೇತ್ರ ರೋಗ)",
+  "departmentPrasuti": "ಪ್ರಸೂತಿ ಮತ್ತು ಸ್ತ್ರೀ ರೋಗ (ಹೆರಿಗೆ ಮತ್ತು ಸ್ತ್ರೀರೋಗ ಚಿಕಿತ್ಸೆ)",
+  "departmentKaumarbhritya": "ಕೌಮಾರಭೃತ್ಯ (ಮಕ್ಕಳ ವೈದ್ಯಶಾಸ್ತ್ರ)",
+  "departmentSwasthavritta": "ಸ್ವಸ್ಥವೃತ್ತ (ತಡೆಗಟ್ಟುವ ಚಿಕಿತ್ಸೆ)",
+  "departmentGeneralNotSure": "ಖಚಿತವಿಲ್ಲ — ಸಿಬ್ಬಂದಿ ಸಹಾಯ ಮಾಡುತ್ತಾರೆ"
 }

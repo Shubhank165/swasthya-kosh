@@ -318,13 +318,6 @@ class _SymptomsFrame extends StatelessWidget {
         child: Column(
           children: [
             const _DemoMic(),
-            const SizedBox(height: Sizes.gap),
-            // The real caption under every question's microphone, word for
-            // word — see `voiceOrChoose` in `answer_widgets.dart`.
-            Text(
-              strings.voiceOrChoose,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
             const SizedBox(height: Sizes.gutter),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,

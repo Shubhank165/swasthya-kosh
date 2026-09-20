@@ -236,5 +236,18 @@
   "onboardingUploadTitle": "మీ వైద్య రికార్డులను జోడించండి",
   "onboardingUploadBody": "పాత ప్రిస్క్రిప్షన్లు లేదా రిపోర్టుల ఫోటో తీయండి.",
   "onboardingReviewTitle": "సమీక్షించి పంపండి",
-  "onboardingReviewBody": "మీ సమాధానాలను సరిచూసి, వైద్యుడికి పంపండి."
+  "onboardingReviewBody": "మీ సమాధానాలను సరిచూసి, వైద్యుడికి పంపండి.",
+  "durationUnitHour": "గంట",
+  "durationUnitDay": "రోజు",
+  "durationUnitWeek": "వారం",
+  "durationUnitMonth": "నెల",
+  "durationUnitYear": "సంవత్సరం",
+  "departmentKayachikitsa": "కాయచికిత్స (సాధారణ వైద్యం)",
+  "departmentPanchakarma": "పంచకర్మ (శుద్ధీకరణ చికిత్స)",
+  "departmentShalya": "శల్య (శస్త్రచికిత్స)",
+  "departmentShalakya": "శాలాక్య (ఇఎన్‌టి మరియు నేత్ర వైద్యం)",
+  "departmentPrasuti": "ప్రసూతి మరియు స్త్రీ రోగ (ప్రసూతి మరియు స్త్రీ వైద్యం)",
+  "departmentKaumarbhritya": "కౌమారభృత్య (పిల్లల వైద్యం)",
+  "departmentSwasthavritta": "స్వస్థవృత్త (నివారణ వైద్యం)",
+  "departmentGeneralNotSure": "తెలియదు — సిబ్బంది సహాయం చేస్తారు"
 }

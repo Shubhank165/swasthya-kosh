@@ -65,10 +65,11 @@ Question q(
   double? min,
   double? max,
   String questionId = 'q',
+  String fieldId = 'f',
 }) =>
     Question(
       questionId: questionId,
-      fieldId: 'f',
+      fieldId: fieldId,
       section: 'hpi',
       answerType: AnswerType.parse(type),
       prompts: const {'en': 'A question'},
@@ -759,6 +760,88 @@ Future<(AnswerValue?, String?)> pumpAnswerWith(
           reason: 'an exact match must not cost the patient an extra tap');
       expect(captured, isA<CodedValue>());
       expect((captured! as CodedValue).code, 'burning');
+    });
+  });
+
+  group('yes/no with a detail box (relieving/aggravating)', () {
+    testWidgets('routes to the yes/no widget for these two fields', (tester) async {
+      await pumpAnswer(tester, q('free_text', fieldId: 'general.relieving'));
+      expect(find.byType(YesNoDetailAnswer), findsOneWidget);
+      expect(find.byKey(const Key('option.yes')), findsOneWidget);
+      expect(find.byKey(const Key('option.no')), findsOneWidget);
+    });
+
+    testWidgets('"no" records an empty string, "yes" needs text first',
+        (tester) async {
+      AnswerValue? value;
+      String? text;
+      await tester.pumpWidget(ProviderScope(child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: YesNoDetailAnswer(
+            question: q('free_text', fieldId: 'general.relieving'),
+            onAnswered: (v, t) {
+              value = v;
+              text = t;
+            },
+          ),
+        ),
+      )));
+
+      // "Yes" opens the box, but Continue stays disabled until something is
+      // typed into it — an empty detail is not "yes" answered.
+      await tester.tap(find.byKey(const Key('option.yes')));
+      await tester.pump();
+      expect(find.byKey(const Key('answer.yes_no_detail')), findsOneWidget);
+      expect(
+        tester.widget<FilledButton>(find.byKey(const Key('answer.confirm'))).onPressed,
+        isNull,
+      );
+
+      await tester.enterText(
+          find.byKey(const Key('answer.yes_no_detail')), 'Lying down');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('answer.confirm')));
+      await tester.pump();
+
+      expect((value! as TextValue).text, 'Lying down');
+      expect(text, 'Lying down');
+    });
+
+    testWidgets('switching to "no" after "yes" clears the detail box',
+        (tester) async {
+      AnswerValue? value;
+      String? text;
+      await tester.pumpWidget(ProviderScope(child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: YesNoDetailAnswer(
+            question: q('free_text', fieldId: 'general.relieving'),
+            onAnswered: (v, t) {
+              value = v;
+              text = t;
+            },
+          ),
+        ),
+      )));
+
+      await tester.tap(find.byKey(const Key('option.yes')));
+      await tester.pump();
+      await tester.enterText(
+          find.byKey(const Key('answer.yes_no_detail')), 'Rest');
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('option.no')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('answer.confirm')));
+      await tester.pump();
+
+      expect((value! as TextValue).text, '',
+          reason: 'a stray "Rest" typed while Yes was selected must not '
+              'survive switching to No');
+      expect(text, 'No');
     });
   });
 }

@@ -65,6 +65,25 @@ Widget? buildAnswerWidget({
   // The key is the question id rather than the answer type: two consecutive
   // free-text questions are the case that broke, and they share a type.
   final resolved = key ?? ValueKey<String>(question.questionId);
+
+  // "Is there something that makes it worse / better" are declared
+  // `free_text` in content (the field the backend extracts is a string), but
+  // the question a patient actually reads is yes-or-no. Asking it that way
+  // first — tap over type, §14 — and opening a detail box only on "yes" is a
+  // presentation choice the app makes for these two fields specifically; it
+  // does not need a content or bundle change, because the value recorded is
+  // still a plain string either way ("" for no, the detail for yes).
+  const yesNoDetailFields = {'general.aggravating', 'general.relieving'};
+  if (yesNoDetailFields.contains(question.fieldId)) {
+    return YesNoDetailAnswer(
+      key: resolved,
+      question: question,
+      language: language,
+      onAnswered: onAnswered,
+      onDontKnow: onDontKnow,
+    );
+  }
+
   return switch (question.answerType) {
       AnswerType.singleChoice => SingleChoiceAnswer(
           key: resolved,
@@ -406,6 +425,20 @@ String optionLabel(String code) {
   return words[0].toUpperCase() + words.substring(1);
 }
 
+/// The label for one of [DurationAnswer]'s five fixed units, in the language
+/// the patient chose. Unlike a content-driven option, these units are never
+/// authored in the questioning content (they are the same five regardless of
+/// question or complaint), so they are translated here instead of falling
+/// back to [optionLabel]'s English de-underscoring.
+String durationUnitLabel(Strings strings, String unit) => switch (unit) {
+      'hour' => strings.durationUnitHour,
+      'day' => strings.durationUnitDay,
+      'week' => strings.durationUnitWeek,
+      'month' => strings.durationUnitMonth,
+      'year' => strings.durationUnitYear,
+      _ => optionLabel(unit),
+    };
+
 /// The label for an option, in the language the patient chose.
 ///
 /// Prefers the content's own text — the questioning engine's bundle authors
@@ -614,21 +647,12 @@ class _VoiceRowState extends State<_VoiceRow> {
             }
           },
         ),
-        // Sits between the hero microphone and the options it is offered
-        // alongside, so the patient reads "or" before they read the first
-        // option. Without it a screen with a 112dp microphone at the top looks
-        // like a screen that wants to be spoken to.
-        if (prominent && pending == null) ...[
-          const SizedBox(height: Sizes.gap + 2),
-          Text(
-            Strings.of(context).voiceOrChoose,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: Sizes.gap),
-        ],
+        // Spacing alone, between the hero microphone and whatever options
+        // follow — the "or choose from options" caption that used to sit here
+        // was removed at the patient's request, but the screen still needs
+        // the breathing room a 112dp microphone otherwise crowds out.
+        if (prominent && pending == null)
+          const SizedBox(height: Sizes.gap + 2 + Sizes.gap),
         if (pending != null) ...[
           const SizedBox(height: Sizes.gap),
           HeardCard(
@@ -872,6 +896,121 @@ class YesNoAnswer extends StatelessWidget {
           label: strings.optNo,
           selected: suggestedBool == false,
           onTap: () => onAnswered(const BoolValue(false), strings.optNo),
+        ),
+      ],
+    );
+  }
+}
+
+/// "Is there something that makes it worse/better" — yes or no first, with a
+/// detail box that opens only on yes.
+///
+/// Used for specific `free_text` fields whose real question is binary (see the
+/// override in [buildAnswerWidget]). The value recorded is still a string, so
+/// this needs no change to the content or the bundle: "no" records an empty
+/// string, "yes" records whatever the patient adds below.
+class YesNoDetailAnswer extends StatefulWidget {
+  const YesNoDetailAnswer({
+    super.key,
+    required this.question,
+    required this.onAnswered,
+    this.language = 'en',
+    this.onDontKnow,
+  });
+
+  final Question question;
+  final String language;
+  final OnAnswered onAnswered;
+  final VoidCallback? onDontKnow;
+
+  @override
+  State<YesNoDetailAnswer> createState() => _YesNoDetailAnswerState();
+}
+
+class _YesNoDetailAnswerState extends State<YesNoDetailAnswer> {
+  bool? _yes;
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// Dictated words land in the box, appended to whatever is already there —
+  /// same bargain as [FreeTextAnswer]: the patient reads and edits before
+  /// anything is recorded.
+  void _dictated(String text) {
+    if (text.trim().isEmpty) return;
+    final existing = _controller.text.trimRight();
+    final joined = existing.isEmpty ? text.trim() : '$existing ${text.trim()}';
+    setState(() {
+      _controller.text = joined;
+      _controller.selection =
+          TextSelection.collapsed(offset: _controller.text.length);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = Strings.of(context);
+    final detailEmpty = _controller.text.trim().isEmpty;
+
+    VoidCallback? onConfirm;
+    if (_yes == false) {
+      onConfirm = () => widget.onAnswered(const TextValue(''), strings.optNo);
+    } else if (_yes == true && !detailEmpty) {
+      onConfirm = () {
+        final text = _controller.text.trim();
+        widget.onAnswered(TextValue(text), text);
+      };
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _VoiceRow(
+          language: widget.language,
+          matcher: (t) => matchYesNo(transcript: t, language: widget.language),
+          onMatch: (m) => setState(() => _yes = m.optionCode == 'yes'),
+          onDontKnow: widget.onDontKnow,
+        ),
+        OptionTile(
+          key: const Key('option.yes'),
+          label: strings.optYes,
+          selected: _yes == true,
+          onTap: () => setState(() => _yes = true),
+        ),
+        OptionTile(
+          key: const Key('option.no'),
+          label: strings.optNo,
+          selected: _yes == false,
+          onTap: () => setState(() {
+            _yes = false;
+            _controller.clear();
+          }),
+        ),
+        if (_yes == true) ...[
+          const SizedBox(height: Sizes.gap),
+          _VoiceRow(
+            language: widget.language,
+            matcher: (t) =>
+                matchDictation(transcript: t, language: widget.language),
+            onMatch: (m) => _dictated(m.heardLabel ?? ''),
+          ),
+          TextField(
+            key: const Key('answer.yes_no_detail'),
+            controller: _controller,
+            maxLines: 4,
+            style: Theme.of(context).textTheme.bodyLarge,
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+        const SizedBox(height: Sizes.gap),
+        ConfirmButton(
+          buttonKey: const Key('answer.confirm'),
+          label: strings.continueLabel,
+          onPressed: onConfirm,
         ),
       ],
     );
@@ -1233,7 +1372,7 @@ class _DurationAnswerState extends State<DurationAnswer> {
         for (final unit in _units)
           OptionTile(
             key: Key('duration.$unit'),
-            label: optionLabel(unit),
+            label: durationUnitLabel(strings, unit),
             selected: _unit == unit,
             onTap: () => setState(() {
               _touchedByPatient = true;

@@ -236,5 +236,18 @@
   "onboardingUploadTitle": "તમારા મેડિકલ રેકોર્ડ ઉમેરો",
   "onboardingUploadBody": "જૂની પ્રિસ્ક્રિપ્શન કે રિપોર્ટનો ફોટો પાડો.",
   "onboardingReviewTitle": "તપાસો અને મોકલો",
-  "onboardingReviewBody": "તમારા જવાબો તપાસો, પછી વૈદ્યને મોકલો."
+  "onboardingReviewBody": "તમારા જવાબો તપાસો, પછી વૈદ્યને મોકલો.",
+  "durationUnitHour": "કલાક",
+  "durationUnitDay": "દિવસ",
+  "durationUnitWeek": "અઠવાડિયું",
+  "durationUnitMonth": "મહિનો",
+  "durationUnitYear": "વર્ષ",
+  "departmentKayachikitsa": "કાયચિકિત્સા (સામાન્ય તબીબી સારવાર)",
+  "departmentPanchakarma": "પંચકર્મ (શુદ્ધિકરણ ઉપચાર)",
+  "departmentShalya": "શલ્ય (સર્જરી)",
+  "departmentShalakya": "શાલાક્ય (ઈએનટી અને નેત્રરોગ)",
+  "departmentPrasuti": "પ્રસૂતિ અને સ્ત્રી રોગ (પ્રસૂતિ અને સ્ત્રીરોગ સારવાર)",
+  "departmentKaumarbhritya": "કૌમારભૃત્ય (બાળરોગ સારવાર)",
+  "departmentSwasthavritta": "સ્વસ્થવૃત્ત (નિવારક સારવાર)",
+  "departmentGeneralNotSure": "ખાતરી નથી — સ્ટાફ મદદ કરશે"
 }

@@ -236,5 +236,18 @@
   "onboardingUploadTitle": "உங்கள் மருத்துவ ஆவணங்களைச் சேருங்கள்",
   "onboardingUploadBody": "பழைய மருந்துச் சீட்டு அல்லது அறிக்கையின் புகைப்படம் எடுங்கள்.",
   "onboardingReviewTitle": "சரிபார்த்து அனுப்புங்கள்",
-  "onboardingReviewBody": "உங்கள் பதில்களைச் சரிபார்த்து, பின் வைத்தியருக்கு அனுப்புங்கள்."
+  "onboardingReviewBody": "உங்கள் பதில்களைச் சரிபார்த்து, பின் வைத்தியருக்கு அனுப்புங்கள்.",
+  "durationUnitHour": "மணி நேரம்",
+  "durationUnitDay": "நாள்",
+  "durationUnitWeek": "வாரம்",
+  "durationUnitMonth": "மாதம்",
+  "durationUnitYear": "ஆண்டு",
+  "departmentKayachikitsa": "காயசிகிச்சை (பொது மருத்துவம்)",
+  "departmentPanchakarma": "பஞ்சகர்மா (சுத்திகரிப்பு சிகிச்சை)",
+  "departmentShalya": "சல்யா (அறுவை சிகிச்சை)",
+  "departmentShalakya": "சாலாக்யா (காது மூக்கு தொண்டை மற்றும் கண் மருத்துவம்)",
+  "departmentPrasuti": "பிரசூதி மற்றும் ஸ்திரீ ரோகா (மகப்பேறு மற்றும் மகளிர் மருத்துவம்)",
+  "departmentKaumarbhritya": "கௌமாரப்ரிதயா (குழந்தை மருத்துவம்)",
+  "departmentSwasthavritta": "ஸ்வஸ்தவிருத்தா (தடுப்பு மருத்துவம்)",
+  "departmentGeneralNotSure": "தெரியவில்லை — பணியாளர்கள் வழிகாட்டுவார்கள்"
 }

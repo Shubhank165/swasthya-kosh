@@ -12,6 +12,7 @@ import '../../identity/abha_screen.dart';
 import '../../identity/hospital_repository.dart';
 import '../begin.dart';
 import '../widgets/answer_widgets.dart';
+import '../../voice/read_aloud.dart';
 import '../../voice/read_aloud_button.dart';
 
 /// An icon for a department, by the code the content uses.
@@ -70,6 +71,30 @@ const _catchAllDepartments = <String>{
   'unsure',
   'dont_know',
 };
+
+/// The label for a department, in the language the patient chose.
+///
+/// The backend sends `display` as a plain-English gloss for a client with no
+/// string yet for this code (see `api/v1/hospitals.py`'s `_DISPLAY`) — never a
+/// translation. Rendering a department in every language this app speaks is
+/// this app's job, so the code is looked up here first and `display` is only
+/// the fallback for a department code this app does not yet have a string
+/// for. The Sanskrit name itself is left as-is in every language — see the
+/// backend comment this mirrors: anglicising or transliterating it would make
+/// the screen easier to read and harder to match against the sign a patient
+/// walked past.
+String departmentLabel(Strings strings, String code, String fallbackDisplay) =>
+    switch (code) {
+      'kayachikitsa' => strings.departmentKayachikitsa,
+      'panchakarma' => strings.departmentPanchakarma,
+      'shalya' => strings.departmentShalya,
+      'shalakya' => strings.departmentShalakya,
+      'prasuti' => strings.departmentPrasuti,
+      'kaumarbhritya' => strings.departmentKaumarbhritya,
+      'swasthavritta' => strings.departmentSwasthavritta,
+      'general' => strings.departmentGeneralNotSure,
+      _ => fallbackDisplay,
+    };
 
 IconData _iconFor(String code) =>
     _departmentIcons[code.toLowerCase()] ?? Icons.medical_information_outlined;
@@ -133,21 +158,30 @@ class HospitalScreen extends ConsumerWidget {
                     // reach of screen 5 — and it is offered only to a patient
                     // who has signed in, since there is nothing to link an
                     // address to otherwise (§7.2, §7.3).
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) =>
-                            ref.watch(signedInProvider).valueOrNull == true
-                                ? AbhaScreen(
-                                    onDone: () =>
-                                        Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) => const ConsentGate(),
+                    onPressed: () {
+                      // Pushing a new route keeps this one alive underneath
+                      // (in case of a back gesture), so its ReadAloudButton is
+                      // never disposed and, unlike walking question-to-
+                      // question inside the interview, nothing here rebuilds
+                      // it either. Left alone, whatever this screen was
+                      // reading carries on playing under the next screen.
+                      ref.read(readAloudProvider).stop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              ref.watch(signedInProvider).valueOrNull == true
+                                  ? AbhaScreen(
+                                      onDone: () =>
+                                          Navigator.of(context).pushReplacement(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => const ConsentGate(),
+                                        ),
                                       ),
-                                    ),
-                                  )
-                                : const ConsentGate(),
-                      ),
-                    ),
+                                    )
+                                  : const ConsentGate(),
+                        ),
+                      );
+                    },
                     icon: const Icon(Icons.arrow_forward),
                     iconAlignment: IconAlignment.end,
                     label: Text(strings.continueLabel),
@@ -207,7 +241,8 @@ class HospitalScreen extends ConsumerWidget {
                         // Read in the order they are drawn in. A voice that
                         // lists them differently from the screen is a voice the
                         // patient has to reconcile against it.
-                        for (final department in ordered) department.display,
+                        for (final department in ordered)
+                          departmentLabel(strings, department.code, department.display),
                     ].join('. '),
                     language: language,
                   ),
@@ -273,7 +308,8 @@ class _DepartmentTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => OptionTile(
         key: Key('department.${department.code}'),
         icon: _iconFor(department.code),
-        label: department.display,
+        label: departmentLabel(
+            Strings.of(context), department.code, department.display),
         selected: ref.watch(selectedDepartmentProvider) == department.code,
         onTap: () =>
             ref.read(selectedDepartmentProvider.notifier).state =

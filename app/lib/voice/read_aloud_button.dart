@@ -76,6 +76,12 @@ class _ReadAloudButtonState extends ConsumerState<ReadAloudButton> {
       _available = ref.read(readAloudProvider).canSpeak(widget.language);
     }
     if (old.utteranceKey != widget.utteranceKey) {
+      // Leaving the previous question for this one. Whatever it was saying
+      // must not carry on over the new question — belt-and-braces alongside
+      // `speak()`'s own stop-before-play, so a question with nothing to say
+      // (or a device that briefly reports no voice available) still leaves
+      // the old audio silenced rather than let it run on.
+      _service.stop();
       _scheduleAutoRead();
     }
   }

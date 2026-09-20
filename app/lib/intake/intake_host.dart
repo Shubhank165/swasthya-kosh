@@ -143,14 +143,14 @@ class _IntakeHostState extends ConsumerState<IntakeHost> {
     // doing its job. A bundle can also carry a section id nobody has written a
     // name for yet, and in that case the label stays the plain section count
     // rather than showing a patient an internal identifier.
+    // Section name only, never "n/total" — a patient is not told how many
+    // questions remain. The bar above the label (driven by
+    // `flow.questionFraction`) still shows how far through the section they
+    // are, just without putting a count on it.
     String? stepLabel;
     final step = flow.sectionStepFor(question.questionId);
     if (step != null) {
-      final name = sectionDisplayName(strings, step.section);
-      if (name != null) {
-        stepLabel =
-            step.stable ? strings.sectionStep(name, step.position, step.total) : name;
-      }
+      stepLabel = sectionDisplayName(strings, step.section);
     }
 
     // The chief complaint gets the icon grid (§5 screen 6) — it is the first
