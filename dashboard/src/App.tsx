@@ -15,8 +15,9 @@ import {
   Eye
 } from 'lucide-react';
 import { IntakeData, PatientQueueItem } from './types';
-import { OPD_PATIENT_QUEUE } from './data/patientIntakes';
+import { useQueue } from './api/useQueue';
 import { OpdPatientQueueView } from './components/OpdPatientQueueView';
+import { QueueStatusBar } from './components/QueueStatusBar';
 import { Header } from './components/Header';
 import { VitalsStation } from './components/VitalsStation';
 import { ChiefComplaintCard } from './components/ChiefComplaintCard';
@@ -30,15 +31,28 @@ type TabType = 'overview' | 'ayurveda' | 'complaints' | 'vitals' | 'ocr' | 'tran
 
 export default function App() {
   const [viewMode, setViewMode] = useState<'queue' | 'patient_portal'>('queue');
-  const [patientQueue, setPatientQueue] = useState<PatientQueueItem[]>(OPD_PATIENT_QUEUE);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('p-042');
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showAbhaModal, setShowAbhaModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
 
-  // Active Patient Object
-  const currentPatient = patientQueue.find(p => p.id === selectedPatientId) || patientQueue[0];
-  const currentData: IntakeData = currentPatient.intakeData;
+  // The live OPD queue. `overrides` holds the one thing this screen changes
+  // locally — whether the doctor has started or finished with a patient —
+  // because the backend has no endpoint for it yet and losing it on every
+  // fifteen-second refresh would be worse than holding it here.
+  const { patients: livePatients, loading, error, lastUpdated, refresh } = useQueue();
+  const [overrides, setOverrides] = useState<Record<string, PatientQueueItem['queueStatus']>>({});
+  const patientQueue = livePatients.map((p) =>
+    overrides[p.id] ? { ...p, queueStatus: overrides[p.id] } : p,
+  );
+
+  // Active Patient Object. Both may be absent before the first load lands, and
+  // every read below is guarded rather than defaulted: a dashboard that renders
+  // a plausible patient while it waits is a dashboard that can show the wrong
+  // one.
+  const currentPatient =
+    patientQueue.find((p) => p.id === selectedPatientId) ?? patientQueue[0] ?? null;
+  const currentData: IntakeData | null = currentPatient ? currentPatient.intakeData : null;
 
   // Next patient navigation
   const currentIndex = patientQueue.findIndex(p => p.id === selectedPatientId);
@@ -59,17 +73,51 @@ export default function App() {
   };
 
   const handleStatusChange = (newStatus: string) => {
-    setPatientQueue(prev =>
-      prev.map(p => (p.id === currentPatient.id ? { ...p, queueStatus: newStatus as PatientQueueItem['queueStatus'] } : p))
-    );
+    if (!currentPatient) return;
+    setOverrides(prev => ({
+      ...prev,
+      [currentPatient.id]: newStatus as PatientQueueItem['queueStatus'],
+    }));
   };
 
   if (viewMode === 'queue') {
     return (
-      <OpdPatientQueueView
-        queue={patientQueue}
-        onSelectPatient={handleSelectPatient}
-      />
+      <>
+        <QueueStatusBar
+          loading={loading}
+          error={error}
+          lastUpdated={lastUpdated}
+          count={patientQueue.length}
+          onRefresh={refresh}
+        />
+        <OpdPatientQueueView
+          queue={patientQueue}
+          onSelectPatient={handleSelectPatient}
+        />
+      </>
+    );
+  }
+
+  // The queue can be empty, and before the first fetch lands it always is.
+  // `patientQueue[0]` is typed as present but is not, so this guard is load
+  // bearing rather than defensive decoration — without it the first render
+  // reads `.intakeData` off undefined.
+  if (!currentPatient || !currentData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100/70">
+        <div className="text-center max-w-md px-6">
+          <p className="text-slate-700 font-semibold">
+            {loading ? 'Loading the OPD queue…' : 'No patient selected'}
+          </p>
+          {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
+          <button
+            onClick={() => setViewMode('queue')}
+            className="mt-4 px-4 py-2 rounded-lg bg-slate-800 text-white text-sm"
+          >
+            Back to queue
+          </button>
+        </div>
+      </div>
     );
   }
 
