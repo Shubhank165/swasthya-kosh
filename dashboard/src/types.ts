@@ -52,6 +52,23 @@ export interface IntakeData {
   turns: Turn[];
   fields: Record<string, FieldItem>;
   red_flags: string[];
+  /**
+   * Scans the patient attached to this visit.
+   *
+   * Separate from `fields` because a document and a fact are different things:
+   * the OCR of a prescription becomes facts (`current_medications`, `lab_*`),
+   * but the scan itself is evidence a physician may want to look at, and it
+   * exists even while its reading is still pending or has failed. An empty
+   * list and an absent list mean the same thing here — nothing was attached.
+   */
+  documents?: Array<{
+    document_id: string;
+    kind: string;
+    status?: string;
+    captured_at?: string | null;
+    items?: Array<{ label?: string; value?: string; text?: string }>;
+  }>;
+
   // Clinical enriched extensions for the Doctor's Dashboard:
   abhaDetails?: {
     abhaNumber: string;

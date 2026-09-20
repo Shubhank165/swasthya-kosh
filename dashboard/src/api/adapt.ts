@@ -181,6 +181,11 @@ export function toIntakeData(intake: ApiIntake): IntakeData {
     turns: rebuildTurns(intake.facts),
     fields,
     red_flags: intake.red_flags.map((flag) => flag.label || flag.rule_id),
+    // Carried through as sent. A scan whose OCR has not run yet, or failed, is
+    // still a document the patient handed over, and dropping it here would let
+    // the screen say "no records" about a prescription that is sitting in the
+    // bucket.
+    documents: intake.documents,
     cameraVitals: cameraVitals(fields),
   };
 }

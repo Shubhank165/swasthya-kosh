@@ -7,17 +7,33 @@ interface VitalsStationProps {
 }
 
 export const VitalsStation: React.FC<VitalsStationProps> = ({ currentData }) => {
-  const vitals = currentData.cameraVitals || {
-    heartRateBpm: 82,
-    respiratoryRateBpm: 18,
-    confidence: 0.93,
-    sensorType: 'Kiosk Contactless Jetson-Camera (rPPG)',
-    extractionDurationSec: 18,
-    timestamp: 'Just now',
-    spo2Estimate: 98,
-    hrvMs: 58,
-    qualityIndex: 'Good'
-  };
+  const vitals = currentData.cameraVitals;
+
+  // No reading is a state to report, not a gap to fill. This used to fall back
+  // to 82 bpm / 18 rpm / 98% SpO2, which reads on a physician's screen as four
+  // measurements that were taken — and none of them were. A kiosk that could
+  // not hold the patient's face, or an intake from the phone app where there is
+  // no camera at all, must say so.
+  if (!vitals) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center shrink-0">
+            <Camera className="w-3.5 h-3.5" />
+          </div>
+          <h3 className="text-sm font-bold text-slate-900">Contactless Vitals</h3>
+        </div>
+        <div className="px-5 py-8 text-center">
+          <p className="text-sm font-semibold text-slate-700">No camera reading on this record</p>
+          <p className="mt-1.5 text-xs text-slate-500 max-w-sm mx-auto">
+            {currentData.source === 'kiosk'
+              ? 'The kiosk either did not run the measurement, or discarded one its signal analysis would not stand behind.'
+              : 'This intake came from the phone app, which has no contactless vitals station.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
@@ -111,7 +127,7 @@ export const VitalsStation: React.FC<VitalsStationProps> = ({ currentData }) => 
               </div>
               <div className="mt-0.5 flex items-baseline gap-1.5">
                 <span className="text-2xl font-black text-slate-900 tracking-tight">
-                  {vitals.spo2Estimate || 98}%
+                  {vitals.spo2Estimate ?? '\u2014'}{vitals.spo2Estimate ? '%' : ''}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-500">O₂ saturation</span>
               </div>
