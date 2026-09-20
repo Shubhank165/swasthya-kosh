@@ -92,9 +92,19 @@ def _readable(field_id: str) -> str:
         bowel.blood_in_stool       ->  Blood in stool
         ayush.skin_texture         ->  Skin texture
     """
-    tail = field_id.rsplit(".", 1)[-1]
+    namespace, _, tail = field_id.rpartition(".")
     words = tail.replace("_", " ").strip()
-    return words[:1].upper() + words[1:] if words else field_id
+    if not words:
+        return field_id
+    # A one-word tail under a clinical namespace loses its subject when the
+    # namespace goes: `bleeding.amount` becomes "Amount", which on a report line
+    # says nothing. So the namespace comes back for those — but only for the
+    # clinical ones. `general`, `routing`, `fixed` and `history` are structural,
+    # and "General severity" is worse than "Severity", not better.
+    structural = {"general", "routing", "fixed", "history"}
+    if namespace and namespace not in structural and " " not in words:
+        words = f"{namespace.replace('_', ' ')} {words}"
+    return words[:1].upper() + words[1:]
 
 
 class FieldLabels:
