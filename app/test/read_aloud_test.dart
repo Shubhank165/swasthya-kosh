@@ -164,6 +164,55 @@ void main() {
       expect(find.byIcon(Icons.volume_off), findsOneWidget);
     });
 
+    testWidgets('silencing one question never silences the next', (tester) async {
+      // The mute used to be sticky — turning off read-aloud on one question
+      // turned it off for every question after, until tapped back on. The
+      // patient wants exactly the opposite: stopping this one must not touch
+      // the next one's automatic read.
+      final fake = _FakeReadAloud();
+      await tester.pumpWidget(_host(
+        const ReadAloudButton(
+          utteranceKey: 'q1', text: 'First?', language: 'en'),
+        fake,
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('question.readAloud')));
+      await tester.pumpAndSettle();
+      expect(fake.speakingKey.value, isNull);
+
+      await tester.pumpWidget(_host(
+        const ReadAloudButton(
+          utteranceKey: 'q2', text: 'Second?', language: 'en'),
+        fake,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(fake.spoken.map((s) => s.text), ['First?', 'Second?']);
+      expect(find.byIcon(Icons.stop), findsOneWidget,
+          reason: 'the new question is speaking on its own, unmuted');
+    });
+
+    testWidgets('tapping again while silent replays this question',
+        (tester) async {
+      final fake = _FakeReadAloud();
+      await tester.pumpWidget(_host(
+        const ReadAloudButton(
+          utteranceKey: 'q1', text: 'Kaisa lag raha hai?', language: 'hi'),
+        fake,
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('question.readAloud')));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.volume_off), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('question.readAloud')));
+      await tester.pumpAndSettle();
+
+      expect(fake.spoken.map((s) => s.text),
+          ['Kaisa lag raha hai?', 'Kaisa lag raha hai?']);
+      expect(find.byIcon(Icons.stop), findsOneWidget);
+    });
+
     testWidgets('renders nothing for an empty utterance', (tester) async {
       final fake = _FakeReadAloud();
       await tester.pumpWidget(_host(

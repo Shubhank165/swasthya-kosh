@@ -2,19 +2,21 @@
 ///
 /// Read-aloud is automatic: when a question opens, its prompt and options are
 /// spoken without the patient touching anything, in the language they chose.
-/// This control is then a **mute toggle** — tap it while it is speaking (or any
-/// time after) to silence it and stop the next question reading itself; tap it
-/// again to turn the automatic reading back on and replay the current question.
+/// Tapping the control while it speaks silences *that one utterance* — the
+/// next question still reads itself automatically, unaffected. Tapping it
+/// again while silent replays the current question. Nothing here is
+/// remembered between questions or between launches: every new question gets
+/// its own fresh, unmuted automatic read, which is what "starts automatically,
+/// but the patient can stop it" means for a screen that changes every few
+/// seconds.
 ///
 /// It renders nothing when the device has no voice for the chosen language, so
-/// a patient is never offered — or played — audio in the wrong one. The choice
-/// is remembered between launches via [readAloudEnabledProvider].
+/// a patient is never offered — or played — audio in the wrong one.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/providers.dart';
 import '../l10n/strings.dart';
 import 'read_aloud.dart';
 
@@ -46,8 +48,13 @@ class _ReadAloudButtonState extends ConsumerState<ReadAloudButton> {
   late final ReadAloud _service;
 
   /// The question this button has already started reading, so a rebuild does
-  /// not restart it and a mute is not immediately undone.
+  /// not restart it and a manual stop is not immediately undone.
   String? _handled;
+
+  /// True once the patient has silenced *this* question. Reset the moment a
+  /// new question arrives — it is never carried forward, unlike the mute this
+  /// control used to be.
+  bool _mutedByPatient = false;
 
   @override
   void initState() {
@@ -82,6 +89,9 @@ class _ReadAloudButtonState extends ConsumerState<ReadAloudButton> {
       // (or a device that briefly reports no voice available) still leaves
       // the old audio silenced rather than let it run on.
       _service.stop();
+      // A fresh question always starts unmuted — silencing one question never
+      // silences the next.
+      setState(() => _mutedByPatient = false);
       _scheduleAutoRead();
     }
   }
@@ -94,7 +104,6 @@ class _ReadAloudButtonState extends ConsumerState<ReadAloudButton> {
     if (!mounted) return;
     if (widget.text.trim().isEmpty) return;
     if (_handled == widget.utteranceKey) return;
-    if (!ref.read(readAloudEnabledProvider)) return;
     if (!await _available) return;
     if (!mounted || _handled == widget.utteranceKey) return;
     _handled = widget.utteranceKey;
@@ -105,25 +114,20 @@ class _ReadAloudButtonState extends ConsumerState<ReadAloudButton> {
         );
   }
 
-  void _setEnabled(bool value) {
-    ref.read(readAloudEnabledProvider.notifier).state = value;
-    ref.read(readAloudPrefStoreProvider).write(value);
-  }
-
   Future<void> _onTap() async {
     final service = ref.read(readAloudProvider);
     final speakingThis = service.speakingKey.value == widget.utteranceKey;
     if (speakingThis) {
-      // Silence it and keep it silenced — the next question will not read
-      // itself until the patient turns this back on.
+      // Silence just this question. The next one is untouched by this — it
+      // still reads itself the moment it appears.
       await service.stop();
       _handled = widget.utteranceKey;
-      _setEnabled(false);
+      setState(() => _mutedByPatient = true);
       return;
     }
-    // Not speaking: (re)start this question and resume automatic reading.
-    if (!ref.read(readAloudEnabledProvider)) _setEnabled(true);
+    // Not speaking: replay this question.
     _handled = widget.utteranceKey;
+    setState(() => _mutedByPatient = false);
     await service.speak(
       key: widget.utteranceKey,
       text: widget.text,
@@ -136,7 +140,6 @@ class _ReadAloudButtonState extends ConsumerState<ReadAloudButton> {
     if (widget.text.trim().isEmpty) return const SizedBox.shrink();
     final strings = Strings.of(context);
     final service = ref.watch(readAloudProvider);
-    final enabled = ref.watch(readAloudEnabledProvider);
 
     return FutureBuilder<bool>(
       future: _available,
@@ -152,7 +155,7 @@ class _ReadAloudButtonState extends ConsumerState<ReadAloudButton> {
               icon: Icon(
                 isThis
                     ? Icons.stop
-                    : (enabled ? Icons.volume_up : Icons.volume_off),
+                    : (_mutedByPatient ? Icons.volume_off : Icons.volume_up),
               ),
               label:
                   Text(isThis ? strings.stopListening : strings.listenToThis),
