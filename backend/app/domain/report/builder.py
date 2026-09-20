@@ -71,6 +71,32 @@ BODY_SECTIONS: tuple[Section, ...] = tuple(
 )
 
 
+def _readable(field_id: str) -> str:
+    """A field id with no concept, made readable — and nothing more.
+
+    The registry names 119 concepts. The compiled question bundle emits several
+    hundred more as namespaced ids (`general.previous_episodes`,
+    `bowel.blood_in_stool`, `ayush.skin_texture`), none of which match a concept,
+    so every one of them used to print as its own id with the underscores taken
+    out: a physician's sheet read `general.previous_episodes`. On one live app
+    intake that was 87 of 92 lines.
+
+    This is a **formatting** change and deliberately not a content one. The
+    namespace is dropped, underscores become spaces, and the first letter is
+    capitalised. Nothing here invents a clinical display name — naming a finding
+    is a clinician's act, which is why `concepts.yaml` entries carry
+    `needs_clinical_review` and this does not pretend to substitute for one. A
+    concept always wins where it exists.
+
+        general.previous_episodes  ->  Previous episodes
+        bowel.blood_in_stool       ->  Blood in stool
+        ayush.skin_texture         ->  Skin texture
+    """
+    tail = field_id.rsplit(".", 1)[-1]
+    words = tail.replace("_", " ").strip()
+    return words[:1].upper() + words[1:] if words else field_id
+
+
 class FieldLabels:
     """Field id -> the words a physician reads.
 
@@ -84,7 +110,7 @@ class FieldLabels:
         self._labels = dict(labels or {})
 
     def __call__(self, field_id: str) -> str:
-        return self._labels.get(field_id) or field_id.replace("_", " ")
+        return self._labels.get(field_id) or _readable(field_id)
 
     def as_mapping(self) -> dict[str, str]:
         """The underlying map, for callers that need it as data."""

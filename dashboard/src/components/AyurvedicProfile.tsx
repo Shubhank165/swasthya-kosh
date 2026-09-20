@@ -18,12 +18,48 @@ export const AyurvedicProfile: React.FC<AyurvedicProfileProps> = ({ currentData 
   const [activeSubTab, setActiveSubTab] = useState<'prakriti' | 'pariksha' | 'chikitsa'>('prakriti');
   const fields = currentData.fields;
 
-  // Dynamically derived from JSON intake fields
-  const dosha = fields.ayurveda_dosha_tendency?.value?.text || 'pitta';
-  const aharaShakti = fields.ayurveda_ahara_shakti?.value?.text || 'moderate';
-  const vyayamaShakti = fields.ayurveda_vyayama_shakti?.value?.text || 'moderate';
-  const satmya = fields.ayurveda_satmya?.value?.text || 'mixed';
-  const satva = fields.ayurveda_satva?.value?.text || 'moderate';
+  /**
+   * Dashavidha Pariksha, as the kiosk reported it.
+   *
+   * These used to default to 'pitta' / 'moderate' / 'mixed' when the fact was
+   * absent, which put a constitutional finding on the screen for a patient
+   * nobody had assessed. A Prakriti is a clinical act performed by a Vaidya;
+   * inventing one is the worst version of the fabricated-vitals problem, not a
+   * milder one. Absent now reads as absent.
+   */
+  const dosha = fields.ayurveda_dosha_tendency?.value?.text ?? null;
+  const aharaShakti = fields.ayurveda_ahara_shakti?.value?.text ?? null;
+  const vyayamaShakti = fields.ayurveda_vyayama_shakti?.value?.text ?? null;
+  const satmya = fields.ayurveda_satmya?.value?.text ?? null;
+  const satva = fields.ayurveda_satva?.value?.text ?? null;
+  const prakritiSelfReport = fields.prakriti_self_report?.value?.text ?? null;
+
+  /**
+   * The phone app's AYUSH module, which is a different instrument.
+   *
+   * The kiosk runs Dashavidha Pariksha and sends `ayurveda_*`; the app walks a
+   * 62-item CCRAS Prakriti questionnaire and sends `ayush.*`. They are
+   * deliberately **not** aliased onto each other — "Ahara Shakti" and "skin
+   * texture" are not two names for one observation, and merging them would put
+   * a classical parameter on a sheet that no question established. So each is
+   * shown as itself, under its own heading, and a record carrying neither says
+   * so.
+   */
+  const ayushItems = Object.entries(fields)
+    .filter(([fieldId, item]) => fieldId.startsWith('ayush.') && item.status === 'answered')
+    .map(([fieldId, item]) => ({
+      fieldId,
+      // The backend labels these; it is the only place allowed to name a
+      // clinical field, and deriving a display string here would be the
+      // dashboard inventing content.
+      label: fieldId.slice('ayush.'.length).replace(/_/g, ' '),
+      value: item.value?.text ?? item.value?.display ?? item.original_text ?? '',
+    }))
+    .filter((row) => row.value !== '');
+
+  const hasDashavidha = Boolean(
+    dosha || aharaShakti || vyayamaShakti || satmya || satva || prakritiSelfReport,
+  );
 
   // Dynamic suspected roga & chikitsa derived directly from JSON fields
   const complaintText = (
@@ -33,6 +69,20 @@ export const AyurvedicProfile: React.FC<AyurvedicProfileProps> = ({ currentData 
     ''
   ).toLowerCase();
 
+  /**
+   * Whether the complaint matched any pattern below.
+   *
+   * The Roga, Samprapti, Chikitsa, Pathya/Apathya and three formulations that
+   * follow are a hardcoded lookup on the complaint text, and Amlapitta was its
+   * *default* — so a patient whose complaint was "mental" was shown a suspected
+   * diagnosis of hyperacidity, a samprapti, and three named medicines with
+   * doses. That is a prescription for a condition nobody suspected.
+   *
+   * The lookup is left as it is for the three patterns it genuinely recognises,
+   * but it no longer falls through to one. An unmatched complaint says the
+   * mapping does not cover it, and the block is not rendered at all.
+   */
+  let matchedRoga = false;
   let suspectedRoga = 'Amlapitta (Hyperacidity / Vidagdhajirna)';
   let samprapti = 'Pitta vitiation with Drava & Tikshna Guna increase';
   let chikitsaPrinciple = 'Deepana, Pachana, and Pitta-shamana followed by gentle Anulomana. Eradicate Aama dosha before prescribing heavy Rasayana formulations.';
@@ -50,7 +100,10 @@ export const AyurvedicProfile: React.FC<AyurvedicProfileProps> = ({ currentData 
   let formulation2 = { name: 'Kamadudha Rasa (Mukta-yukta)', dose: '250mg twice daily with lukewarm milk to cool acidity.', role: 'Pitta Shamana' };
   let formulation3 = { name: 'Triphala / Drakshasava', dose: '15-20ml with equal water post-dinner for mild laxative action.', role: 'Anulomana' };
 
-  if (complaintText.includes('knee') || complaintText.includes('joint') || complaintText.includes('sandhivata') || dosha.includes('vata-kapha')) {
+  if (complaintText.includes('acid') || complaintText.includes('amlapitta') || complaintText.includes('heartburn')) {
+    matchedRoga = true;
+  } else if (complaintText.includes('knee') || complaintText.includes('joint') || complaintText.includes('sandhivata') || (dosha?.includes('vata-kapha') ?? false)) {
+    matchedRoga = true;
     suspectedRoga = 'Sandhivata (Osteoarthritis / Vata-Kapha Joint Disorder)';
     samprapti = 'Vata aggravation causing Dhatukshaya (cartilage wear) & joint stiffness';
     chikitsaPrinciple = 'Vata-shamana, Snehana-Swedana, Agni Deepana, and Shothahara (anti-inflammatory) principles.';
@@ -67,7 +120,8 @@ export const AyurvedicProfile: React.FC<AyurvedicProfileProps> = ({ currentData 
     formulation1 = { name: 'Yograj Guggulu', dose: '2 tablets twice daily with warm water after meals.', role: 'Shoola & Shothahara' };
     formulation2 = { name: 'Dashamoola Kwatha', dose: '20ml with equal warm water morning and evening.', role: 'Vata Shamana' };
     formulation3 = { name: 'Mahanarayana Taila', dose: 'External gentle application to affected joints twice daily.', role: 'Snehana & Vedanasthapana' };
-  } else if (complaintText.includes('headache') || complaintText.includes('migraine') || complaintText.includes('shirashoola') || dosha.includes('pitta-vata')) {
+  } else if (complaintText.includes('headache') || complaintText.includes('migraine') || complaintText.includes('shirashoola') || (dosha?.includes('pitta-vata') ?? false)) {
+    matchedRoga = true;
     suspectedRoga = 'Ardhavabhedaka / Shirashoola (Vascular Cephalea / Pitta-Vata Shiroroga)';
     samprapti = 'Rakta-Pitta vitiation provoked by Ushna-Tikshna triggers and irregular eating';
     chikitsaPrinciple = 'Shiro-abhyanga, Pratimarsha Nasya, Pitta Shamana, and stress alleviation.';
@@ -145,24 +199,75 @@ export const AyurvedicProfile: React.FC<AyurvedicProfileProps> = ({ currentData 
       </div>
 
       <div className="p-5 space-y-4">
-        {/* Suspected Vyadhi Diagnostic Banner with Warm Saffron Accents */}
-        <div className="p-3.5 bg-amber-50/60 border border-amber-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <span className="text-[11px] font-bold text-amber-900 bg-amber-200/70 px-2 py-0.5 rounded-md uppercase tracking-wider">
-              Suspected Roga
-            </span>
-            <span className="text-sm font-bold text-amber-950">
-              {suspectedRoga}
-            </span>
+        {/* Suspected Vyadhi. Shown only where the complaint mapping recognises
+            the complaint — never as a default. */}
+        {matchedRoga ? (
+          <div className="p-3.5 bg-amber-50/60 border border-amber-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-[11px] font-bold text-amber-900 bg-amber-200/70 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                Suspected Roga
+              </span>
+              <span className="text-sm font-bold text-amber-950">{suspectedRoga}</span>
+            </div>
+            {dosha && (
+              <span className="text-xs font-bold text-amber-900 bg-white/90 px-2.5 py-1 rounded-lg border border-amber-200 shadow-2xs self-start sm:self-auto">
+                Dosha: <strong className="capitalize text-amber-950">{dosha}</strong>
+              </span>
+            )}
           </div>
-          <span className="text-xs font-bold text-amber-900 bg-white/90 px-2.5 py-1 rounded-lg border border-amber-200 shadow-2xs self-start sm:self-auto">
-            Dosha: <strong className="capitalize text-amber-950">{dosha}</strong>
-          </span>
-        </div>
+        ) : (
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
+            No suspected Roga shown — this complaint is not covered by the
+            dashboard's complaint mapping, and a default would be a guess at a
+            diagnosis. The recorded complaint and findings are below.
+          </div>
+        )}
 
         {/* 1. Prakriti & Agni View */}
         {activeSubTab === 'prakriti' && (
           <div className="space-y-4">
+            {!hasDashavidha && ayushItems.length === 0 && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-6 text-center">
+                <p className="text-sm font-semibold text-slate-700">
+                  No Ayurvedic assessment on this record
+                </p>
+                <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
+                  Neither the kiosk's Dashavidha Pariksha nor the app's Prakriti
+                  questionnaire was completed for this visit.
+                </p>
+              </div>
+            )}
+
+            {ayushItems.length > 0 && (
+              <div className="rounded-xl border border-violet-200/80 bg-violet-50/40 overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-violet-200/70 flex items-center justify-between gap-2 flex-wrap">
+                  <h4 className="text-xs font-bold text-violet-950 uppercase tracking-wide">
+                    Prakriti questionnaire (CCRAS, patient-reported)
+                  </h4>
+                  <span className="text-[10px] font-semibold bg-violet-100 text-violet-900 px-2 py-0.5 rounded-full border border-violet-200">
+                    {ayushItems.length} of 62 answered · from the app
+                  </span>
+                </div>
+                <dl className="divide-y divide-violet-100">
+                  {ayushItems.map((row) => (
+                    <div key={row.fieldId} className="px-4 py-2 flex items-baseline gap-3 text-xs">
+                      <dt className="w-1/2 shrink-0 text-slate-600 capitalize">{row.label}</dt>
+                      <dd className="font-semibold text-slate-900">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="px-4 py-2 text-[11px] text-violet-900/70 border-t border-violet-100">
+                  A self-reported instrument, not a Vaidya's classification. Item
+                  weights are provisional until reviewed.
+                </p>
+              </div>
+            )}
+
+            {hasDashavidha && (
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                Dashavidha Pariksha · from the kiosk
+              </p>
+            )}
             {/* 4 Colorful Vitality Markers (Orange, Emerald, Purple, Blue) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Dosha Tendency */}
@@ -177,7 +282,7 @@ export const AyurvedicProfile: React.FC<AyurvedicProfileProps> = ({ currentData 
                   </span>
                 </div>
                 <div className="text-lg font-bold text-orange-950 capitalize">
-                  {dosha} Pradhana
+                  {dosha ? `${dosha} Pradhana` : 'Not assessed'}
                 </div>
                 <p className="text-xs text-orange-800/80 mt-1">
                   Evaluated through physical and functional symptom indicators in intake.
@@ -196,7 +301,7 @@ export const AyurvedicProfile: React.FC<AyurvedicProfileProps> = ({ currentData 
                   </span>
                 </div>
                 <div className="text-lg font-bold text-emerald-950 capitalize">
-                  {aharaShakti} Agni
+                  {aharaShakti ?? 'Not assessed'} Agni
                 </div>
                 <p className="text-xs text-emerald-800/80 mt-1">
                   Digestive power and metabolic fire status recorded during interview.
@@ -215,7 +320,7 @@ export const AyurvedicProfile: React.FC<AyurvedicProfileProps> = ({ currentData 
                   </span>
                 </div>
                 <div className="text-lg font-bold text-purple-950 capitalize">
-                  {satva} Satva
+                  {satva ?? 'Not assessed'} Satva
                 </div>
                 <p className="text-xs text-purple-800/80 mt-1">
                   Emotional disposition and stress reaction profile.
@@ -234,15 +339,18 @@ export const AyurvedicProfile: React.FC<AyurvedicProfileProps> = ({ currentData 
                   </span>
                 </div>
                 <div className="text-xs font-semibold text-blue-950 mt-1">
-                  Physical: <span className="capitalize text-blue-800">{vyayamaShakti}</span>
+                  Physical: <span className="capitalize text-blue-800">{vyayamaShakti ?? 'Not assessed'}</span>
                 </div>
                 <div className="text-xs font-semibold text-blue-950 mt-0.5">
-                  Habituation: <span className="capitalize text-blue-800">{satmya}</span>
+                  Habituation: <span className="capitalize text-blue-800">{satmya ?? 'Not assessed'}</span>
                 </div>
               </div>
             </div>
 
-            {/* Pathya / Apathya Colorful Guidance Panels */}
+            {/* Pathya / Apathya. Same fixed complaint mapping as the Roga above,
+                so it is shown on the same condition — diet and regimen advice
+                for a condition nobody suspected is still advice. */}
+            {matchedRoga && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-3.5">
                 <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5 mb-2">
@@ -268,6 +376,7 @@ export const AyurvedicProfile: React.FC<AyurvedicProfileProps> = ({ currentData 
                 </ul>
               </div>
             </div>
+            )}
           </div>
         )}
 
@@ -327,7 +436,19 @@ export const AyurvedicProfile: React.FC<AyurvedicProfileProps> = ({ currentData 
         )}
 
         {/* 3. Ayush Chikitsa Guidance View with Color-Coded Formulation Badges */}
-        {activeSubTab === 'chikitsa' && (
+        {activeSubTab === 'chikitsa' && !matchedRoga && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-6 text-center">
+            <p className="text-sm font-semibold text-slate-700">No Chikitsa guidance for this complaint</p>
+            <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
+              The formulations, doses and Pathya/Apathya below are a fixed mapping
+              from a small set of complaints. This patient's complaint is not one
+              of them, and showing the default would name three medicines with
+              doses for a condition nobody suspected.
+            </p>
+          </div>
+        )}
+
+        {activeSubTab === 'chikitsa' && matchedRoga && (
           <div className="space-y-3.5">
             <div className="bg-teal-50/40 border border-teal-200/80 rounded-xl p-3.5">
               <span className="text-[11px] font-bold text-teal-900 uppercase tracking-wide flex items-center gap-1.5 mb-1.5">

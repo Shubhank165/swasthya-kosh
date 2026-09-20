@@ -67,27 +67,27 @@
   - doc_000003 की तिथि 2026-08-28 है — इस इंटेक से 6 दिन पहले। इससे पढ़ी गई कोई भी बात उस तिथि पर रोगी की स्थिति दर्शाती है, आवश्यक नहीं कि आज की; वर्तमान स्थिति रोगी से पुष्टि करें।
 
 जानकारी में विरोधाभास
-  medication amlodipine
+  Medication amlodipine
     आज रोगी ने      : उल्लेख नहीं
     पूर्व अभिलेख    : medication amlodipine: Amlodipine 5 mg OD for 30 days [doc_000001 p1]
     -> चिकित्सक द्वारा सत्यापन आवश्यक
-  medication aspirin
+  Medication aspirin
     आज रोगी ने      : उल्लेख नहीं
     पूर्व अभिलेख    : medication aspirin: Ecosprin 75 mg OD for 30 days [doc_000001 p1]
     -> चिकित्सक द्वारा सत्यापन आवश्यक
-  medication clopidogrel
+  Medication clopidogrel
     आज रोगी ने      : उल्लेख नहीं
     पूर्व अभिलेख    : medication clopidogrel: Clopidogrel 75 mg OD for 30 days [doc_000001 p1]
     -> चिकित्सक द्वारा सत्यापन आवश्यक
-  medication metformin
+  Medication metformin
     आज रोगी ने      : medication metformin: Metformin 500 [turn 7]
     पूर्व अभिलेख    : medication metformin: Metformin 900.2 mg BD [doc_000002 p1]
     -> चिकित्सक द्वारा सत्यापन आवश्यक
-  medication metformin
+  Medication metformin
     आज रोगी ने      : medication metformin: Metformin 500 [turn 7]
     पूर्व अभिलेख    : medication metformin: Metformin 500 mg BD for 30 days [doc_000001 p1]
     -> चिकित्सक द्वारा सत्यापन आवश्यक
-  medication omeprazole
+  Medication omeprazole
     आज रोगी ने      : उल्लेख नहीं
     पूर्व अभिलेख    : medication omeprazole: Omeprazole 20 mg OD for 14 days [doc_000001 p1]
     -> चिकित्सक द्वारा सत्यापन आवश्यक

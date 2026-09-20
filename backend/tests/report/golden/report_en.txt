@@ -67,27 +67,27 @@ DOCUMENT TIMELINE
   - doc_000003 is dated 2026-08-28 — 6 day(s) before this intake. Anything read from it describes the patient on that date, not necessarily today; confirm current status with the patient.
 
 INFORMATION CONFLICTS
-  medication amlodipine
+  Medication amlodipine
     Patient today   : not mentioned
     Prior record    : medication amlodipine: Amlodipine 5 mg OD for 30 days [doc_000001 p1]
     -> Physician verification required
-  medication aspirin
+  Medication aspirin
     Patient today   : not mentioned
     Prior record    : medication aspirin: Ecosprin 75 mg OD for 30 days [doc_000001 p1]
     -> Physician verification required
-  medication clopidogrel
+  Medication clopidogrel
     Patient today   : not mentioned
     Prior record    : medication clopidogrel: Clopidogrel 75 mg OD for 30 days [doc_000001 p1]
     -> Physician verification required
-  medication metformin
+  Medication metformin
     Patient today   : medication metformin: Metformin 500 [turn 7]
     Prior record    : medication metformin: Metformin 900.2 mg BD [doc_000002 p1]
     -> Physician verification required
-  medication metformin
+  Medication metformin
     Patient today   : medication metformin: Metformin 500 [turn 7]
     Prior record    : medication metformin: Metformin 500 mg BD for 30 days [doc_000001 p1]
     -> Physician verification required
-  medication omeprazole
+  Medication omeprazole
     Patient today   : not mentioned
     Prior record    : medication omeprazole: Omeprazole 20 mg OD for 14 days [doc_000001 p1]
     -> Physician verification required
