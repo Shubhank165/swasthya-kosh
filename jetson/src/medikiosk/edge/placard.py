@@ -1,10 +1,9 @@
-"""Hold the team's entry details, and the kiosk's address, on the 2.8" panel.
+"""Hold the kiosk's address on the 2.8" panel.
 
 The panel is otherwise driven by the intake loop, one patient screen at a time. On a demo table it
-has a second job: say which entry this hardware belongs to, and - with no laptop present - what
-address the tablet should be pointed at. When the tablet is plugged in and sharing its connection
-over USB, the tablet's DHCP decides what this board's address is, and this screen is the only
-place anyone can read it.
+has a second job: say - with no laptop present - what address the tablet should be pointed at. When
+the tablet is plugged in and sharing its connection over USB, the tablet's DHCP decides what this
+board's address is, and this screen is the only place anyone can read it.
 
     python3 -m medikiosk.edge.placard                 # show it and hold
     python3 -m medikiosk.edge.placard --png out.png   # render only, no panel needed
@@ -15,8 +14,6 @@ Run it under system python: the panel needs spidev and Jetson.GPIO, which the au
 from __future__ import annotations
 
 import argparse
-import json
-import os
 import socket
 import subprocess
 import sys
@@ -26,23 +23,6 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 WIDTH, HEIGHT = 320, 240
-
-# The entry details are competition paperwork, not product configuration: they name a team and a
-# submission, they change per event, and they have no business being in a public repository. So they
-# live in a JSON file on the board that renders them, and this module only knows how to find one.
-#
-#     [["Team Name", "..."], ["Track", "..."]]
-#
-# A list of [label, value] pairs, rendered top to bottom in the order given. Point
-# MEDIKIOSK_PLACARD_ENTRY at a file, or drop one at the default path below. With no file present the
-# placeholder renders, which keeps `--png` working on a fresh clone.
-ENTRY_ENV = "MEDIKIOSK_PLACARD_ENTRY"
-ENTRY_PATH = Path.home() / ".config" / "medikiosk" / "placard.json"
-
-PLACEHOLDER: tuple[tuple[str, str], ...] = (
-    ("Project", "MediKiosk"),
-    ("Role", "Clinical intake kiosk"),
-)
 
 FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -55,26 +35,6 @@ ADDRESS_INK = (12, 92, 62)
 # Interfaces worth showing, in the order a demo would use them. A USB tether appears as its own
 # interface whose name the kernel picks, so anything usb-shaped is matched by prefix.
 WIRED_PREFIXES = ("usb", "enx", "eth", "rndis")
-
-
-
-def _entry() -> tuple[tuple[str, str], ...]:
-    """The entry details, or the placeholder if no file is installed.
-
-    A malformed file is worth a word on stderr rather than a traceback: the placard runs headless
-    under systemd on a demo table, and a crash there means a blank panel with nobody watching a log.
-    """
-
-    path = Path(os.environ[ENTRY_ENV]) if os.environ.get(ENTRY_ENV) else ENTRY_PATH
-    if not path.is_file():
-        return PLACEHOLDER
-    try:
-        loaded = json.loads(path.read_text())
-        return tuple((str(label), str(value)) for label, value in loaded)
-    except (OSError, ValueError, TypeError) as exc:
-        print(f"placard: ignoring {path}: {exc}", file=sys.stderr)
-        return PLACEHOLDER
-
 
 def _addresses() -> list[str]:
     """Every usable IPv4 address this board answers on, most useful first.
@@ -122,30 +82,18 @@ def _font(path: str, size: int):
         return ImageFont.load_default()
 
 
-def _wrap(draw: ImageDraw.ImageDraw, text: str, font, width: int) -> list[str]:
-    words, lines, current = text.split(), [], ""
-    for word in words:
-        candidate = f"{current} {word}".strip()
-        if draw.textlength(candidate, font=font) <= width or not current:
-            current = candidate
-        else:
-            lines.append(current)
-            current = word
-    if current:
-        lines.append(current)
-    return lines
-
 
 def render(scale: int = 1, addresses: list[str] | None = None) -> Image.Image:
     """The card, at `scale` for inspection on a normal screen."""
 
     image = Image.new("RGB", (WIDTH * scale, HEIGHT * scale), BACKGROUND)
     draw = ImageDraw.Draw(image)
-    label_font = _font(FONT_PATH, 8 * scale)
-    value_font = _font(FONT_BOLD, 12 * scale)
-    address_font = _font(FONT_BOLD, 9 * scale)
+    label_font = _font(FONT_PATH, 9 * scale)
+    title_font = _font(FONT_BOLD, 13 * scale)
+    # The address is the reason this screen exists, and it gets read from across a table by someone
+    # typing it into a tablet. On a 320px panel that is worth most of the space now going spare.
+    address_font = _font(FONT_BOLD, 17 * scale)
     margin = 8 * scale
-    inner = image.width - margin * 2
 
     draw.rectangle(
         [(margin // 2, margin // 2), (image.width - margin // 2, image.height - margin // 2)],
@@ -153,22 +101,22 @@ def render(scale: int = 1, addresses: list[str] | None = None) -> Image.Image:
         width=max(1, scale),
     )
 
-    y = margin + 2 * scale
-    for label, value in _entry():
-        draw.text((margin, y), label.upper(), font=label_font, fill=LABEL_INK)
-        y += int(10 * scale)
-        for line in _wrap(draw, value, value_font, inner):
-            draw.text((margin, y), line, font=value_font, fill=INK)
-            y += int(14 * scale)
-        y += int(2 * scale)
+    lines = (addresses if addresses is not None else _addresses()) or ["waiting for a network"]
 
-    lines = addresses if addresses is not None else _addresses()
-    footer = image.height - margin - int(11 * scale) * max(1, len(lines))
-    draw.line([(margin, footer - 5 * scale), (image.width - margin, footer - 5 * scale)], fill=RULE)
-    draw.text((margin, footer - int(14 * scale)), "KIOSK ADDRESS  PORT 8000", font=label_font, fill=LABEL_INK)
-    for line in lines or ["waiting for a network"]:
-        draw.text((margin, footer), line, font=address_font, fill=ADDRESS_INK)
-        footer += int(11 * scale)
+    # One block, centred: with nothing else on the card, a footer-pinned address sits under an
+    # expanse of empty panel and reads like something failed to draw.
+    block = int(19 * scale) + int(11 * scale) + int(14 * scale) + int(21 * scale) * len(lines)
+    y = max(margin + 2 * scale, (image.height - block) // 2)
+
+    draw.text((margin, y), "MEDIKIOSK", font=title_font, fill=INK)
+    y += int(19 * scale)
+    draw.line([(margin, y), (image.width - margin, y)], fill=RULE)
+    y += int(11 * scale)
+    draw.text((margin, y), "KIOSK ADDRESS  PORT 8000", font=label_font, fill=LABEL_INK)
+    y += int(14 * scale)
+    for line in lines:
+        draw.text((margin, y), line, font=address_font, fill=ADDRESS_INK)
+        y += int(21 * scale)
     return image
 
 
@@ -188,8 +136,8 @@ def main(argv: list[str] | None = None) -> int:
     panel = KioskPanel()
     panel.open()
 
-    # Redraw only when the addresses change: the entry details never do, and pushing 320x240 over
-    # SPI every few seconds for an identical image is wasted power on a battery-run table.
+    # Redraw only when the addresses change: pushing 320x240 over SPI every few seconds for an
+    # identical image is wasted power on a battery-run table.
     shown: list[str] | None = None
     try:
         while True:
