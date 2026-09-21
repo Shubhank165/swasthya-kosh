@@ -203,7 +203,7 @@ class IntakeWalker {
   /// Every question id this intake will walk, in order.
   ///
   /// Core first, then the branch for the chosen complaint. Ayurveda is
-  /// deliberately **not** appended here any more — SIH items 3/4: it used to
+  /// deliberately **not** appended here any more — review items 3/4: it used to
   /// ride along on every visit as an unlabelled extra section, which made a
   /// symptom intake longer than the symptom warranted. It now lives on its own
   /// screen (`home/ayush_screen.dart`), answered once, whenever the patient

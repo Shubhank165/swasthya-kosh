@@ -18,3 +18,7 @@ uploads/
 # GCP service-account keys for local Vertex AI testing — never committed.
 secrets/*
 !secrets/.gitkeep
+
+# Competition entry details for the kiosk placard — event paperwork, not product
+# configuration, and not for a public repository. See jetson/deploy/placard.example.json.
+placard.json

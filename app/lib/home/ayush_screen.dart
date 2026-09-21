@@ -1,4 +1,4 @@
-/// The Ayurveda self-report — SIH items 3/4.
+/// The Ayurveda self-report — review items 3/4.
 ///
 /// This used to be "Section 4": the last few questions of every symptom
 /// intake, asked whether or not the patient wanted them, on top of whatever

@@ -1,7 +1,7 @@
 # Assumptions made to close the clinical review queue
 
 `docs/CLINICAL_REVIEW_QUEUE.md` is the agenda for an AIIA mentor / Vaidya
-session that has not happened yet. This hackathon build needed every item to
+session that has not happened yet. This build needed every item to
 have *some* answer so the system runs end to end and the demo does not stall
 on an open question — so each item below was closed with an engineer's
 judgment call rather than a clinician's, on the explicit understanding that
@@ -127,8 +127,8 @@ rather than falsely, which is the documented intended failure direction.
 **§6.** `abdominal_rigidity`, `thunderclap_onset`, `menstrual_history`,
 `ritu_seasonal_variation` — wording accepted as displayed. `needs_clinical_review:
 true` was deliberately **not** cleared on any of them: leaving it true keeps
-the registry honestly reporting these as unreviewed rather than having a
-hackathon judgment call masquerade as clinical sign-off.
+the registry honestly reporting these as unreviewed rather than having an
+engineering judgment call masquerade as clinical sign-off.
 
 **To change:** edit `clinical/terminology/concepts.yaml`; flip the flag to
 `false` only after an actual clinician reviews the entry.
@@ -211,7 +211,7 @@ the file's own comment gives the synthetic reference points (~11000 sharp,
 
 ---
 
-## If this goes past the hackathon
+## If this goes past the prototype
 
 Read `docs/CLINICAL_REVIEW_QUEUE.md` with an actual Vaidya / AIIA mentor and
 treat every "kept as-is" above as reopened, not settled. The fastest way to

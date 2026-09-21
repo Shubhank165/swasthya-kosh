@@ -162,7 +162,7 @@ showed it unverified.
 - **iOS.** Unverified, and it stays that way without a Mac. Android-only is a
   reasonable scope statement; implying iOS works is not.
 - **The Vertex ML processing region.** Still unconfirmed, and the models are now
-  on anyway in the `medikiosk-sih-2026` deployment — deliberately, on a project
+  on anyway in the demo deployment — deliberately, on a project
   holding synthetic documents and no patient. `VERTEX_ZDR_ENABLED=true` is an
   operator's assertion, not evidence, and decision 31 now says so with a date.
   Real patient data still waits on the written answer.
@@ -218,7 +218,7 @@ when repair is Vertex, and only then.
 Deployed shape:
 
 ```
-project   medikiosk-sih-2026        region  asia-south1
+project   <gcp-project-id>          region  asia-south1
 image     medikiosk:50b8895         schema  at head
 ocr       gemini                    repair  vertex
 storage   gcs                       queue   pubsub (push -> worker)

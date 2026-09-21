@@ -75,7 +75,7 @@ class HomeTab extends ConsumerWidget {
           // Says what it is before it is tapped, same principle as when this
           // read "Not available yet" — the card now says the thing itself is
           // real and optional, rather than claiming a result it does not
-          // compute (SIH items 3/4; see `ayush_screen.dart`).
+          // compute (review items 3/4; see `ayush_screen.dart`).
           subtitle: strings.ayurvedaTitle,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const AyushScreen()),

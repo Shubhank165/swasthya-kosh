@@ -23,7 +23,7 @@ lives in `backend/stale/` — the interview runs on the Jetson and this reposito
 no longer holds those files.
 
 **2026-09-08 — every item below closed by engineer judgment, not by a
-clinician, so this hackathon build has no open questions blocking a demo.**
+clinician, so this build has no open questions blocking a demo.**
 Each checkbox is annotated `(A#)`, pointing at `../ASSUMPTIONS.md`, which says
 what was decided, why, and exactly which file to edit to revisit it. **None of
 this is a substitute for the session this document exists to be the agenda
@@ -313,7 +313,7 @@ tables.
 - [x] **They must be replaced with the licensed releases before any clinical
       use.** This is a licensing and procurement task, not a review task.
       *(A10 — explicitly NOT closed by judgment; genuinely out of scope for a
-      hackathon. Curated seed data shipped as labeled placeholders.)*
+      prototype. Curated seed data shipped as labeled placeholders.)*
 - [x] Of the 8 mappings, are any wrong? Where no mapping exists there is no
       entry, and nothing in the codebase may synthesise one — an invented
       mapping is worse than an absent one because it looks authoritative.
@@ -330,7 +330,7 @@ requirements; pending institutional legal review"*.
       that we can produce, for any patient, exactly what they agreed to, in
       which language, when, and who granted it — which is why the text is
       versioned content rather than a string in a template.
-      *(A11 — not obtainable in a hackathon; shipped as drafted, and the
+      *(A11 — not obtainable at this stage; shipped as drafted, and the
       `clinical_source: "...pending institutional legal review"` label was
       deliberately left in place rather than cleared.)*
 - [x] Is the Hindi notice text right? Same concern as item 1, with legal weight.

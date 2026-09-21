@@ -2,7 +2,7 @@
 ///
 /// No hostname, key or token literal in this file or anywhere else in the app,
 /// for the same reason the backend has none: this repository is shared under
-/// hackathon pressure, and a credential committed once is a credential leaked
+/// deadline pressure, and a credential committed once is a credential leaked
 /// forever. The base URL comes from `--dart-define` at build time.
 library;
 

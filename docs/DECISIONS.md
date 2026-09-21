@@ -827,7 +827,7 @@ guards deliberately fail closed so that shipping without the answer is
 impossible rather than merely inadvisable.
 
 **2026-09-06, and this is the part to read before pointing anything at a
-patient.** The models are now on in the `medikiosk-sih-2026` deployment —
+patient.** The models are now on in the demo deployment —
 `OCR_PROVIDER=gemini`, `REPAIR_PROVIDER=vertex`, both on a Gemini Flash model in
 `asia-south1`. The three questions above are still unanswered. Nothing was
 verified; a flag was set, on purpose, by a person, for a project holding

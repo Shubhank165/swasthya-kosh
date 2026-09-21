@@ -1,5 +1,5 @@
 [Unit]
-Description=MediKiosk 2.8" panel placard (team entry card)
+Description=MediKiosk 2.8" panel placard (entry card and kiosk address)
 After=network.target
 
 [Service]

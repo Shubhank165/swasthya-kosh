@@ -15,6 +15,8 @@ Run it under system python: the panel needs spidev and Jetson.GPIO, which the au
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import socket
 import subprocess
 import sys
@@ -25,14 +27,21 @@ from PIL import Image, ImageDraw, ImageFont
 
 WIDTH, HEIGHT = 320, 240
 
-# Label, value. Rendered in this order, top to bottom.
-ENTRY: tuple[tuple[str, str], ...] = (
-    ("Problem Statement ID", "26047"),
-    ("Problem Statement Title", "Patient Case-Taking Software"),
-    ("Theme", "MedTech / BioTech / HealthTech"),
-    ("PS Category", "Software"),
-    ("Team ID", "R221-286"),
-    ("Team Name", "drift_issues"),
+# The entry details are competition paperwork, not product configuration: they name a team and a
+# submission, they change per event, and they have no business being in a public repository. So they
+# live in a JSON file on the board that renders them, and this module only knows how to find one.
+#
+#     [["Team Name", "..."], ["Track", "..."]]
+#
+# A list of [label, value] pairs, rendered top to bottom in the order given. Point
+# MEDIKIOSK_PLACARD_ENTRY at a file, or drop one at the default path below. With no file present the
+# placeholder renders, which keeps `--png` working on a fresh clone.
+ENTRY_ENV = "MEDIKIOSK_PLACARD_ENTRY"
+ENTRY_PATH = Path.home() / ".config" / "medikiosk" / "placard.json"
+
+PLACEHOLDER: tuple[tuple[str, str], ...] = (
+    ("Project", "MediKiosk"),
+    ("Role", "Clinical intake kiosk"),
 )
 
 FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
@@ -46,6 +55,25 @@ ADDRESS_INK = (12, 92, 62)
 # Interfaces worth showing, in the order a demo would use them. A USB tether appears as its own
 # interface whose name the kernel picks, so anything usb-shaped is matched by prefix.
 WIRED_PREFIXES = ("usb", "enx", "eth", "rndis")
+
+
+
+def _entry() -> tuple[tuple[str, str], ...]:
+    """The entry details, or the placeholder if no file is installed.
+
+    A malformed file is worth a word on stderr rather than a traceback: the placard runs headless
+    under systemd on a demo table, and a crash there means a blank panel with nobody watching a log.
+    """
+
+    path = Path(os.environ[ENTRY_ENV]) if os.environ.get(ENTRY_ENV) else ENTRY_PATH
+    if not path.is_file():
+        return PLACEHOLDER
+    try:
+        loaded = json.loads(path.read_text())
+        return tuple((str(label), str(value)) for label, value in loaded)
+    except (OSError, ValueError, TypeError) as exc:
+        print(f"placard: ignoring {path}: {exc}", file=sys.stderr)
+        return PLACEHOLDER
 
 
 def _addresses() -> list[str]:
@@ -126,7 +154,7 @@ def render(scale: int = 1, addresses: list[str] | None = None) -> Image.Image:
     )
 
     y = margin + 2 * scale
-    for label, value in ENTRY:
+    for label, value in _entry():
         draw.text((margin, y), label.upper(), font=label_font, fill=LABEL_INK)
         y += int(10 * scale)
         for line in _wrap(draw, value, value_font, inner):

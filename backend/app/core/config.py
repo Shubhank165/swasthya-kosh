@@ -2,7 +2,7 @@
 
 Everything is environment-driven. There is no secret, key, model id or hostname
 literal anywhere in this codebase — including in fixtures — because this repo is
-shared under hackathon pressure and a credential committed once is a credential
+shared under deadline pressure and a credential committed once is a credential
 leaked forever.
 
 Model ids in particular are config and never inline: `OCR_MODEL_ID` and
