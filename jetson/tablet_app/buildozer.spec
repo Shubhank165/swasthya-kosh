@@ -1,7 +1,7 @@
 [app]
 title = MediKiosk
 package.name = medikiosk
-package.domain = org.sih26
+package.domain = in.medikiosk
 
 source.dir = .
 source.include_exts = py
