@@ -1374,7 +1374,7 @@ as the Jetson handwriting path.
 So there are two switches, and neither is a performance knob:
 
 - `TIMELINE_PROVIDER` defaults to `none`. With no provider the report still
-  carries a full dated history built by pure code, so the problem statement's
+  carries a full dated history built by pure code, so the spec's
   requirement is met with no model involved. **Off is not a degraded mode.**
 - `TIMELINE_SHARE_PRIOR_RECORDS` defaults to `false`, and it guards the
   *candidates* rather than the provider. With it false the provider still runs,

@@ -147,7 +147,7 @@ class PhysicianReport(BaseModel):
     #: section.
     document_timeline: tuple[TimelineEntry, ...] = ()
     document_notes: tuple[ReportLine, ...] = ()
-    #: The medical history timeline — the problem statement's dated-history
+    #: The medical history timeline — the spec's dated-history
     #: requirement. `None` means it has not been built for this intake yet, and
     #: the renderer says so rather than printing an empty section: "not ready"
     #: and "nothing on record" look identical and mean opposite things.

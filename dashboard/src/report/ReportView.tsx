@@ -1,7 +1,7 @@
 /**
  * The patient report — 3/3 §4.2, the main event.
  *
- * Section order is fixed by the problem statement and is not a preference:
+ * Section order is fixed by the spec and is not a preference:
  * chief complaint first because it is what the consultation is about, and
  * **Unresolved and Conflicts last as full sections rather than a collapsed
  * disclosure**. Hiding the gaps to make the document look tidy would defeat the

@@ -2,7 +2,7 @@
 
 Minimal on purpose. `stale/queue/` holds a full OPD queue domain — priority
 classes, recall, no-show accounting, overtake limits, shadow-mode reconciliation
-with an HMIS — and none of it is rebuilt here. The problem statement does not ask
+with an HMIS — and none of it is rebuilt here. The spec does not ask
 for queue management, the hospital already has one, and every line of queue code
 is a line that has to agree with whatever the HMIS decides.
 

@@ -1,7 +1,7 @@
 """The timeline pure code can build on its own.
 
 **This is the one that ships.** With no provider configured — the default — the
-report still carries a dated, ordered history, which is the problem statement's
+report still carries a dated, ordered history, which is the spec's
 timeline requirement met with zero model risk. The provider, when one is turned
 on, only ever *narrows* this set to what relates to today's complaint; it can
 never add an event pure code did not already find.

@@ -61,7 +61,7 @@ from app.domain.timeline.model import TimelineSnapshot, TimelineStatus
 TEMPLATE_VERSION = "1.2"
 
 #: Sections that appear in the report body, in render order. Fixed by the
-#: problem statement: chief complaint, HPI, past medical and surgical, drug and
+#: spec: chief complaint, HPI, past medical and surgical, drug and
 #: allergy, family, personal, review of systems, prior investigations, the
 #: Ayurveda patient-reported section, then unresolved, conflicts and safety.
 BODY_SECTIONS: tuple[Section, ...] = tuple(

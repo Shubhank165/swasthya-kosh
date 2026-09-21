@@ -31,7 +31,7 @@ strings:
   no_conflicts: "No conflicts detected between today's answers and prior records."
   timeline_none: "No documents to place in time."
 
-  # The medical history timeline — the problem statement's dated-history
+  # The medical history timeline — the spec's dated-history
   # requirement. Separate from the document timeline above, which answers a
   # different question: how stale each uploaded scan is. Mixing "this scan is 40
   # days old" with "3 Aug 2026 — Metformin started" makes both unreadable.

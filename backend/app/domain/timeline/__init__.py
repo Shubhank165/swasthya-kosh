@@ -1,4 +1,4 @@
-"""The medical timeline — the problem statement's dated-history requirement.
+"""The medical timeline — the spec's dated-history requirement.
 
 Three modules, and the split is the safety property:
 

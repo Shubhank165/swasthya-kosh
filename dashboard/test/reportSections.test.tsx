@@ -4,7 +4,7 @@
  * `PhysicianReport` has always carried `alerts`, `interactions`,
  * `document_timeline` and `document_notes`. Three were typed and none were
  * rendered, so drug interactions were computed on every report build and thrown
- * away, and the document timeline — which is the problem statement's timeline
+ * away, and the document timeline — which is the spec's timeline
  * requirement — never reached a physician at all. These tests exist so that
  * cannot quietly happen again.
  *

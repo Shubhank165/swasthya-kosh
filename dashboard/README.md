@@ -67,7 +67,7 @@ Replacing it changes `setAccessToken`, `LoginPage` and nothing else.
 ## What is deliberately absent
 
 - **Queue management.** No calling, recalling, deferring, transferring or token
-  issuing. §4.1: the problem statement does not ask for it, `stale/queue/`
+  issuing. §4.1: the spec does not ask for it, `stale/queue/`
   already holds a version of it, and it is surface area to defend with no marks
   attached. A list the doctor works down is enough.
 - **Any client-side clinical derivation.** Coverage is arithmetic over facts the

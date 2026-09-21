@@ -126,7 +126,7 @@ class ReportService:
         With no provider configured — the default — this is the **deterministic**
         timeline: pure code over the patient's prior records at this hospital,
         plus whatever their uploaded documents were dated. No model, no
-        configuration, and it already meets the problem statement's
+        configuration, and it already meets the spec's
         dated-history requirement. A provider only ever narrows it.
 
         Prior visits are found through the patient's whole alias set, so the

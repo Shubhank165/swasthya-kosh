@@ -245,7 +245,7 @@ void main() {
     });
 
     testWidgets('no appointment is offered or implied', (tester) async {
-      // §7.4: the app does not book. It is not in the problem statement and it
+      // §7.4: the app does not book. It is not in the spec and it
       // is scope this build does not need.
       await tester.pumpWidget(wrap(const SubmittedScreen(
         referenceCode: 'MK-4821',

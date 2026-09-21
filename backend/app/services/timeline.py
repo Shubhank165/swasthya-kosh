@@ -1,4 +1,4 @@
-"""Building a patient's dated history — the problem statement's timeline.
+"""Building a patient's dated history — the spec's timeline.
 
 Three stages, and **the deterministic ones carry the guarantee**:
 

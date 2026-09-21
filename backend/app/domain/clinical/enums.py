@@ -56,7 +56,7 @@ def certainty_rank(certainty: Certainty) -> int:
 class Section(StrEnum):
     """Sections of the history, in the clinical order it is taken.
 
-    The order is fixed by the problem statement and is the render order of the
+    The order is fixed by the spec and is the render order of the
     report — see `SECTION_ORDER`.
     """
 

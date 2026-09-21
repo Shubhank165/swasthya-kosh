@@ -84,7 +84,7 @@ def _service(provider: Any = None) -> TimelineService:
 class TestWithNoProvider:
     async def test_the_report_still_gets_a_dated_history(self) -> None:
         """**The one that ships.** `TIMELINE_PROVIDER=none` is the default, and
-        the problem statement's dated-history requirement is met without a model
+        the spec's dated-history requirement is met without a model
         being involved at all."""
         snapshot = await _service().build(TODAY, prior=[PRIOR_FEVER, PRIOR_FOOT])
         assert snapshot.status is TimelineStatus.UNFILTERED
