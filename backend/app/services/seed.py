@@ -12,6 +12,7 @@ demo nobody can rehearse.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -22,7 +23,9 @@ from app.core.clock import Clock, SystemClock
 from app.core.ids import SequentialIdFactory
 from app.core.logging import get_logger
 from app.db.tenancy import tenant_scope
+from app.domain.coordination import OrderKind
 from app.events.bus import InProcessBus
+from app.models.clinical import PharmacyStockRecord, ServiceSlotRecord
 from app.normalize.from_kiosk_v0_1 import intake_uuid
 from app.repositories.consent import AuditRepository, IngestRawRepository
 from app.repositories.intakes import IntakeRepository
@@ -32,6 +35,7 @@ from app.repositories.patients import (
     PatientRepository,
 )
 from app.repositories.terminology import TerminologyRepository
+from app.services.coordination import CoordinationService
 from app.services.ingest import IngestService
 from app.services.patient_auth import phone_ref
 from app.services.terminology import seed_terminology
@@ -350,6 +354,138 @@ def app_visit_payloads(reference: str) -> list[dict[str, Any]]:
     ]
 
 
+#: Declared capacity, per destination, as hours of the working day.
+#:
+#: **These are the one part of the seed that cannot be pinned to `_BASE`.** A
+#: slot is only offered if it starts in the future, so a fixed date is a demo
+#: that works until that date and silently offers nothing afterwards. They are
+#: laid out relative to whatever "now" is when the seeder runs, which is the
+#: only way a referral in a demo comes back with a time in it.
+#:
+#: `physiotherapy` is deliberately absent. A referral there finds no capacity
+#: and is stored `unfilled` — the distinction the slice exists to make, and one
+#: nobody sees unless a destination with nothing free is on screen.
+SLOT_DESTINATIONS: dict[str, tuple[int, ...]] = {
+    # Radiology runs all day and has room; a scan booked here gets a time.
+    "radiology": (1, 3, 5, 24, 26, 28),
+    # Pathology has one slot today and it is already taken, so the next offer
+    # is tomorrow. That is a real hospital, not a broken one.
+    "pathology": (2, 25, 27),
+    "shalya": (26, 48),
+}
+
+#: Slots the seeder marks as already taken, as (destination, hours ahead).
+SLOTS_ALREADY_FULL: tuple[tuple[str, int], ...] = (("pathology", 2),)
+
+#: One shelf, covering every state `stock_state` can return except UNKNOWN —
+#: which has no row by definition, and is what a prescription for anything not
+#: listed here reads as.
+#:
+#: Expiry is relative for the same reason slot times are: a fixed date stops
+#: being "expiring soon" and starts being "expired" while nobody is looking.
+PHARMACY_STOCK: tuple[tuple[str, str, int, int, int | None], ...] = (
+    # code, display, on_hand, reorder_level, expiry in days from today
+    ("metformin_500", "Metformin 500 mg", 480, 100, 400),
+    ("amlodipine_5", "Amlodipine 5 mg", 60, 80, 300),
+    ("paracetamol_650", "Paracetamol 650 mg", 240, 100, 21),
+    ("ors_sachet", "ORS sachet", 90, 50, -3),
+    ("pantoprazole_40", "Pantoprazole 40 mg", 0, 40, 200),
+    ("cetirizine_10", "Cetirizine 10 mg", 700, 150, None),
+)
+
+
+async def seed_coordination(
+    service: CoordinationService,
+    session: AsyncSession,
+    *,
+    now: datetime,
+    ids: SequentialIdFactory,
+    intake_ids: Sequence[str],
+) -> dict[str, int]:
+    """The slots, the shelf and a handful of orders against them.
+
+    Written last, because an order is only interesting once there is somewhere
+    for it to go. The three orders are chosen to put all three outcomes on one
+    screen: one that finds a slot, one that finds none, and one for a medicine
+    the pharmacy has run out of.
+    """
+
+    top_of_hour = now.replace(minute=0, second=0, microsecond=0)
+    full = set(SLOTS_ALREADY_FULL)
+    slots = 0
+    for destination, offsets in SLOT_DESTINATIONS.items():
+        for offset in offsets:
+            capacity = 2 if destination == "radiology" else 1
+            session.add(
+                ServiceSlotRecord(
+                    id=ids.new_id("slot"),
+                    hospital_id=HOSPITAL_ID,
+                    destination=destination,
+                    starts_at=top_of_hour + timedelta(hours=offset),
+                    capacity=capacity,
+                    booked=capacity if (destination, offset) in full else 0,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            slots += 1
+
+    today = now.date()
+    for code, display, on_hand, reorder_level, expiry_days in PHARMACY_STOCK:
+        session.add(
+            PharmacyStockRecord(
+                id=ids.new_id("stk"),
+                hospital_id=HOSPITAL_ID,
+                code=code,
+                display=display,
+                on_hand=on_hand,
+                reorder_level=reorder_level,
+                expires_on=None if expiry_days is None else today + timedelta(days=expiry_days),
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    await session.flush()
+
+    if not intake_ids:
+        return {"slots": slots, "stock": len(PHARMACY_STOCK), "orders": 0}
+
+    first = intake_ids[0]
+    orders = [
+        # Finds capacity, and comes back with a time on it.
+        await service.issue(
+            intake_id=first,
+            kind=OrderKind.IMAGING,
+            code="usg_abdomen",
+            display="Ultrasound, abdomen",
+            ordered_by="seed",
+            destination="radiology",
+            note="Three days of epigastric pain.",
+        ),
+        # Finds none. Stored `unfilled`, which is a different answer from
+        # `requested` and the reason both statuses exist.
+        await service.issue(
+            intake_id=first,
+            kind=OrderKind.REFERRAL,
+            code="physio_opd",
+            display="Physiotherapy OPD",
+            ordered_by="seed",
+            destination="physiotherapy",
+        ),
+        # Prescribed, and the pharmacy has none. The order is still a record of
+        # what the doctor decided; the shelf is a separate fact about today.
+        await service.issue(
+            intake_id=first,
+            kind=OrderKind.PRESCRIPTION,
+            code="pantoprazole_40",
+            display="Pantoprazole 40 mg",
+            ordered_by="seed",
+            destination="pharmacy",
+        ),
+    ]
+    return {"slots": slots, "stock": len(PHARMACY_STOCK), "orders": len(orders)}
+
+
 async def seed(
     session: AsyncSession,
     *,
@@ -443,9 +579,7 @@ async def seed(
         )
         created: list[str] = []
         for payload in sample_payloads():
-            result = await service.ingest(
-                payload, hospital_id=HOSPITAL_ID, actor_id="seed"
-            )
+            result = await service.ingest(payload, hospital_id=HOSPITAL_ID, actor_id="seed")
             if result.intake_id is None:
                 # Our own fixtures failing their own contract is a broken
                 # build, not a seeded demo. Surfacing it here beats a demo that
@@ -475,9 +609,7 @@ async def seed(
             # produces a patient whose history nobody can reach.
             reference = phone_ref(DEMO_PHONE, pepper=patient_ref_pepper)
             for payload in app_visit_payloads(reference):
-                result = await service.ingest(
-                    payload, hospital_id=HOSPITAL_ID, actor_id="seed"
-                )
+                result = await service.ingest(payload, hospital_id=HOSPITAL_ID, actor_id="seed")
                 if result.intake_id is None:
                     raise RuntimeError(
                         f"seed payload was not usable ({result.reason}): {result.errors}"
@@ -487,6 +619,20 @@ async def seed(
             phone_linked = True
         else:
             logger.info("seed_phone_link_skipped", reason="no_patient_ref_pepper")
+
+        coordination_ids = SequentialIdFactory()
+        coordination = await seed_coordination(
+            CoordinationService(
+                session=session,
+                clock=clock,
+                ids=coordination_ids,
+                hospital_id=HOSPITAL_ID,
+            ),
+            session,
+            now=now,
+            ids=coordination_ids,
+            intake_ids=created,
+        )
 
         for index, (patient_id, ref_type, ref_value) in enumerate(link_refs):
             await links.link(
@@ -504,6 +650,7 @@ async def seed(
         count=len(created) + len(phone_intakes),
         concepts=concepts,
         phone_linked=phone_linked,
+        **coordination,
     )
     return {
         "hospital_id": HOSPITAL_ID,
@@ -516,6 +663,7 @@ async def seed(
         "demo_phone": DEMO_PHONE if phone_linked else None,
         "demo_abha": DEMO_ABHA,
         "phone_linked": phone_linked,
+        "coordination": coordination,
     }
 
 

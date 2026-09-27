@@ -18,7 +18,7 @@ export default {
         conflict: { DEFAULT: '#a8321f', soft: '#fdf0ee' },
         verified: { DEFAULT: '#1a6b45', soft: '#eef8f2' },
         urgent: { DEFAULT: '#b3261e', soft: '#fdecea' },
-        // AYUSH & clinical portal palette
+        // Clinical portal palette
         herb: { DEFAULT: '#0f766e', soft: '#e6f4ea', deep: '#134e4a' },
         saffron: { DEFAULT: '#b45309', soft: '#fef3c7' },
         alert: { DEFAULT: '#b91c1c', soft: '#fee2e2' },

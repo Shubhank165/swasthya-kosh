@@ -282,6 +282,70 @@ const en = {
     'The denominator is facts a physician actually looked at, not every fact stored. A field nobody reviewed says nothing about extraction quality, and counting it would let this number be improved by ingesting more intakes rather than by extracting better. A field acted on twice counts once, with the latest action winning.',
   'metrics.noteEmpty':
     'Until it has data behind it, this figure — and the ones the retired evaluation harness produced — should not appear on a slide.',
+  // Care coordination — what happens after the consultation.
+  'nav.operations': 'Operations',
+  'report.tabEmpty': 'Nothing recorded under this heading',
+  'report.tabEmptyDetail':
+    'This part of the history was not taken during the interview. It is not a statement that there is nothing to report.',
+
+  'orders.aria': 'Orders raised on this intake',
+  'orders.title': 'Orders',
+  'orders.subtitle':
+    'Tests, scans, referrals and prescriptions raised after the consultation. The receiving department’s own system remains the record of whether an appointment is kept.',
+  'orders.none': 'Nothing has been ordered on this intake.',
+  'orders.loadError': 'The orders on this intake could not be loaded.',
+  'orders.issue': 'Issue order',
+  'orders.issueError': 'That order was not recorded. Nothing has been sent.',
+  'orders.noSlot': 'No slot available',
+  'orders.slotNote':
+    'A referral or scan is given the earliest free slot the destination has declared. Where there is none it is recorded as unfilled rather than left waiting, so nobody is sent to a time that was never offered.',
+  'orders.field.kind': 'Kind',
+  'orders.field.code': 'Code',
+  'orders.field.display': 'Description',
+  'orders.field.destination': 'Destination',
+  'orders.kind.lab': 'Lab',
+  'orders.kind.imaging': 'Imaging',
+  'orders.kind.referral': 'Referral',
+  'orders.kind.prescription': 'Prescription',
+  'orders.status.requested': 'Requested',
+  'orders.status.scheduled': 'Scheduled',
+  'orders.status.completed': 'Completed',
+  'orders.status.cancelled': 'Cancelled',
+  'orders.status.unfilled': 'No capacity offered',
+
+  'wait.position': 'Position {position} in the queue',
+  'wait.minutes': 'about {minutes} min',
+  'wait.noEstimate': 'too few consultations today to estimate a time',
+
+  'ops.title': 'Operations',
+  'ops.subtitle':
+    'Counted from what the system already holds over the last day. Nothing here is forecast or predicted.',
+  'ops.load': 'Departments',
+  'ops.loadNote': 'Longest wait first — not the busiest department, the one somebody has been sitting in longest.',
+  'ops.loadError': 'The department counts could not be loaded.',
+  'ops.nobodyWaiting': 'Nobody is waiting.',
+  'ops.department': 'Department',
+  'ops.waiting': 'Waiting',
+  'ops.flagged': 'Flagged',
+  'ops.longest': 'Longest wait',
+  'ops.unfilled': 'Unfilled',
+  'ops.minutes': '{minutes} min',
+  'ops.asOf': 'As of {time}.',
+
+  'stock.title': 'Pharmacy',
+  'stock.subtitle': 'Items low, expiring, expired or out — what a pharmacist should see before a patient reaches the counter.',
+  'stock.loadError': 'The pharmacy list could not be loaded.',
+  'stock.nothingToAct': 'Nothing needs attention.',
+  'stock.onHand': '{onHand} on hand, reorder at {reorder}',
+  'stock.expires': 'Expires {date}',
+  'stock.unknownNote':
+    'Only items the pharmacy has recorded appear here. A medicine with no entry is one this system has never been told about, which is a different thing from one that has run out.',
+  'stock.state.available': 'In stock',
+  'stock.state.low': 'Low',
+  'stock.state.expiring': 'Expiring soon',
+  'stock.state.expired': 'Expired',
+  'stock.state.out': 'Out of stock',
+  'stock.state.unknown': 'Not recorded',
 } as const;
 
 export type StringKey = keyof typeof en;
@@ -534,6 +598,71 @@ const hi: Record<StringKey, string> = {
     'हर संग्रहीत तथ्य नहीं, बल्कि चिकित्सक ने वास्तव में जितने तथ्य देखे वही हर है। जिस प्रश्न को किसी ने देखा ही नहीं, वह निष्कर्षण की गुणवत्ता के बारे में कुछ नहीं कहता, और उसे गिनने से यह संख्या बेहतर निष्कर्षण के बजाय अधिक इनटेक लेने से सुधर जाती। एक ही तथ्य पर दो बार कार्रवाई एक बार गिनी जाती है, जिसमें अंतिम कार्रवाई मान्य होती है।',
   'metrics.noteEmpty':
     'जब तक इसके पीछे आँकड़े न हों, यह संख्या — और सेवानिवृत्त मूल्यांकन हार्नेस द्वारा दी गई संख्याएँ — किसी स्लाइड पर नहीं आनी चाहिए।',
+
+  // Care coordination — what happens after the consultation.
+  'nav.operations': 'संचालन',
+  'report.tabEmpty': 'इस शीर्षक के अंतर्गत कुछ दर्ज नहीं',
+  'report.tabEmptyDetail':
+    'साक्षात्कार के दौरान इतिहास का यह भाग नहीं लिया गया। यह इस बात का कथन नहीं है कि बताने को कुछ नहीं है।',
+
+  'orders.aria': 'इस इनटेक पर दिए गए आदेश',
+  'orders.title': 'आदेश',
+  'orders.subtitle':
+    'परामर्श के बाद दी गई जाँचें, स्कैन, रेफरल और नुस्खे। नियुक्ति वास्तव में पूरी हुई या नहीं, इसका अभिलेख संबंधित विभाग की अपनी प्रणाली ही रहती है।',
+  'orders.none': 'इस इनटेक पर कुछ भी आदेशित नहीं किया गया है।',
+  'orders.loadError': 'इस इनटेक के आदेश लोड नहीं हो सके।',
+  'orders.issue': 'आदेश दर्ज करें',
+  'orders.issueError': 'यह आदेश दर्ज नहीं हुआ। कुछ भी भेजा नहीं गया है।',
+  'orders.noSlot': 'कोई समय उपलब्ध नहीं',
+  'orders.slotNote':
+    'रेफरल या स्कैन को गंतव्य द्वारा घोषित सबसे निकट खाली समय दिया जाता है। जहाँ कोई खाली समय नहीं है, उसे प्रतीक्षारत छोड़ने के बजाय “अपूर्ण” दर्ज किया जाता है, ताकि किसी को ऐसे समय पर न भेजा जाए जो कभी दिया ही नहीं गया।',
+  'orders.field.kind': 'प्रकार',
+  'orders.field.code': 'कोड',
+  'orders.field.display': 'विवरण',
+  'orders.field.destination': 'गंतव्य',
+  'orders.kind.lab': 'प्रयोगशाला',
+  'orders.kind.imaging': 'इमेजिंग',
+  'orders.kind.referral': 'रेफरल',
+  'orders.kind.prescription': 'नुस्खा',
+  'orders.status.requested': 'अनुरोधित',
+  'orders.status.scheduled': 'समय नियत',
+  'orders.status.completed': 'पूर्ण',
+  'orders.status.cancelled': 'निरस्त',
+  'orders.status.unfilled': 'कोई क्षमता नहीं मिली',
+
+  'wait.position': 'कतार में {position} स्थान',
+  'wait.minutes': 'लगभग {minutes} मिनट',
+  'wait.noEstimate': 'आज इतने परामर्श नहीं हुए कि समय का अनुमान लगाया जा सके',
+
+  'ops.title': 'संचालन',
+  'ops.subtitle':
+    'पिछले एक दिन में प्रणाली के पास पहले से मौजूद अभिलेखों से गिना गया। यहाँ कुछ भी पूर्वानुमान या भविष्यवाणी नहीं है।',
+  'ops.load': 'विभाग',
+  'ops.loadNote': 'सबसे लंबी प्रतीक्षा पहले — सबसे व्यस्त विभाग नहीं, बल्कि वह जिसमें कोई सबसे देर से बैठा है।',
+  'ops.loadError': 'विभागवार गणना लोड नहीं हो सकी।',
+  'ops.nobodyWaiting': 'कोई प्रतीक्षा में नहीं है।',
+  'ops.department': 'विभाग',
+  'ops.waiting': 'प्रतीक्षारत',
+  'ops.flagged': 'चिह्नित',
+  'ops.longest': 'सबसे लंबी प्रतीक्षा',
+  'ops.unfilled': 'अपूर्ण',
+  'ops.minutes': '{minutes} मिनट',
+  'ops.asOf': '{time} तक।',
+
+  'stock.title': 'औषधालय',
+  'stock.subtitle': 'कम, समाप्ति के निकट, समाप्त या खत्म हो चुकी वस्तुएँ — जो रोगी के काउंटर तक पहुँचने से पहले फार्मासिस्ट को दिखनी चाहिए।',
+  'stock.loadError': 'औषधालय सूची लोड नहीं हो सकी।',
+  'stock.nothingToAct': 'किसी वस्तु पर ध्यान देने की आवश्यकता नहीं।',
+  'stock.onHand': '{onHand} उपलब्ध, {reorder} पर पुनः मँगाएँ',
+  'stock.expires': '{date} को समाप्त',
+  'stock.unknownNote':
+    'यहाँ केवल वे वस्तुएँ दिखती हैं जो औषधालय ने दर्ज की हैं। जिस दवा की कोई प्रविष्टि नहीं है, उसके बारे में इस प्रणाली को कभी बताया ही नहीं गया — यह उस दवा से भिन्न बात है जो समाप्त हो चुकी हो।',
+  'stock.state.available': 'उपलब्ध',
+  'stock.state.low': 'कम',
+  'stock.state.expiring': 'शीघ्र समाप्त',
+  'stock.state.expired': 'समाप्त',
+  'stock.state.out': 'स्टॉक में नहीं',
+  'stock.state.unknown': 'दर्ज नहीं',
 };
 
 export const STRINGS: Record<Locale, Record<StringKey, string>> = { en, hi };

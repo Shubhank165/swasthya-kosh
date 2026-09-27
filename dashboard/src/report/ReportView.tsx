@@ -32,7 +32,7 @@ import { statesFor, type FactLike, type FactState } from './factState';
 
 export type { PhysicianReport, ReportLine, ReportSection, Contradiction };
 
-export type ReportTab = 'complaint' | 'ayurveda' | 'meds' | 'labs' | 'discrepancies' | 'all';
+export type ReportTab = 'complaint' | 'history' | 'meds' | 'labs' | 'discrepancies' | 'all';
 
 interface Props {
   report: PhysicianReport;
@@ -73,20 +73,19 @@ export function ReportView({
         s.section === 'review_of_systems'
       );
     }
-    if (activeTab === 'ayurveda') {
-      return s.section === 'ayurveda';
-    }
-    if (activeTab === 'meds') {
-      return s.section === 'medications' || s.section === 'allergies';
-    }
-    if (activeTab === 'labs') {
+    if (activeTab === 'history') {
       return (
-        s.section === 'investigations' ||
         s.section === 'past_medical' ||
         s.section === 'past_surgical' ||
         s.section === 'family_history' ||
         s.section === 'personal_history'
       );
+    }
+    if (activeTab === 'meds') {
+      return s.section === 'medications' || s.section === 'allergies';
+    }
+    if (activeTab === 'labs') {
+      return s.section === 'investigations';
     }
     if (activeTab === 'discrepancies') {
       return false; // Discrepancies has Unresolved, Conflicts & DocumentNotes
@@ -94,15 +93,19 @@ export function ReportView({
     return true;
   });
 
-  const showAyurvedaEmptyNotice =
-    activeTab === 'ayurveda' &&
+  // A tab whose sections are all empty says so, rather than showing a blank
+  // card that reads as a loading failure. It is not the same claim as "nothing
+  // is wrong": it says this part of the history was not taken.
+  const isEmptyTab =
+    activeTab !== 'all' &&
+    activeTab !== 'discrepancies' &&
     (filteredSections.length === 0 ||
       filteredSections.every((s) => !s.lines || s.lines.length === 0));
 
   return (
     <article className="space-y-6" aria-label={label}>
       {/* Alerts render on every tab. A red flag a physician cannot see because
-          they are looking at the Ayurveda tab is a red flag that did not fire —
+          they are reading the medication tab is a red flag that did not fire —
           the point of the block is that it is impossible to miss. */}
       <AlertsBlock alerts={report.alerts ?? []} t={t} />
 
@@ -120,12 +123,10 @@ export function ReportView({
         />
       ))}
 
-      {showAyurvedaEmptyNotice && (
+      {isEmptyTab && (
         <div className="surface-card p-6 text-center text-ink-muted">
-          <p className="font-medium text-sm text-ink">No Specific Ayurvedic Assessment Reported</p>
-          <p className="mt-1 text-xs">
-            Patient did not report Dosha-specific aggravation or prior Ayurvedic treatment during kiosk intake.
-          </p>
+          <p className="text-sm font-medium text-ink">{t('report.tabEmpty')}</p>
+          <p className="mt-1 text-xs">{t('report.tabEmptyDetail')}</p>
         </div>
       )}
 

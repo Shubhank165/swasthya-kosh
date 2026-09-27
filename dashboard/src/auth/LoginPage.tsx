@@ -130,15 +130,15 @@ export function LoginPage() {
       <div className="tricolour-rule h-1.5 w-full" />
       <header className="border-b border-line bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-6">
-          <span className="ayush-gradient flex size-10 items-center justify-center rounded-xl text-white shadow-sm">
+          <span className="brand-gradient flex size-10 items-center justify-center rounded-xl text-white shadow-sm">
             <Leaf className="size-5" />
           </span>
           <span className="leading-tight">
             <span className="block font-semibold text-ink text-base">
-              {isHi ? 'राष्ट्रीय आयुष अस्पताल पोर्टल' : 'National AYUSH Hospital Portal'}
+              {isHi ? 'मेडीकियोस्क अस्पताल पोर्टल' : 'MediKiosk Hospital Portal'}
             </span>
             <span className="block text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-muted">
-              {isHi ? 'आयुष मंत्रालय • भारत सरकार' : 'Ministry of Ayush • Government of India'}
+              {isHi ? 'परामर्श-पूर्व पंजीकरण • ओपीडी' : 'Pre-consultation intake • OPD'}
             </span>
           </span>
           <div className="ml-auto">
@@ -170,8 +170,8 @@ export function LoginPage() {
           </h1>
           <p className="mt-4 max-w-md text-sm sm:text-base leading-relaxed text-ink-muted">
             {isHi
-              ? 'भारत के संबद्ध आयुष अस्पतालों के लिए कियोस्क-आधारित परामर्श-पूर्व पंजीकरण, आयुर्वेदिक मूल्यांकन और स्वचालित ट्रायेज।'
-              : 'Kiosk-led pre-consultation intake, Ayurvedic assessment capture, and automated triage for affiliated AYUSH hospitals across India.'}
+              ? 'अस्पताल ओपीडी के लिए कियोस्क-आधारित परामर्श-पूर्व पंजीकरण, बहुभाषी केस-टेकिंग और लाल-झंडा स्क्रीनिंग।'
+              : 'Kiosk-led pre-consultation intake, multilingual case taking, and red-flag screening for hospital OPDs.'}
           </p>
 
           {/* Visual Hero Card with subtle floating micro-animations */}
@@ -182,7 +182,7 @@ export function LoginPage() {
               </span>
               <div>
                 <h3 className="font-semibold text-lg leading-tight">
-                  {isHi ? 'आयुष डिजिटल ओपीडी' : 'Ayush Digital OPD'}
+                  {isHi ? 'डिजिटल ओपीडी पंजीकरण' : 'Digital OPD Intake'}
                 </h3>
                 <p className="text-xs text-white/80">
                   {isHi ? 'रीयल-टाइम प्री-कंसल्टेशन सिस्टम' : 'Real-time Pre-Consultation System'}

@@ -47,7 +47,7 @@ async def request_code(
 
     Always answers the same way for a well-formed number, whether or not that
     number has ever been seen. Telling a caller "no account for this number"
-    would turn the endpoint into a membership oracle for patients of an AYUSH
+    would turn the endpoint into a membership oracle for the patients of a given
     hospital.
     """
     challenge = await service.request_code(body.phone)

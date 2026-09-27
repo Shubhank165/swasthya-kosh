@@ -7,9 +7,9 @@ import {
   FileText,
   FlaskConical,
   GitCompare,
+  History,
   Pill,
   Printer,
-  Sparkles,
 } from 'lucide-react';
 
 import {
@@ -23,6 +23,7 @@ import {
 } from '../api/queries';
 import type { Fact, PhysicianReport } from '../api/types';
 import { useSession } from '../auth/session';
+import { OrdersPanel } from '../coordination/OrdersPanel';
 import { EvidenceDrawer } from '../evidence/EvidencePanel';
 import { useLocale, useT } from '../i18n';
 import { evidenceFromApi } from '../evidence/fromApi';
@@ -32,7 +33,7 @@ import { humanise, timeOfDay } from '../lib/format';
 
 const TABS = [
   { id: 'complaint', labelEn: 'Chief Complaint & HPI', labelHi: 'मुख्य शिकायत एवं HPI', icon: FileText },
-  { id: 'ayurveda', labelEn: 'Ayurvedic Assessment', labelHi: 'आयुर्वेदिक मूल्यांकन', icon: Sparkles },
+  { id: 'history', labelEn: 'Past & Personal History', labelHi: 'पूर्व एवं व्यक्तिगत इतिहास', icon: History },
   { id: 'meds', labelEn: 'Medications & Safety', labelHi: 'औषधियाँ एवं सुरक्षा', icon: Pill },
   { id: 'labs', labelEn: 'Lab Investigations', labelHi: 'प्रयोगशाला जाँचें', icon: FlaskConical },
   { id: 'discrepancies', labelEn: 'Clinical Discrepancies', labelHi: 'नैदानिक विसंगतियाँ', icon: GitCompare },
@@ -144,7 +145,7 @@ export function ReportPage() {
 
       {/* Patient Header Banner */}
       <section className="surface-card overflow-hidden animate-fade-rise">
-        <div className="ayush-gradient h-1.5 w-full" />
+        <div className="brand-gradient h-1.5 w-full" />
         <div className="flex flex-wrap items-center justify-between gap-6 p-6">
           <div className="flex items-center gap-4">
             <span className="flex size-14 items-center justify-center rounded-2xl bg-herb-soft text-xl font-bold text-herb shadow-sm">
@@ -272,6 +273,12 @@ export function ReportPage() {
           </button>
         </div>
       </div>
+
+      {/* What happens after the consultation. Below the record rather than
+          beside it: the orders follow from what the record says, and a panel
+          competing with the report for a physician's first look would invert
+          that. */}
+      <OrdersPanel intakeId={intakeId} />
 
       {/* On-Demand Slide-Out Evidence Drawer */}
       <EvidenceDrawer

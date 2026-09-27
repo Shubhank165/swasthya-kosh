@@ -19,14 +19,20 @@ import {
 import { api } from './client';
 import type {
   AlertList,
+  CareOrder,
+  CareOrderList,
   CorrectionRate,
   DocumentRef,
   EvidencePayload,
   Fact,
   FactValue,
   Intake,
+  Operations,
+  OrderKind,
   PhysicianAction,
   Report,
+  StockAlertList,
+  WaitEstimate,
   HospitalList,
   Worklist,
   WorklistState,
@@ -52,6 +58,10 @@ export const keys = {
     ['evidence', intakeId, factId] as const,
   correctionRate: () => ['metrics', 'correction-rate'] as const,
   hospitals: () => ['hospitals'] as const,
+  orders: (intakeId: string) => ['orders', intakeId] as const,
+  wait: (intakeId: string) => ['wait', intakeId] as const,
+  stockAlerts: () => ['pharmacy', 'alerts'] as const,
+  operations: () => ['operations'] as const,
 };
 
 function query(params: Record<string, string | number | boolean | null | undefined>) {
@@ -236,5 +246,78 @@ export function useAcknowledgeAlert() {
       void client.invalidateQueries({ queryKey: ['alerts'] });
       void client.invalidateQueries({ queryKey: ['worklist'] });
     },
+  });
+}
+
+// ------------------------------------------------------------- coordination
+
+/** Everything asked for on this intake — §coordination. */
+export function useOrders(intakeId: string) {
+  return useQuery<CareOrderList>({
+    queryKey: keys.orders(intakeId),
+    queryFn: () => api.get<CareOrderList>(`/intakes/${intakeId}/orders`),
+  });
+}
+
+/**
+ * Issue one order.
+ *
+ * The response is refetched rather than spliced in, for the same reason a
+ * verified fact is: whether the order found a slot is the backend's answer, and
+ * a client that guessed `scheduled` because it asked for a destination would be
+ * inventing the one distinction this feature exists to make.
+ */
+export function useIssueOrder(intakeId: string) {
+  const client = useQueryClient();
+  return useMutation<
+    CareOrder,
+    Error,
+    { kind: OrderKind; code: string; display: string; destination?: string; note?: string }
+  >({
+    mutationFn: (body) =>
+      api.post<CareOrder>(`/intakes/${intakeId}/orders`, {
+        kind: body.kind,
+        code: body.code,
+        display: body.display,
+        ...(body.destination ? { destination: body.destination } : {}),
+        ...(body.note ? { note: body.note } : {}),
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.orders(intakeId) });
+      // An unfilled referral changes the operations view, which counts them.
+      void client.invalidateQueries({ queryKey: keys.operations() });
+    },
+  });
+}
+
+/**
+ * Where this patient stands in the queue.
+ *
+ * Refetched on an interval because a position that is forty minutes stale is
+ * worse than none — it is a number a patient was given and then kept.
+ */
+export function useWaitEstimate(intakeId: string) {
+  return useQuery<WaitEstimate>({
+    queryKey: keys.wait(intakeId),
+    queryFn: () => api.get<WaitEstimate>(`/intakes/${intakeId}/wait`),
+    refetchInterval: 60_000,
+  });
+}
+
+/** Items low, expiring, expired or out. Never items nobody recorded. */
+export function useStockAlerts() {
+  return useQuery<StockAlertList>({
+    queryKey: keys.stockAlerts(),
+    queryFn: () => api.get<StockAlertList>('/pharmacy/alerts'),
+  });
+}
+
+/** Waiting, flagged and unfilled by department — admin only, and the backend
+ *  enforces that rather than trusting this client. */
+export function useOperations() {
+  return useQuery<Operations>({
+    queryKey: keys.operations(),
+    queryFn: () => api.get<Operations>('/operations'),
+    refetchInterval: 60_000,
   });
 }

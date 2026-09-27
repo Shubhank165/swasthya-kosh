@@ -13,6 +13,7 @@ import { AlertsPage } from './alerts/AlertsPage';
 import { LocaleSwitch } from './components/LocaleSwitch';
 import { useT } from './i18n';
 import { MetricsPage } from './admin/MetricsPage';
+import { OperationsPage } from './coordination/OperationsPage';
 import { RequireDashboardRole } from './auth/RequireDashboardRole';
 import { useIdleTimeout } from './auth/useIdleTimeout';
 import { useSession } from './auth/session';
@@ -34,6 +35,14 @@ export function App() {
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/intakes/:intakeId" element={<ReportPage />} />
             <Route path="/patient/:intakeId" element={<ReportPage />} />
+            <Route
+              path="/operations"
+              element={
+                <RequireDashboardRole allow={['admin']}>
+                  <OperationsPage />
+                </RequireDashboardRole>
+              }
+            />
             <Route
               path="/metrics"
               element={
@@ -69,13 +78,13 @@ function TopBar() {
       <div className="tricolour-rule h-1 w-full" />
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-3">
-          <span className="ayush-gradient flex size-10 items-center justify-center rounded-xl text-white shadow-sm">
+          <span className="brand-gradient flex size-10 items-center justify-center rounded-xl text-white shadow-sm">
             <Leaf className="size-5" />
           </span>
           <span className="leading-tight">
             <span className="block font-semibold text-ink text-base">MediKiosk</span>
             <span className="block text-[10px] font-semibold uppercase tracking-[0.13em] text-ink-muted">
-              Ministry of Ayush • Government of India
+              {t('app.subtitle')}
             </span>
           </span>
         </Link>
@@ -83,7 +92,12 @@ function TopBar() {
         <nav className="ml-6 hidden items-center gap-1 md:flex">
           <Tab to="/" label={t('nav.worklist')} />
           <Tab to="/alerts" label={t('nav.alerts')} />
-          {session?.role === 'admin' && <Tab to="/metrics" label={t('nav.quality')} />}
+          {session?.role === 'admin' && (
+            <>
+              <Tab to="/operations" label={t('nav.operations')} />
+              <Tab to="/metrics" label={t('nav.quality')} />
+            </>
+          )}
         </nav>
 
         <div className="ml-auto flex items-center gap-3">

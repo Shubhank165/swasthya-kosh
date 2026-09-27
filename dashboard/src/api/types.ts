@@ -231,3 +231,91 @@ export interface EvidencePayload {
   recorded_at: string;
   supersedes?: string | null;
 }
+
+// ------------------------------------------------------------- coordination
+
+/**
+ * What happens after the consultation — `app/domain/coordination.py`.
+ *
+ * The bounds stated there apply to anything rendered from these types. This is
+ * not inventory management and not a booking engine: stock is a count and an
+ * expiry date, slots are declared capacity, and the hospital's own systems stay
+ * the system of record for both. A screen that implies otherwise is claiming
+ * more than the data supports.
+ */
+export type OrderKind = 'lab' | 'imaging' | 'referral' | 'prescription';
+
+/**
+ * `unfilled` is not `requested`. One says the destination had no capacity to
+ * offer, the other says nobody has looked yet, and a patient walking across a
+ * site deserves to know which — so the two never collapse into one chip.
+ */
+export type OrderStatus =
+  | 'requested'
+  | 'scheduled'
+  | 'completed'
+  | 'cancelled'
+  | 'unfilled';
+
+export interface CareOrder {
+  id: string;
+  intake_id: string;
+  kind: OrderKind;
+  code: string;
+  display: string;
+  status: OrderStatus;
+  destination?: string | null;
+  slot_at?: string | null;
+  ordered_by: string;
+  note?: string | null;
+  created_at: string;
+}
+
+export interface CareOrderList {
+  intake_id: string;
+  orders?: readonly CareOrder[];
+}
+
+/** `unknown` never reaches this list: an item nobody recorded is not a shortage. */
+export type StockState = 'available' | 'low' | 'expiring' | 'expired' | 'out' | 'unknown';
+
+export interface StockAlert {
+  code: string;
+  display: string;
+  on_hand: number;
+  reorder_level: number;
+  expires_on?: string | null;
+  state: StockState;
+}
+
+export interface StockAlertList {
+  generated_at: string;
+  alerts?: readonly StockAlert[];
+}
+
+/**
+ * `minutes` is null and `confident` false when the department has not seen
+ * enough patients today to average over. A waiting room told "about eight
+ * minutes" that waits ninety stops believing the screen, so the screen shows a
+ * position and no time rather than a number it cannot stand behind.
+ */
+export interface WaitEstimate {
+  intake_id: string;
+  position: number;
+  ahead: number;
+  minutes?: number | null;
+  confident: boolean;
+}
+
+export interface DepartmentLoad {
+  department_code: string;
+  waiting: number;
+  flagged: number;
+  longest_wait_minutes: number;
+  unfilled_orders: number;
+}
+
+export interface Operations {
+  generated_at: string;
+  departments?: readonly DepartmentLoad[];
+}
