@@ -1,0 +1,196 @@
+# Personal and lifestyle history.
+#
+# Fifteen questions about how the patient lives: what they eat, how they sleep,
+# how their bowels and appetite behave, what work and stress fill their day.
+# Every one asks about something the patient experiences directly, and every one
+# means the same thing with no interpretive framework around it.
+#
+# These are the questions the kiosk has always actually asked. A separate
+# sixty-two question constitutional module existed in the backend's content tree
+# - forehead width in angula, eyelash texture, hair curl, and a psychometric
+# battery on temperament and recall - but no device ever served it, and the two
+# trees had drifted so far apart that the generator agreed with neither. It was
+# removed rather than reconciled: it is only interpretable inside the framework
+# it came from, and that framework is no longer what this system is for.
+#
+# clinical_source: engineer-authored, structured from standard OPD case-taking
+# order; pending clinical review.
+
+# `current_state: true` marks the three re-asked on a return visit: appetite,
+# bowel habit and sleep. What a patient reports about those moves between two
+# visits a fortnight apart, and today's answer is the one that matters. The
+# rest of the set does not move, and asking again would waste the visit.
+
+version: 1
+questions:
+- id: lifestyle.appetite
+  answer_type: single_select
+  extracts:
+  - lifestyle.appetite
+  priority: 8
+  burden: 1
+  options:
+  - poor
+  - variable
+  - normal
+  - excessive
+  current_state: true
+- id: lifestyle.after_eating
+  answer_type: multi_select
+  extracts:
+  - lifestyle.after_eating
+  priority: 8
+  burden: 2
+  options:
+  - comfortable
+  - heaviness
+  - bloating
+  - burning
+  - sleepiness
+  - pain
+  - nausea
+- id: lifestyle.bowel_habit
+  answer_type: single_select
+  extracts:
+  - lifestyle.bowel_habit
+  priority: 8
+  burden: 1
+  options:
+  - once_daily
+  - twice_daily
+  - alternate_days
+  - irregular
+  - constipated
+  - loose
+  current_state: true
+- id: lifestyle.urine_pattern
+  answer_type: single_select
+  extracts:
+  - lifestyle.urine_pattern
+  priority: 6
+  burden: 1
+  options:
+  - normal
+  - frequent
+  - scanty
+  - burning
+  - night_only
+- id: lifestyle.sleep_quality
+  answer_type: single_select
+  extracts:
+  - lifestyle.sleep_quality
+  priority: 8
+  burden: 1
+  options:
+  - sound
+  - disturbed
+  - difficulty_falling_asleep
+  - wakes_early
+  - excessive
+  current_state: true
+- id: lifestyle.diet_type
+  answer_type: single_select
+  extracts:
+  - lifestyle.diet_type
+  priority: 6
+  burden: 1
+  options:
+  - vegetarian
+  - eggetarian
+  - non_vegetarian
+  - vegan
+  - mixed
+- id: lifestyle.meal_regularity
+  answer_type: single_select
+  extracts:
+  - lifestyle.meal_regularity
+  priority: 7
+  burden: 1
+  options:
+  - regular
+  - mostly_regular
+  - irregular
+  - often_skipped
+- id: lifestyle.food_preferences
+  answer_type: multi_select
+  extracts:
+  - lifestyle.food_preferences
+  priority: 6
+  burden: 2
+  options:
+  - sweet
+  - sour
+  - salty
+  - pungent
+  - bitter
+  - astringent
+  - prefers_hot
+  - prefers_cold
+  - no_preference
+- id: lifestyle.thirst
+  answer_type: single_select
+  extracts:
+  - lifestyle.thirst
+  priority: 6
+  burden: 1
+  options:
+  - little
+  - normal
+  - excessive
+- id: lifestyle.sweating
+  answer_type: single_select
+  extracts:
+  - lifestyle.sweating
+  priority: 6
+  burden: 1
+  options:
+  - little
+  - normal
+  - profuse
+  - night_sweats
+- id: lifestyle.daily_routine
+  answer_type: free_text
+  extracts:
+  - lifestyle.daily_routine
+  priority: 6
+  burden: 3
+- id: lifestyle.physical_activity
+  answer_type: single_select
+  extracts:
+  - lifestyle.physical_activity
+  priority: 6
+  burden: 1
+  options:
+  - sedentary
+  - light
+  - moderate
+  - heavy_labour
+  - regular_exercise
+- id: lifestyle.stress
+  answer_type: single_select
+  extracts:
+  - lifestyle.stress
+  priority: 7
+  burden: 1
+  options:
+  - none
+  - mild
+  - moderate
+  - severe
+- id: lifestyle.environment
+  answer_type: free_text
+  extracts:
+  - lifestyle.environment
+  priority: 5
+  burden: 2
+- id: lifestyle.energy_through_day
+  answer_type: single_select
+  extracts:
+  - lifestyle.energy_through_day
+  priority: 5
+  burden: 1
+  options:
+  - morning_best
+  - afternoon_best
+  - evening_best
+  - no_pattern

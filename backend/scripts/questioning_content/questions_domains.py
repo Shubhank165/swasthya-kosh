@@ -635,7 +635,7 @@ DOMAIN_QUESTIONS: dict[str, list[str]] = {
 
 
 AYUSH_QUESTIONS: dict[str, list[str]] = {
-    "ayush.appetite": [
+    "lifestyle.appetite": [
         "How is your appetite these days?",
         "इन दिनों आपकी भूख कैसी है?",
         "আজকাল আপনার খিদে কেমন?",
@@ -646,7 +646,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ಈ ದಿನಗಳಲ್ಲಿ ನಿಮ್ಮ ಹಸಿವು ಹೇಗಿದೆ?",
         "ਇਹਨਾਂ ਦਿਨਾਂ ਵਿੱਚ ਤੁਹਾਡੀ ਭੁੱਖ ਕਿਹੋ ਜਿਹੀ ਹੈ?",
     ],
-    "ayush.after_eating": [
+    "lifestyle.after_eating": [
         "What do you usually feel after a full meal? Choose everything that applies.",
         "भरपेट खाना खाने के बाद आमतौर पर कैसा लगता है? जो भी लागू हो, सब चुनें।",
         "পেট ভরে খাওয়ার পরে সাধারণত কেমন লাগে? যা প্রযোজ্য সব বেছে নিন।",
@@ -657,7 +657,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ಹೊಟ್ಟೆ ತುಂಬ ಊಟ ಮಾಡಿದ ನಂತರ ಸಾಮಾನ್ಯವಾಗಿ ಹೇಗನಿಸುತ್ತದೆ? ಅನ್ವಯಿಸುವ ಎಲ್ಲವನ್ನೂ ಆಯ್ಕೆಮಾಡಿ.",
         "ਰੱਜ ਕੇ ਖਾਣਾ ਖਾਣ ਤੋਂ ਬਾਅਦ ਆਮ ਤੌਰ ਤੇ ਕਿਵੇਂ ਲੱਗਦਾ ਹੈ? ਜੋ ਲਾਗੂ ਹੋਵੇ ਸਭ ਚੁਣੋ।",
     ],
-    "ayush.bowel_habit": [
+    "lifestyle.bowel_habit": [
         "On a normal day, how are your bowels?",
         "आम दिनों में आपका शौच कैसा रहता है?",
         "স্বাভাবিক দিনে আপনার মলত্যাগ কেমন হয়?",
@@ -668,7 +668,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ಸಾಮಾನ್ಯ ದಿನದಲ್ಲಿ ನಿಮ್ಮ ಮಲವಿಸರ್ಜನೆ ಹೇಗಿರುತ್ತದೆ?",
         "ਆਮ ਦਿਨਾਂ ਵਿੱਚ ਤੁਹਾਡੀ ਟੱਟੀ ਕਿਹੋ ਜਿਹੀ ਰਹਿੰਦੀ ਹੈ?",
     ],
-    "ayush.urine_pattern": [
+    "lifestyle.urine_pattern": [
         "On a normal day, how is your urine?",
         "आम दिनों में आपका पेशाब कैसा रहता है?",
         "স্বাভাবিক দিনে আপনার প্রস্রাব কেমন হয়?",
@@ -679,7 +679,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ಸಾಮಾನ್ಯ ದಿನದಲ್ಲಿ ನಿಮ್ಮ ಮೂತ್ರ ಹೇಗಿರುತ್ತದೆ?",
         "ਆਮ ਦਿਨਾਂ ਵਿੱਚ ਤੁਹਾਡਾ ਪਿਸ਼ਾਬ ਕਿਹੋ ਜਿਹਾ ਰਹਿੰਦਾ ਹੈ?",
     ],
-    "ayush.sleep_quality": [
+    "lifestyle.sleep_quality": [
         "On a normal night, how do you sleep?",
         "आम रातों में आपकी नींद कैसी होती है?",
         "স্বাভাবিক রাতে আপনার ঘুম কেমন হয়?",
@@ -690,7 +690,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ಸಾಮಾನ್ಯ ರಾತ್ರಿ ನಿಮ್ಮ ನಿದ್ರೆ ಹೇಗಿರುತ್ತದೆ?",
         "ਆਮ ਰਾਤਾਂ ਵਿੱਚ ਤੁਹਾਡੀ ਨੀਂਦ ਕਿਹੋ ਜਿਹੀ ਹੁੰਦੀ ਹੈ?",
     ],
-    "ayush.diet_type": [
+    "lifestyle.diet_type": [
         "What sort of food do you usually eat?",
         "आप आमतौर पर किस तरह का खाना खाते हैं?",
         "আপনি সাধারণত কী ধরনের খাবার খান?",
@@ -701,7 +701,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ನೀವು ಸಾಮಾನ್ಯವಾಗಿ ಯಾವ ರೀತಿಯ ಆಹಾರ ಸೇವಿಸುತ್ತೀರಿ?",
         "ਤੁਸੀਂ ਆਮ ਤੌਰ ਤੇ ਕਿਹੋ ਜਿਹਾ ਖਾਣਾ ਖਾਂਦੇ ਹੋ?",
     ],
-    "ayush.meal_regularity": [
+    "lifestyle.meal_regularity": [
         "Do you eat at regular times?",
         "क्या आप तय समय पर खाना खाते हैं?",
         "আপনি কি নির্দিষ্ট সময়ে খান?",
@@ -712,7 +712,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ನೀವು ನಿಗದಿತ ಸಮಯದಲ್ಲಿ ಊಟ ಮಾಡುತ್ತೀರಾ?",
         "ਕੀ ਤੁਸੀਂ ਤੈਅ ਸਮੇਂ ਤੇ ਖਾਣਾ ਖਾਂਦੇ ਹੋ?",
     ],
-    "ayush.food_preferences": [
+    "lifestyle.food_preferences": [
         "Which tastes do you find yourself drawn to? Choose everything that applies.",
         "आपको कौन से स्वाद ज़्यादा पसंद आते हैं? जो भी लागू हो, सब चुनें।",
         "কোন স্বাদ আপনার বেশি ভালো লাগে? যা প্রযোজ্য সব বেছে নিন।",
@@ -723,7 +723,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ನಿಮಗೆ ಯಾವ ರುಚಿಗಳು ಇಷ್ಟ? ಅನ್ವಯಿಸುವ ಎಲ್ಲವನ್ನೂ ಆಯ್ಕೆಮಾಡಿ.",
         "ਤੁਹਾਨੂੰ ਕਿਹੜੇ ਸੁਆਦ ਜ਼ਿਆਦਾ ਪਸੰਦ ਹਨ? ਜੋ ਲਾਗੂ ਹੋਵੇ ਸਭ ਚੁਣੋ।",
     ],
-    "ayush.thirst": [
+    "lifestyle.thirst": [
         "How much do you feel like drinking through the day?",
         "दिन भर में आपको कितनी प्यास लगती है?",
         "সারাদিনে আপনার কতটা তেষ্টা পায়?",
@@ -734,7 +734,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ದಿನವಿಡೀ ನಿಮಗೆ ಎಷ್ಟು ಬಾಯಾರಿಕೆ ಆಗುತ್ತದೆ?",
         "ਦਿਨ ਭਰ ਵਿੱਚ ਤੁਹਾਨੂੰ ਕਿੰਨੀ ਪਿਆਸ ਲੱਗਦੀ ਹੈ?",
     ],
-    "ayush.sweating": [
+    "lifestyle.sweating": [
         "How much do you sweat compared with usual?",
         "आपको सामान्य से कितना ज़्यादा या कम पसीना आता है?",
         "স্বাভাবিকের তুলনায় কতটা ঘাম হয়?",
@@ -745,7 +745,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ಎಂದಿಗಿಂತ ಎಷ್ಟು ಬೆವರು ಬರುತ್ತದೆ?",
         "ਆਮ ਨਾਲੋਂ ਕਿੰਨਾ ਪਸੀਨਾ ਆਉਂਦਾ ਹੈ?",
     ],
-    "ayush.daily_routine": [
+    "lifestyle.daily_routine": [
         "Tell us about a usual day — when you wake, when you work, when you sleep.",
         "अपने आम दिन के बारे में बताइए — कब उठते हैं, कब काम करते हैं, कब सोते हैं।",
         "আপনার সাধারণ দিনের কথা বলুন — কখন ওঠেন, কখন কাজ করেন, কখন ঘুমান।",
@@ -756,7 +756,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ನಿಮ್ಮ ಸಾಮಾನ್ಯ ದಿನದ ಬಗ್ಗೆ ಹೇಳಿ — ಯಾವಾಗ ಏಳುತ್ತೀರಿ, ಕೆಲಸ, ನಿದ್ರೆ.",
         "ਆਪਣੇ ਆਮ ਦਿਨ ਬਾਰੇ ਦੱਸੋ — ਕਦੋਂ ਉੱਠਦੇ ਹੋ, ਕੰਮ, ਨੀਂਦ।",
     ],
-    "ayush.physical_activity": [
+    "lifestyle.physical_activity": [
         "How much do you move about in a usual day?",
         "आम दिन में आप कितना चलते-फिरते हैं?",
         "সাধারণ দিনে আপনি কতটা চলাফেরা করেন?",
@@ -767,7 +767,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ಸಾಮಾನ್ಯ ದಿನದಲ್ಲಿ ನೀವು ಎಷ್ಟು ಓಡಾಡುತ್ತೀರಿ?",
         "ਆਮ ਦਿਨ ਵਿੱਚ ਤੁਸੀਂ ਕਿੰਨਾ ਤੁਰਦੇ-ਫਿਰਦੇ ਹੋ?",
     ],
-    "ayush.stress": [
+    "lifestyle.stress": [
         "How much strain or worry do you feel day to day?",
         "रोज़ाना आप कितना तनाव या चिंता महसूस करते हैं?",
         "প্রতিদিন আপনি কতটা চাপ বা দুশ্চিন্তা অনুভব করেন?",
@@ -778,7 +778,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ಪ್ರತಿದಿನ ನೀವು ಎಷ್ಟು ಒತ್ತಡ ಅಥವಾ ಚಿಂತೆ ಅನುಭವಿಸುತ್ತೀರಿ?",
         "ਰੋਜ਼ਾਨਾ ਤੁਸੀਂ ਕਿੰਨਾ ਤਣਾਅ ਜਾਂ ਚਿੰਤਾ ਮਹਿਸੂਸ ਕਰਦੇ ਹੋ?",
     ],
-    "ayush.environment": [
+    "lifestyle.environment": [
         "Is there anything in your surroundings or your work that seems to affect it?",
         "क्या आपके आसपास या काम में कुछ ऐसा है जिसका इस पर असर लगता है?",
         "আপনার আশপাশে বা কাজে এমন কিছু আছে যা এতে প্রভাব ফেলে?",
@@ -789,7 +789,7 @@ AYUSH_QUESTIONS: dict[str, list[str]] = {
         "ನಿಮ್ಮ ಸುತ್ತಮುತ್ತ ಅಥವಾ ಕೆಲಸದಲ್ಲಿ ಇದರ ಮೇಲೆ ಪರಿಣಾಮ ಬೀರುವ ಏನಾದರೂ ಇದೆಯೇ?",
         "ਕੀ ਤੁਹਾਡੇ ਆਲੇ-ਦੁਆਲੇ ਜਾਂ ਕੰਮ ਵਿੱਚ ਕੁਝ ਅਜਿਹਾ ਹੈ ਜਿਸ ਦਾ ਇਸ ਤੇ ਅਸਰ ਲੱਗਦਾ ਹੈ?",
     ],
-    "ayush.energy_through_day": [
+    "lifestyle.energy_through_day": [
         "At what time of day do you feel at your best?",
         "दिन के किस समय आप सबसे बेहतर महसूस करते हैं?",
         "দিনের কোন সময়ে আপনি সবচেয়ে ভালো বোধ করেন?",

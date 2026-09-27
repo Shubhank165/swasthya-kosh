@@ -48,7 +48,7 @@ _STATUSES: frozenset[str] = frozenset(status.value for status in FieldStatus)
 #: rejected whole rather than filtered: a client sending `general.*` into an
 #: AYUSH profile has misunderstood something, and silently dropping the strays
 #: would hide it.
-_NAMESPACE = "ayush."
+_NAMESPACE = "lifestyle."
 
 #: One patient's constitution is 62 questions today and will not plausibly be
 #: thousands. A cap here is what stops a malformed or hostile client writing an
@@ -157,7 +157,7 @@ class PatientProfileService:
             patient_ref_type=patient_ref_type,
             patient_ref_value=patient_ref_value,
         )
-        profile_id = self._ids.new_id("ayush")
+        profile_id = self._ids.new_id("profile")
         await self._profiles.add_revision(
             profile_id=profile_id,
             hospital_id=hospital_id,

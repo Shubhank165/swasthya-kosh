@@ -71,13 +71,15 @@ FIELD_SECTIONS: Mapping[str, Section] = {
     "occupation": Section.PERSONAL_HISTORY,
     "menstrual_history": Section.PERSONAL_HISTORY,
     "pregnancy": Section.PERSONAL_HISTORY,
-    # ayurveda, patient-reported only
-    "prakriti_self_report": Section.AYURVEDA,
-    "agni": Section.AYURVEDA,
-    "koshtha": Section.AYURVEDA,
-    "nidra": Section.AYURVEDA,
-    "mala": Section.AYURVEDA,
-    "mutra": Section.AYURVEDA,
+    # Bare names the Jetson extractor once emitted. The Ayurvedic terms name
+    # ordinary things - digestion, bowel habit, sleep, stool, urine - and the
+    # things themselves are personal history, so they are kept and refiled
+    # rather than dropped: an old record still has facts under these ids.
+    "agni": Section.PERSONAL_HISTORY,
+    "koshtha": Section.PERSONAL_HISTORY,
+    "nidra": Section.PERSONAL_HISTORY,
+    "mala": Section.PERSONAL_HISTORY,
+    "mutra": Section.PERSONAL_HISTORY,
     # red-flag screening answers
     "breathlessness": Section.RED_FLAG_SCREEN,
     "chest_pain": Section.RED_FLAG_SCREEN,
@@ -96,9 +98,9 @@ FIELD_SECTIONS: Mapping[str, Section] = {
 #: The table above was written against the Jetson extractor's bare field names
 #: (`age`, `diet`, `sleep`). The compiled question bundle emits dotted ids
 #: instead, none of which match a bare name and none of which match a prefix
-#: rule — `ayush.` is not `ayurveda_`. Every one of them therefore fell to
+#: rule — `lifestyle.` matched no prefix rule at all. Every one of them therefore fell to
 #: `DEFAULT_SECTION`, which is how one intake came to render thirty-four lines
-#: under *History of presenting illness* with an empty *Ayurveda* section
+#: under *History of presenting illness* with an empty *Personal history* section
 #: beneath it, and with the patient's age and family history filed as features
 #: of today's complaint.
 #:
@@ -187,12 +189,10 @@ BUNDLE_FIELD_SECTIONS: Mapping[str, Section] = {
     "menstrual.flow": Section.PERSONAL_HISTORY,
     "menstrual.last_period": Section.PERSONAL_HISTORY,
     "menstrual.pain_with_periods": Section.PERSONAL_HISTORY,
-    # ayurveda — no explicit entries. The module's 62 questions all carry the
-    # `ayush.` namespace and are routed by the prefix rule below, which is the
-    # rule that was already the safety net for them. Fifteen ids were listed
-    # here when the module had fifteen questions; none of those ids survived
-    # the module being rewritten, so listing ids individually was a promise
-    # this file could not keep across a content change.
+    # lifestyle — no explicit entries. All fifteen carry the `lifestyle.`
+    # namespace and are routed by the prefix rule below. Listing ids
+    # individually was tried once and broke the first time the content
+    # changed, which is a promise this file cannot keep.
     # red flag screen
     "bleeding.amount": Section.RED_FLAG_SCREEN,
     "bleeding.ongoing": Section.RED_FLAG_SCREEN,
@@ -209,11 +209,11 @@ PREFIX_SECTIONS: Mapping[str, Section] = {
     "diagnosis_": Section.PAST_MEDICAL,
     "surgery_": Section.PAST_SURGICAL,
     "family_": Section.FAMILY_HISTORY,
-    "ayurveda_": Section.AYURVEDA,
-    # The bundle's Ayurveda namespace. A safety net for an `ayush.` question
-    # added to the content without an entry in `BUNDLE_FIELD_SECTIONS`: it
-    # lands under Ayurveda with a plain label rather than under HPI.
-    "ayush.": Section.AYURVEDA,
+    # Personal and lifestyle history — sleep, appetite, bowel habit, diet,
+    # work and stress. A safety net for a `lifestyle.` question added to the
+    # content without an entry in `BUNDLE_FIELD_SECTIONS`: it lands under
+    # personal history with a plain label rather than under HPI.
+    "lifestyle.": Section.PERSONAL_HISTORY,
     "lab_": Section.INVESTIGATIONS,
     "screen_": Section.RED_FLAG_SCREEN,
     "redflag_": Section.RED_FLAG_SCREEN,

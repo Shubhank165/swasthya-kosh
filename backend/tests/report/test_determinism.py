@@ -369,9 +369,9 @@ class TestFallbackFieldsAreReFiled:
             recorded_at=FROZEN_NOW,
         )
 
-    def test_an_ayurveda_field_stored_as_hpi_renders_under_ayurveda(self) -> None:
-        fact = self._fact("ayush.appetite", Section.HPI)
-        assert builder._effective_section(fact) is Section.AYURVEDA
+    def test_a_lifestyle_field_stored_as_hpi_renders_under_personal_history(self) -> None:
+        fact = self._fact("lifestyle.appetite", Section.HPI)
+        assert builder._effective_section(fact) is Section.PERSONAL_HISTORY
 
     def test_age_stored_as_hpi_renders_under_identity(self) -> None:
         fact = self._fact("general.age", Section.HPI)
@@ -383,10 +383,10 @@ class TestFallbackFieldsAreReFiled:
         assert builder._effective_section(fact) is Section.CHIEF_COMPLAINT
 
     def test_a_deliberate_section_is_never_overridden(self) -> None:
-        """A device that filed this under personal history meant it. The table
-        would say Ayurveda; the stored answer wins because it is not the
-        fallback."""
-        fact = self._fact("ayush.appetite", Section.PERSONAL_HISTORY)
+        """A device that filed this deliberately meant it: the stored answer
+        wins because it is not the fallback. The prefix rule agrees here, which
+        is why the assertion below reads the same either way."""
+        fact = self._fact("lifestyle.appetite", Section.PERSONAL_HISTORY)
         assert builder._effective_section(fact) is Section.PERSONAL_HISTORY
 
     def test_an_unknown_field_stays_in_the_fallback(self) -> None:

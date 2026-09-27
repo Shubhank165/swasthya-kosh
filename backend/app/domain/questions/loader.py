@@ -47,7 +47,6 @@ SECTION_ORDER: tuple[str, ...] = (
     "allergies",
     "family_history",
     "personal_history",
-    "ayurveda",
     "documents",
     "confirmation",
 )
@@ -227,14 +226,6 @@ def load_questions(
         questions.extend(screens.get("general", ()))
         branches[complaint] = tuple(questions)
 
-    ayurveda: tuple[Question, ...] = ()
-    ayurveda_dir = directory / "ayurveda"
-    if ayurveda_dir.is_dir():
-        for path in sorted(ayurveda_dir.glob("*.yaml")):
-            ayurveda = ayurveda + _questions_from(
-                path, default_section="ayurveda", languages=languages
-            )
-
     complaints = _complaint_values(core)
 
     red_flags: list[RedFlagRule] = []
@@ -256,16 +247,22 @@ def load_questions(
                 )
             )
 
+    # Questions asked once per patient rather than once per visit. The
+    # constitutional module that used to fill this is gone; the slot stays
+    # because the shape of a patient-level question set is still right and a
+    # future module drops straight into it.
+    standing: tuple[Question, ...] = ()
+
     question_set = QuestionSet(
         content_version=content_version,
         languages=tuple(languages),
         core=core,
         branches=branches,
-        ayurveda=ayurveda,
+        standing=standing,
         red_flags=tuple(red_flags),
         sections=tuple(
             s for s in SECTION_ORDER
-            if any(q.section == s for q in _every(core, branches, ayurveda))
+            if any(q.section == s for q in _every(core, branches, standing))
         ),
     )
     _check_rules_are_answerable(question_set)
@@ -367,9 +364,9 @@ def _check_no_rule_is_unsatisfiable(question_set: QuestionSet) -> None:
 def _every(
     core: Sequence[Question],
     branches: Mapping[str, Sequence[Question]],
-    ayurveda: Sequence[Question],
+    standing: Sequence[Question],
 ) -> list[Question]:
-    out = list(core) + list(ayurveda)
+    out = list(core) + list(standing)
     for group in branches.values():
         out.extend(group)
     return out

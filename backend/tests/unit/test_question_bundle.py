@@ -60,12 +60,12 @@ class TestItLoads:
         assert branchless == [], f"complaints with no questions behind them: {branchless}"
 
     def test_every_referenced_question_id_exists(self, bundle: dict[str, Any]) -> None:
-        """`core`, `branches` and `ayurveda` are lists of ids into `questions`.
+        """`core`, `branches` and `lifestyle` are lists of ids into `questions`.
 
         A dangling id is a question the app is told to ask and has no text for.
         """
         known = {q["question_id"] for q in bundle["questions"]}
-        referenced = set(bundle["core"]) | set(bundle["ayurveda"])
+        referenced = set(bundle["core"]) | set(bundle["lifestyle"])
         for ids in bundle["branches"].values():
             referenced |= set(ids)
         assert referenced <= known, f"dangling: {sorted(referenced - known)}"

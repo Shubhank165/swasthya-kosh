@@ -71,7 +71,6 @@ class Section(StrEnum):
     PERSONAL_HISTORY = "personal_history"
     REVIEW_OF_SYSTEMS = "review_of_systems"
     INVESTIGATIONS = "investigations"
-    AYURVEDA = "ayurveda"
     #: Screening answers the Jetson collected alongside its red-flag criteria.
     RED_FLAG_SCREEN = "red_flag_screen"
     CONSENT = "consent"
@@ -90,7 +89,6 @@ SECTION_ORDER: tuple[Section, ...] = (
     Section.PERSONAL_HISTORY,
     Section.REVIEW_OF_SYSTEMS,
     Section.INVESTIGATIONS,
-    Section.AYURVEDA,
     Section.RED_FLAG_SCREEN,
     Section.CONSENT,
 )

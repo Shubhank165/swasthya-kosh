@@ -364,52 +364,52 @@ menstrual_history:
 # collects what the patient can report about themselves.
 agni_appetite:
   display: Appetite and digestion (Agni)
-  section: ayurveda
+  section: personal_history
   synonyms: ["bhookh", "भूख", "agni", "digestion"]
   codes: {NAMASTE: "AY-AGN"}
 koshtha_bowel:
   display: Bowel pattern (Koshtha)
-  section: ayurveda
+  section: personal_history
   synonyms: ["pakhana", "पाखाना", "koshtha", "motions"]
   codes: {NAMASTE: "AY-KST"}
 nidra_sleep:
   display: Sleep quality (Nidra)
-  section: ayurveda
+  section: personal_history
   synonyms: ["nidra", "निद्रा"]
   codes: {NAMASTE: "AY-NDR"}
 mutra_urine:
   display: Urine pattern (Mutra)
-  section: ayurveda
+  section: personal_history
   synonyms: ["mutra", "peshab", "पेशाब"]
   codes: {NAMASTE: "AY-MTR"}
 sweda_perspiration:
   display: Perspiration (Sweda)
-  section: ayurveda
+  section: personal_history
   synonyms: ["sweda", "pasina"]
   codes: {NAMASTE: "AY-SWD"}
 bala_strength:
   display: Strength and stamina (Bala)
-  section: ayurveda
+  section: personal_history
   synonyms: ["bala", "taakat", "ताकत"]
   codes: {NAMASTE: "AY-BAL"}
 ahara_pattern:
   display: Dietary habits (Ahara)
-  section: ayurveda
+  section: personal_history
   synonyms: ["ahara", "aahar", "khan paan"]
   codes: {NAMASTE: "AY-AHR"}
 vihara_routine:
   display: Daily routine (Vihara)
-  section: ayurveda
+  section: personal_history
   synonyms: ["vihara", "dinacharya", "daily routine"]
   codes: {NAMASTE: "AY-VHR"}
 ritu_seasonal_variation:
   display: Seasonal variation of symptoms (Ritu)
-  section: ayurveda
+  section: personal_history
   needs_clinical_review: true
   codes: {NAMASTE: "AY-RTU"}
 manas_stress:
   display: Stress and mental state (patient-reported)
-  section: ayurveda
+  section: personal_history
   synonyms: ["tanav", "तनाव", "stress", "chinta"]
 
 # --- the Jetson kiosk's own field names -------------------------------------------
@@ -417,7 +417,7 @@ manas_stress:
 # (`jetson/src/medikiosk/providers/intake_api.py`). Several of them are not the
 # names used above, and a field id absent from this registry is rendered by
 # title-casing the id itself, so a physician's sheet read
-# "ayurveda ahara shakti" where it should have read a clinical label.
+# a raw field id where it should have read a clinical label.
 #
 # These are *aliases in the kiosk's vocabulary*, not new clinical concepts, and
 # they are deliberately not folded into the entries above. `screen_fever` is the
@@ -475,33 +475,6 @@ heart_rate_bpm:
 # Patient-reported capacities from the kiosk's Dashavidha Pariksha module. Each
 # names the classical parameter it asks about and says, in its own display text,
 # that the answer is the patient's. None of them is a Vaidya's assessment, and
-# the display names must not be shortened to the bare Sanskrit term later — a
-# line reading "Satva: anxious" would present a classical finding where a
-# patient described their own temperament.
-ayurveda_ahara_shakti:
-  display: Capacity for food (Ahara Shakti, patient-reported)
-  section: ayurveda
-  needs_clinical_review: true
-ayurveda_vyayama_shakti:
-  display: Capacity for exertion (Vyayama Shakti, patient-reported)
-  section: ayurveda
-  needs_clinical_review: true
-ayurveda_satva:
-  display: Mental temperament (Satva, patient-reported)
-  section: ayurveda
-  needs_clinical_review: true
-ayurveda_satmya:
-  display: What suits the patient (Satmya, patient-reported)
-  section: ayurveda
-  needs_clinical_review: true
-ayurveda_dosha_tendency:
-  display: Dosha tendency suggested by the kiosk tally (not a Prakriti)
-  section: ayurveda
-  needs_clinical_review: true
-prakriti_self_report:
-  display: Prakriti, self-reported and provisional
-  section: ayurveda
-  needs_clinical_review: true
 
 # --- documents and confirmation ----------------------------------------------------
 has_prior_documents:

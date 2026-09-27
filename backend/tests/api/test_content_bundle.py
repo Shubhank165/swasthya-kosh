@@ -60,11 +60,11 @@ class TestServingTheBundle:
         body = app_client.get("/api/v1/content/bundle").json()
         assert set(body) == {
             "bundle_format", "content_version", "schema_version", "languages",
-            "sections", "core", "branches", "ayurveda",
-            "ayurveda_current_state", "questions", "red_flag_rules",
+            "sections", "core", "branches", "lifestyle",
+            "lifestyle_current_state", "questions", "red_flag_rules",
         }
 
-    def test_the_return_visit_ayurveda_subset_is_a_subset(
+    def test_the_return_visit_lifestyle_subset_is_a_subset(
         self, app_client: Any
     ) -> None:
         """2/3 §5 screen 8 — the full set on a first visit, the current-state
@@ -76,8 +76,8 @@ class TestServingTheBundle:
         returning patients and to nobody else, which no clinician authored.
         """
         body = app_client.get("/api/v1/content/bundle").json()
-        full = set(body["ayurveda"])
-        subset = set(body["ayurveda_current_state"])
+        full = set(body["lifestyle"])
+        subset = set(body["lifestyle_current_state"])
         assert subset
         assert subset < full
 

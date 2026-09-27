@@ -221,13 +221,13 @@ class QuestionSet(BaseModel):
     core: tuple[Question, ...]
     #: Complaint value -> the questions that complaint adds, in order.
     branches: Mapping[str, tuple[Question, ...]]
-    ayurveda: tuple[Question, ...]
+    standing: tuple[Question, ...]
     red_flags: tuple[RedFlagRule, ...]
     sections: tuple[str, ...]
 
     def all_questions(self) -> Sequence[Question]:
         seen: dict[str, Question] = {}
-        for group in (self.core, *self.branches.values(), self.ayurveda):
+        for group in (self.core, *self.branches.values(), self.standing):
             for question in group:
                 seen.setdefault(question.question_id, question)
         return list(seen.values())

@@ -58,7 +58,7 @@ BUNDLE_FORMAT_VERSION = "2"
 COMPLAINTS_FIELD = "routing.complaints"
 
 #: Ordered, because the app shows "3 of 7 sections" and a set has no third.
-SECTIONS = ("presenting", "symptoms", "history", "ayurveda")
+SECTIONS = ("presenting", "symptoms", "history", "lifestyle")
 
 #: The engine's answer types in the app's vocabulary. `structured_text` becomes
 #: free text: the app renders a box and the interpreter pulls the slots out of
@@ -93,8 +93,8 @@ def _field_id(question: Question) -> str:
 def _section(question: Question) -> str:
     if question.fixed_order is not None:
         return "presenting"
-    if question.id.startswith("ayush."):
-        return "ayurveda"
+    if question.id.startswith("lifestyle."):
+        return "lifestyle"
     if question.is_general or question.domains:
         return "symptoms"
     return "history"
@@ -344,12 +344,12 @@ def _plan(bank: QuestionBank) -> list[str]:
     adaptive = [q for q in bank.all if q.fixed_order is None]
 
     cross_domain = sorted((q for q in adaptive if q.is_general), key=rank)
-    ayurveda = [q for q in adaptive if q.id.startswith("ayush.")]
+    lifestyle = [q for q in adaptive if q.id.startswith("lifestyle.")]
     history = sorted(
         (
             q
             for q in adaptive
-            if not q.is_general and not q.domains and not q.id.startswith("ayush.")
+            if not q.is_general and not q.domains and not q.id.startswith("lifestyle.")
         ),
         key=rank,
     )
@@ -364,7 +364,7 @@ def _plan(bank: QuestionBank) -> list[str]:
     ordered = [*fixed, *cross_domain, *per_domain, *history]
     seen: set[str] = set()
     plan: list[str] = []
-    for question in [*ordered, *ayurveda]:
+    for question in [*ordered, *lifestyle]:
         if question.id not in seen:
             seen.add(question.id)
             plan.append(question.id)
@@ -391,7 +391,7 @@ def compile_bundle(
     index = _FieldIndex(bank, slots)
     questions = sorted(bank.all, key=lambda q: q.id)
     plan = _plan(bank)
-    ayurveda = [qid for qid in plan if qid.startswith("ayush.")]
+    lifestyle = [qid for qid in plan if qid.startswith("lifestyle.")]
 
     rules = [
         {
@@ -438,15 +438,15 @@ def compile_bundle(
         "schema_version": schema_version,
         "languages": list(localization.languages),
         "sections": list(SECTIONS),
-        "core": [qid for qid in plan if qid not in set(ayurveda)],
+        "core": [qid for qid in plan if qid not in set(lifestyle)],
         # Nothing branches on the chief complaint any more — see the docstring.
         "branches": {},
-        "ayurveda": ayurveda,
+        "lifestyle": lifestyle,
         # 2/3 §5 screen 8 — the full module on a first visit, this subset on a
         # return. A separate list rather than a flag per question because the
         # app chooses between two plans, and a plan is a list.
-        "ayurveda_current_state": [
-            qid for qid in ayurveda if bank.require(qid).current_state
+        "lifestyle_current_state": [
+            qid for qid in lifestyle if bank.require(qid).current_state
         ],
         "questions": [_question(q, localization, index, options_by_slot) for q in questions],
         "red_flag_rules": rules,

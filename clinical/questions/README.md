@@ -33,7 +33,7 @@ pathways/
                          questions whose answers the rules in redflags/ read
   ros/                   review-of-systems groups, pulled in by a pathway's
                          `review_of_systems` list
-ayurveda/                patient-reportable Ayurveda only. Deliberately NOT a
+  (removed — the constitutional module is no longer part of this system)
                          Prakriti assessment — that is a clinical act performed
                          by the Vaidya, and a kiosk claiming to do it would be
                          exactly the overreach this project refuses

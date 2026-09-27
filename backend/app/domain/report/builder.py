@@ -565,12 +565,12 @@ def build(
         ]
         lines = [_line_for(f, templates, labels) for f in _sort_facts(answered)]
         lines.extend(document_lines.get(section, ()))
-        # The patient-level module, which has no facts in this intake's record
+        # The patient-level profile, which has no facts in this intake's record
         # and so cannot arrive through `voice`. Appended rather than given a
-        # section of its own: a Vaidya reading AYURVEDA wants the constitution
-        # and today's answers in one place, and two adjacent sections with
-        # similar titles is how a reader learns to skip one.
-        if section is Section.AYURVEDA and patient_profile is not None:
+        # section of its own: a reader wants the standing profile and today's
+        # answers in one place, and two adjacent sections with similar titles
+        # is how a reader learns to skip one.
+        if section is Section.PERSONAL_HISTORY and patient_profile is not None:
             lines.extend(_profile_lines(patient_profile, labels))
         sections.append(
             ReportSection(

@@ -216,15 +216,15 @@ class TestEveryQuestionIsRenderable:
 
     def test_every_question_in_the_plan_exists(self, bundle: dict[str, Any]) -> None:
         known = {q["question_id"] for q in bundle["questions"]}
-        planned = [*bundle["core"], *bundle["ayurveda"]]
+        planned = [*bundle["core"], *bundle["lifestyle"]]
         assert set(planned) <= known
         assert len(planned) == len(set(planned)), "a question is planned twice"
         assert set(planned) == known, "a question exists but is never planned"
 
     def test_the_return_visit_subset_is_a_subset(self, bundle: dict[str, Any]) -> None:
-        subset = set(bundle["ayurveda_current_state"])
+        subset = set(bundle["lifestyle_current_state"])
         assert subset
-        assert subset < set(bundle["ayurveda"])
+        assert subset < set(bundle["lifestyle"])
 
 
 class TestTheFixedThreeComeFirst:

@@ -45,12 +45,12 @@ def compile_bundle(question_set: QuestionSet, *, schema_version: str) -> dict[st
             complaint: [q.question_id for q in group]
             for complaint, group in sorted(question_set.branches.items())
         },
-        "ayurveda": [q.question_id for q in question_set.ayurveda],
+        "lifestyle": [q.question_id for q in question_set.standing],
         # The subset a returning patient is asked again — 2/3 §5 screen 8. A
         # separate list rather than a flag on each question because the app
         # chooses between two plans, and a plan is a list.
-        "ayurveda_current_state": [
-            q.question_id for q in question_set.ayurveda if q.current_state
+        "lifestyle_current_state": [
+            q.question_id for q in question_set.standing if q.current_state
         ],
         "questions": [q.as_bundle() for q in questions],
         "red_flag_rules": [r.as_bundle() for r in question_set.red_flags],
