@@ -1,0 +1,70 @@
+# Fever, and the hedge that must survive it.
+scenarios:
+  - id: fever_hedged_duration_01
+    description: >
+      "Maybe two weeks." The patient did not commit, and neither may the
+      record: the value is stored, the hedge is stored with it, and the
+      certainty that comes out may not exceed the certainty that went in.
+    language: hi
+    payload:
+      status: partial
+      reporter: family_attendant
+      department_code: general
+      patient_ref: {type: guest}
+      turns:
+        - {turn_id: 1, question_id: ask_complaint, transcript: "बुखार", asr_confidence: 0.90}
+        - {turn_id: 3, question_id: ask_duration, transcript: "शायद दो हफ्ते", asr_confidence: 0.72}
+      fields:
+        chief_complaint:
+          value: fever
+          status: answered
+          original_text: "बुखार"
+          source_turn: 1
+        duration:
+          value: {n: 2, unit: week}
+          status: answered
+          original_text: "शायद दो हफ्ते"
+          source_turn: 3
+          confidence: 0.72
+          certainty: approximate
+        # Asked twice, never bound. Not `not_asked`, and emphatically not "no".
+        severity: {value: null, status: unresolved, source_turn: 5}
+        current_medications: {value: null, status: not_asked}
+      red_flags: []
+    expect_fields:
+      chief_complaint: answered
+      duration: answered
+      severity: unresolved
+      current_medications: not_asked
+    expect_red_flags: []
+    expect_verbatim: ["शायद दो हफ्ते"]
+    forbid_assertions: ["dengue", "influenza", "viral fever", "antibiotic", "platelet"]
+
+  - id: fever_no_findings_01
+    description: >
+      A short fever with nothing else. The report has little to say, and must
+      say little rather than reassure: "no significant history" is a clinical
+      conclusion and this system does not reach one.
+    language: en
+    payload:
+      status: complete
+      reporter: self
+      department_code: general
+      patient_ref: {type: guest}
+      turns:
+        - {turn_id: 1, question_id: ask_complaint, transcript: "fever since yesterday", asr_confidence: 0.96}
+      fields:
+        chief_complaint:
+          value: fever
+          status: answered
+          original_text: "fever since yesterday"
+          source_turn: 1
+        duration: {value: {n: 1, unit: day}, status: answered, source_turn: 2}
+        drug_allergy: {value: false, status: answered, source_turn: 6}
+      red_flags: []
+    expect_fields:
+      chief_complaint: answered
+      duration: answered
+      drug_allergy: answered
+    expect_red_flags: []
+    forbid_assertions: ["no significant history", "unremarkable", "rule out", "suggestive of"]

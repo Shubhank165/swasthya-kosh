@@ -3,9 +3,9 @@
  *
  * A small admin view, and it is worth having for a reason beyond the slide:
  * **the proportion of facts a physician amends is this project's extraction
- * quality metric.** It replaces the figures the shelved evaluation harness used
- * to produce — those measured question selection, which now runs on the Jetson,
- * so they no longer describe anything this backend does.
+ * quality metric.** It is not the evaluation harness, which measures whether
+ * the pipeline kept its promises on synthetic scenarios and is true on an empty
+ * database. This is a claim about the extraction, and needs real use behind it.
  *
  * The screen says out loud what the number is over. A correction rate quoted
  * without its denominator is not a measurement, and a rate computed from four

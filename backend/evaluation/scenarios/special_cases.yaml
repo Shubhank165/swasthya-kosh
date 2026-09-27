@@ -1,0 +1,107 @@
+# The behaviours that are not about one complaint: the five statuses, who was
+# answering, and the things a report may not say about silence.
+scenarios:
+  - id: five_statuses_01
+    description: >
+      One intake carrying all five field statuses at once. This is the single
+      most important scenario in the set: decision 1 exists because "could not
+      say" turning into "no" somewhere between a kiosk and a physician is the
+      failure mode that costs a patient something, and every other scenario is
+      a variation on it.
+    language: en
+    payload:
+      status: complete
+      reporter: self
+      department_code: general
+      patient_ref: {type: guest}
+      turns:
+        - {turn_id: 1, question_id: ask_complaint, transcript: "pain in both knees", asr_confidence: 0.96}
+      fields:
+        chief_complaint:
+          value: joint_pain
+          status: answered
+          original_text: "pain in both knees"
+          source_turn: 1
+        # Asked, and the patient declined to say. Not an absence of tobacco use.
+        tobacco: {value: null, status: refused, source_turn: 9}
+        # Cannot apply to this patient. Not "no", and not a gap to be filled.
+        pregnancy: {value: null, status: not_applicable}
+        # Put, and went nowhere.
+        severity: {value: null, status: unresolved, source_turn: 4}
+        # Never put at all.
+        drug_allergy: {value: null, status: not_asked}
+      red_flags: []
+    expect_fields:
+      chief_complaint: answered
+      tobacco: refused
+      pregnancy: not_applicable
+      severity: unresolved
+      drug_allergy: not_asked
+    expect_red_flags: []
+    expect_verbatim: ["pain in both knees"]
+    # A refusal rendered as an absence is the specific harm here, so the phrases
+    # that would express it are named.
+    forbid_assertions: ["denies tobacco", "non-smoker", "no history of", "the patient denies"]
+
+  - id: attendant_reported_01
+    description: >
+      A son answering for his mother. Attendant-reported history is weaker
+      evidence than first-hand, and the record has to carry which it is — a
+      report that reads as the patient's own words when a relative supplied
+      them has changed the evidence without saying so.
+    language: hi
+    payload:
+      status: complete
+      reporter: family_attendant
+      department_code: general
+      patient_ref: {type: guest}
+      turns:
+        - {turn_id: 1, question_id: ask_complaint, transcript: "माँ को बुखार है", asr_confidence: 0.88}
+      fields:
+        chief_complaint:
+          value: fever
+          status: answered
+          original_text: "माँ को बुखार है"
+          source_turn: 1
+        duration: {value: {n: 4, unit: day}, status: answered, source_turn: 2}
+        current_medications: {value: null, status: unresolved, source_turn: 7}
+      red_flags: []
+    expect_fields:
+      chief_complaint: answered
+      current_medications: unresolved
+    expect_red_flags: []
+    expect_verbatim: ["माँ को बुखार है"]
+    forbid_assertions: ["the patient reports", "she states"]
+
+  - id: abandoned_interview_01
+    description: >
+      The patient was called before the interview finished. Everything they did
+      answer is kept, and everything they did not is `not_asked` rather than
+      quietly absent — a record that drops the unanswered questions looks
+      complete, and a physician reading it does not know to ask.
+    language: hi
+    payload:
+      status: partial
+      reporter: self
+      department_code: general
+      patient_ref: {type: guest}
+      turns:
+        - {turn_id: 1, question_id: ask_complaint, transcript: "पेट में दर्द", asr_confidence: 0.93}
+      fields:
+        chief_complaint:
+          value: abdominal_pain
+          status: answered
+          original_text: "पेट में दर्द"
+          source_turn: 1
+        duration: {value: null, status: not_asked}
+        severity: {value: null, status: not_asked}
+        drug_allergy: {value: null, status: not_asked}
+      red_flags: []
+    expect_fields:
+      chief_complaint: answered
+      duration: not_asked
+      severity: not_asked
+      drug_allergy: not_asked
+    expect_red_flags: []
+    expect_verbatim: ["पेट में दर्द"]
+    forbid_assertions: ["appendicitis", "perforation", "we recommend"]

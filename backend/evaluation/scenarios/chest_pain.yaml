@@ -1,0 +1,82 @@
+# Chest pain. Both red-flag directions, plus the near-miss that must stay quiet.
+#
+# The `forbid_assertions` lists are carried over from the scenarios this file
+# replaces and are the most valuable thing in them: they name, one by one, the
+# specific diagnoses a reader might expect a system like this to reach for. A
+# report that contains "heart attack" anywhere has stopped being a history.
+scenarios:
+  - id: chest_pain_redflag_01
+    description: >
+      Sudden central chest pain with breathlessness, in Hindi. The device fired
+      its criterion and stopped the interview; the backend records that it
+      fired and re-evaluates nothing.
+    language: hi
+    payload:
+      status: aborted_red_flag
+      reporter: self
+      department_code: general
+      patient_ref: {type: guest}
+      turns:
+        - {turn_id: 1, question_id: ask_complaint, transcript: "सीने में दर्द", asr_confidence: 0.95}
+        - {turn_id: 4, question_id: ask_breathlessness, transcript: "हाँ, साँस लेने में तकलीफ है", asr_confidence: 0.89}
+      fields:
+        chief_complaint:
+          value: chest_pain
+          status: answered
+          original_text: "सीने में दर्द"
+          source_turn: 1
+        breathlessness:
+          value: true
+          status: answered
+          original_text: "हाँ, साँस लेने में तकलीफ है"
+          source_turn: 4
+        severity: {value: 8, status: answered, source_turn: 5}
+        duration: {value: null, status: not_asked}
+      red_flags:
+        - rule_id: RF_ACUTE_CHEST_PAIN_WITH_DYSPNOEA
+          fired_at_turn: 5
+          criteria_met: ["chief_complaint=chest_pain", "breathlessness=true", "severity>=8"]
+          severity: critical
+          label: "Acute chest pain with breathlessness"
+    expect_fields:
+      chief_complaint: answered
+      breathlessness: answered
+      severity: answered
+      # Never asked, because the interview stopped. Not `unresolved`, which
+      # would say it was put and went nowhere.
+      duration: not_asked
+    expect_red_flags: [RF_ACUTE_CHEST_PAIN_WITH_DYSPNOEA]
+    expect_verbatim: ["सीने में दर्द", "हाँ, साँस लेने में तकलीफ है"]
+    forbid_assertions: ["myocardial infarction", "heart attack", "angina"]
+
+  - id: chest_pain_quiet_01
+    description: >
+      Burning chest pain after food, no breathlessness, low severity. The
+      near-miss. Nothing fired, and nothing in the report may suggest reflux —
+      a rule that fires on reflux is a rule triage learns to ignore, and a
+      report that names it has done the naming for the rule.
+    language: en
+    payload:
+      status: complete
+      reporter: self
+      department_code: general
+      patient_ref: {type: guest}
+      turns:
+        - {turn_id: 1, question_id: ask_complaint, transcript: "burning in my chest after eating", asr_confidence: 0.94}
+      fields:
+        chief_complaint:
+          value: chest_pain
+          status: answered
+          original_text: "burning in my chest after eating"
+          source_turn: 1
+        breathlessness: {value: false, status: answered, source_turn: 3}
+        severity: {value: 3, status: answered, source_turn: 4}
+        duration: {value: {n: 3, unit: month}, status: answered, source_turn: 2}
+      red_flags: []
+    expect_fields:
+      chief_complaint: answered
+      breathlessness: answered
+      severity: answered
+    expect_red_flags: []
+    expect_verbatim: ["burning in my chest after eating"]
+    forbid_assertions: ["reflux", "gerd", "acidity"]

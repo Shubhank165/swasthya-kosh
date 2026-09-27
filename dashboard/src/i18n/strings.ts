@@ -281,7 +281,7 @@ const en = {
   'metrics.note':
     'The denominator is facts a physician actually looked at, not every fact stored. A field nobody reviewed says nothing about extraction quality, and counting it would let this number be improved by ingesting more intakes rather than by extracting better. A field acted on twice counts once, with the latest action winning.',
   'metrics.noteEmpty':
-    'Until it has data behind it, this figure — and the ones the retired evaluation harness produced — should not appear on a slide.',
+    'Until it has data behind it, this figure should not appear on a slide. The evaluation harness measures something else: whether the pipeline kept its promises, which is true on an empty database.',
   // Care coordination — what happens after the consultation.
   'nav.operations': 'Operations',
   'report.tabEmpty': 'Nothing recorded under this heading',
@@ -597,7 +597,7 @@ const hi: Record<StringKey, string> = {
   'metrics.note':
     'हर संग्रहीत तथ्य नहीं, बल्कि चिकित्सक ने वास्तव में जितने तथ्य देखे वही हर है। जिस प्रश्न को किसी ने देखा ही नहीं, वह निष्कर्षण की गुणवत्ता के बारे में कुछ नहीं कहता, और उसे गिनने से यह संख्या बेहतर निष्कर्षण के बजाय अधिक इनटेक लेने से सुधर जाती। एक ही तथ्य पर दो बार कार्रवाई एक बार गिनी जाती है, जिसमें अंतिम कार्रवाई मान्य होती है।',
   'metrics.noteEmpty':
-    'जब तक इसके पीछे आँकड़े न हों, यह संख्या — और सेवानिवृत्त मूल्यांकन हार्नेस द्वारा दी गई संख्याएँ — किसी स्लाइड पर नहीं आनी चाहिए।',
+    'जब तक इसके पीछे आँकड़े न हों, यह संख्या किसी स्लाइड पर नहीं आनी चाहिए। मूल्यांकन हार्नेस कुछ और मापता है: क्या पाइपलाइन ने अपने वादे निभाए — और वह खाली डेटाबेस पर भी सत्य है।',
 
   // Care coordination — what happens after the consultation.
   'nav.operations': 'संचालन',

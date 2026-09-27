@@ -73,9 +73,13 @@ test:  ## The suite that gates a deploy. Offline; no network marker.
 test-all:  ## Everything, including the FHIR validation against the published validator
 	cd $(BACKEND) && $(PY) -m pytest -q
 
+.PHONY: evaluate
+evaluate:  ## Run the evaluation scenarios and print the metrics table
+	cd $(BACKEND) && $(PY) -m evaluation.run
+
 .PHONY: lint
 lint:  ## ruff
-	cd $(BACKEND) && $(RUFF) check app tests
+	cd $(BACKEND) && $(RUFF) check app tests evaluation
 
 .PHONY: fmt
 fmt:  ## ruff, fixing what it can
@@ -83,10 +87,10 @@ fmt:  ## ruff, fixing what it can
 
 .PHONY: typecheck
 typecheck:  ## mypy
-	cd $(BACKEND) && $(MYPY) app
+	cd $(BACKEND) && $(MYPY) app evaluation
 
 .PHONY: check
-check: lint typecheck test  ## Everything a deploy requires
+check: lint typecheck test evaluate  ## Everything a deploy requires
 
 # --- database ---------------------------------------------------------------
 

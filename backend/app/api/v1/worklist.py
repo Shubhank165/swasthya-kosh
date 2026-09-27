@@ -169,10 +169,12 @@ async def correction_rate(
     the system rather than about a patient, and the person making that claim on
     a slide should be the person who can see how it was computed.
 
-    It replaces the figures the shelved evaluation harness used to produce.
-    Those measured question selection, which now runs on the Jetson, so they no
-    longer describe anything this backend does — and none of them may be quoted
-    until this number has data behind it.
+    Measured from what physicians actually did, and therefore the one number
+    here that needs real use before it means anything. It is not the evaluation
+    harness: `evaluation/` measures whether the pipeline kept its promises on
+    synthetic scenarios, which is a claim about the code and is true on an empty
+    database. This is a claim about the extraction, and is not quotable until
+    this number has data behind it.
     """
     return CorrectionRateOut(
         **await repository.correction_rate(hospital_id=principal.hospital_id),

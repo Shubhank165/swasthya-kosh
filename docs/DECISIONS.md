@@ -1569,3 +1569,60 @@ screening rule, not a clinician's triage, and a facility may want the fast lane
 gated on a human acknowledging the flag rather than on its absence. That is one
 condition in `priority_for` and a policy flag. It is not built because nobody
 has asked for it yet; it is the first thing to build if a clinician does.
+
+## 78. The evaluation harness comes back measuring something else
+
+The harness in `stale/evaluation/` drove a scripted patient through a
+`ClinicalStateMachine` and reported question-selection numbers: irrelevant
+questions per session, turns to completion, red-flag recall. Five of its six
+imports no longer exist. Question selection runs on the Jetson now.
+
+Reviving it as it was would mean rebuilding a state machine in the backend so
+that the backend could measure it — a second engine, which is decision 1's
+argument turned into a build plan. Reporting its old numbers from a rewritten
+harness would be worse: numbers about code that is not here.
+
+So `evaluation/` is rebuilt around what this backend is actually answerable
+for. A scenario is now a kiosk payload plus what must still be true after
+normalisation and report rendering, and five things are measured:
+
+*Status fidelity.* All five statuses survive. Decision 1 in one number.
+
+*Certainty.* Nothing comes out more certain than it went in — decision 2, and
+the scenario with `"शायद दो हफ्ते"` in it is what holds it.
+
+*Verbatim retention.* The patient's own words are still in the record. A
+pipeline that keeps the coded value and loses the phrase has kept the answer and
+thrown away the only thing a physician can check it against.
+
+*Red-flag fidelity, both directions.* Every criterion the device raised is
+recorded, and **none that it did not**. The second half is the one worth having:
+the backend evaluates no rules, and a flag in the record that no scenario sent
+is this system having decided something.
+
+*Unsupported assertions.* `find_unsupported_assertions` over the rendered
+report, plus the per-scenario `forbid_assertions` lists carried over unchanged
+from the old scenarios. Those lists are the most valuable thing in them — they
+name, one at a time, the specific diagnoses a reader might expect a system like
+this to reach for. Target zero, no other acceptable value.
+
+**What is deliberately not measured.** Anything about which question was asked
+and when. Those numbers belong to the device and have to be produced there, by a
+harness that drives the walker. Until somebody writes it, the honest answer to
+"how good is the question selection" is that this repository does not measure
+it, which is better than a number computed somewhere that cannot see it.
+
+**A green run proves nothing on its own**, so `tests/unit/test_evaluation.py`
+breaks each assertion deliberately and asserts the harness noticed. A harness
+nobody has seen fail is a harness nobody should believe.
+
+`make evaluate` runs it, and `make check` includes it, so a regression in one of
+these promises fails the build exactly like a unit test. It exits non-zero on
+any failed scenario, any invented flag, any raised certainty and any asserted
+phrase.
+
+**Not the correction rate.** `/metrics/correction-rate` measures how often a
+physician had to fix what the pipeline recorded; it is a claim about the
+extraction and needs real use behind it. This is a claim about the code, and is
+true on an empty database. Two different numbers, and quoting either as the
+other is the mistake this paragraph exists to prevent.
