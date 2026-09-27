@@ -8,20 +8,20 @@ from fastapi import APIRouter, Query
 
 from app.api.auth import RequireKioskOrStaff, RequirePatient, RequireStaff
 from app.api.deps import (
-    AyushProfileServiceDep,
     DocumentServiceDep,
     ErasureServiceDep,
     IdentityServiceDep,
+    PatientProfileServiceDep,
 )
 from app.core.errors import NotFoundError
 from app.domain.record import PatientRef, PatientRefType
 from app.schemas.api import (
     ABHALinkRequest,
-    AyushProfileRequest,
-    AyushProfileResponse,
     ErasureResponse,
     HistoryResponse,
     PatientDocumentOut,
+    PatientProfileRequest,
+    PatientProfileResponse,
     ResolveRequest,
     ResolveResponse,
 )
@@ -256,15 +256,15 @@ async def my_documents(
 
 
 @router.post(
-    "/me/ayush-profile",
-    response_model=AyushProfileResponse,
+    "/me/profile",
+    response_model=PatientProfileResponse,
     summary="Store the signed-in patient's AYUSH/Prakriti self-report",
 )
-async def submit_ayush_profile(
+async def submit_patient_profile(
     principal: RequirePatient,
-    service: AyushProfileServiceDep,
-    request: AyushProfileRequest,
-) -> AyushProfileResponse:
+    service: PatientProfileServiceDep,
+    request: PatientProfileRequest,
+) -> PatientProfileResponse:
     """The module's answers, filed against the patient rather than a visit.
 
     **Registered above `/{ref}/history` for the reason `my_history` gives.**
@@ -301,7 +301,7 @@ async def submit_ayush_profile(
         content_version=request.content_version,
         answers=[answer.model_dump() for answer in request.answers],
     )
-    return AyushProfileResponse(
+    return PatientProfileResponse(
         profile_id=stored.profile_id,
         superseded=stored.superseded,
         answers_stored=stored.answers_stored,

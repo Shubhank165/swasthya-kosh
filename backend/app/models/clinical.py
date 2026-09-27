@@ -201,7 +201,7 @@ class ClinicalTimeline(Base, TimestampMixin):
     )
 
 
-class AyushProfileRecord(Base, TimestampMixin):
+class PatientProfileRecord(Base, TimestampMixin):
     """A patient's AYUSH/Prakriti self-report, filed against the patient.
 
     **Not an intake, and deliberately not modelled as one.** Every
@@ -234,7 +234,7 @@ class AyushProfileRecord(Base, TimestampMixin):
     there is no UPDATE path here either.
     """
 
-    __tablename__ = "ayush_profiles"
+    __tablename__ = "patient_profiles"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     hospital_id: Mapped[str] = mapped_column(
@@ -265,7 +265,7 @@ class AyushProfileRecord(Base, TimestampMixin):
         # The current profile for one patient at one hospital is the row nothing
         # supersedes. Indexed on the lookup the report actually makes.
         Index(
-            "ix_ayush_profiles_patient",
+            "ix_patient_profiles_patient",
             "hospital_id",
             "patient_ref_type",
             "patient_ref_value",

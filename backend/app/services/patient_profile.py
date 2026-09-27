@@ -30,10 +30,10 @@ from typing import Any
 from app.core.clock import Clock
 from app.core.errors import ValidationError
 from app.core.ids import IdFactory
-from app.domain.ayush_profile import AyushProfileSnapshot
 from app.domain.clinical.enums import Certainty
+from app.domain.patient_profile import PatientProfileSnapshot
 from app.domain.record import FieldStatus
-from app.repositories.ayush_profiles import AyushProfileRepository
+from app.repositories.patient_profiles import PatientProfileRepository
 
 #: What a patient may assert about themselves. `confirmed` is absent on
 #: purpose: it is a clinician's word, and decision 2 reserves raising certainty
@@ -125,13 +125,13 @@ def _validate(answers: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     return cleaned
 
 
-class AyushProfileService:
+class PatientProfileService:
     """Stores one patient's module answers as an append-only revision."""
 
     def __init__(
         self,
         *,
-        profiles: AyushProfileRepository,
+        profiles: PatientProfileRepository,
         clock: Clock,
         ids: IdFactory,
     ) -> None:
@@ -177,9 +177,9 @@ class AyushProfileService:
 
     async def current_snapshot(
         self, *, hospital_id: str, patient_ref_type: str, patient_ref_value: str
-    ) -> AyushProfileSnapshot | None:
+    ) -> PatientProfileSnapshot | None:
         """The live revision as a frozen value, or `None`."""
-        from app.repositories.ayush_profiles import snapshot_of
+        from app.repositories.patient_profiles import snapshot_of
 
         row = await self._profiles.current(
             hospital_id=hospital_id,

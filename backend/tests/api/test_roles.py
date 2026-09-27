@@ -60,7 +60,7 @@ EXPECTED: dict[tuple[str, str], set[Role]] = {
     # it, so only a patient session may write one — a kiosk has no patient to
     # attribute it to, and staff entering it would be recording someone else's
     # self-report as their own.
-    ("POST", "/api/v1/patients/me/ayush-profile"): {Role.PATIENT},
+    ("POST", "/api/v1/patients/me/profile"): {Role.PATIENT},
     # Erasing your own record. Patient only, and the strongest case for it in
     # the table: the route takes no path parameter and no body, so the only
     # record it can destroy is the one belonging to the token's holder. Staff

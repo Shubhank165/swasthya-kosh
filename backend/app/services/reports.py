@@ -19,7 +19,6 @@ from app.core.clock import Clock
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.ids import IdFactory
 from app.core.logging import get_logger
-from app.domain.ayush_profile import AyushProfileSnapshot
 from app.domain.clinical.enums import Section
 from app.domain.contradictions import detector
 from app.domain.documents.alignment import align_medications
@@ -28,6 +27,7 @@ from app.domain.documents.extraction import (
 )
 from app.domain.documents.ingredients import IngredientIndex
 from app.domain.documents.interactions import InteractionFinding, InteractionTable
+from app.domain.patient_profile import PatientProfileSnapshot
 from app.domain.record import (
     CanonicalRecord,
     Fact,
@@ -43,10 +43,10 @@ from app.domain.timeline.fallback import deterministic_timeline
 from app.domain.timeline.model import TimelineSnapshot
 from app.events.bus import EventBus
 from app.events.schemas import Event, EventName
-from app.repositories.ayush_profiles import AyushProfileRepository, snapshot_of
 from app.repositories.consent import AuditRepository, ReportRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.intakes import IntakeRepository
+from app.repositories.patient_profiles import PatientProfileRepository, snapshot_of
 from app.repositories.patients import PatientLinkRepository
 from app.services.timeline import TimelineService
 
@@ -72,7 +72,7 @@ class ReportService:
         ids: IdFactory,
         links: PatientLinkRepository | None = None,
         timeline: TimelineService | None = None,
-        ayush_profiles: AyushProfileRepository | None = None,
+        patient_profiles: PatientProfileRepository | None = None,
         max_prior_intakes: int = 5,
         facility_timezone: str = "Asia/Kolkata",
         demo: bool = False,
@@ -90,7 +90,7 @@ class ReportService:
         self._ids = ids
         self._links = links
         self._timeline = timeline
-        self._ayush_profiles = ayush_profiles
+        self._patient_profiles = patient_profiles
         self._max_prior_intakes = max_prior_intakes
         self._timezone = facility_timezone
         self._demo = demo
@@ -145,9 +145,9 @@ class ReportService:
             record, prior=prior, extractions=extractions, language=language
         )
 
-    async def _ayush_profile_for(
+    async def _patient_profile_for(
         self, record: CanonicalRecord
-    ) -> AyushProfileSnapshot | None:
+    ) -> PatientProfileSnapshot | None:
         """The patient's AYUSH module answers, if they have filled it.
 
         **This is where the reading happens, and it happens here on purpose.**
@@ -166,7 +166,7 @@ class ReportService:
         match every other guest at this hospital and hand one patient's
         constitution to another.
         """
-        if self._ayush_profiles is None:
+        if self._patient_profiles is None:
             return None
         ref = record.patient_ref
         if ref is None or not ref.value or ref.type is PatientRefType.GUEST:
@@ -183,7 +183,7 @@ class ReportService:
                 ref_type=ref.type.value,
                 ref_value=ref.value,
             )
-        row = await self._ayush_profiles.current_for_refs(
+        row = await self._patient_profiles.current_for_refs(
             hospital_id=record.hospital_id, refs=refs
         )
         return snapshot_of(row)
@@ -224,7 +224,7 @@ class ReportService:
         )
         interactions = self._interactions_for(record, extractions)
         timeline = await self._timeline_for(record, extractions, templates.language)
-        ayush_profile = await self._ayush_profile_for(record)
+        patient_profile = await self._patient_profile_for(record)
 
         report = builder.build(
             record,
@@ -232,7 +232,7 @@ class ReportService:
             extractions=extractions,
             interactions=interactions,
             timeline=timeline,
-            ayush_profile=ayush_profile,
+            patient_profile=patient_profile,
             labels=self._labels,
             demo=self._demo,
         )

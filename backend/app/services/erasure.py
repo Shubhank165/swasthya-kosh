@@ -54,7 +54,6 @@ from app.core.clock import Clock
 from app.core.logging import get_logger
 from app.domain.record import PatientRef, PatientRefType
 from app.models.clinical import (
-    AyushProfileRecord,
     ClinicalFactRecord,
     ClinicalTimeline,
     ConsentArtefact,
@@ -63,6 +62,7 @@ from app.models.clinical import (
     IngestRawRecord,
     IntakeRecord,
     PatientIdentifierLink,
+    PatientProfileRecord,
     RedFlagEventRecord,
     ReportRecord,
 )
@@ -75,7 +75,7 @@ logger = get_logger(__name__)
 #: The tables whose rows belong to one intake at one hospital, and so all
 #: delete the same way. Spelled as a union of the real models rather than a
 #: bare `type`, so handing `_delete_by_intake` a table that is keyed some other
-#: way — `ayush_profiles`, say, which is keyed to the person — is a type error
+#: way — `patient_profiles`, say, which is keyed to the person — is a type error
 #: rather than a delete that silently matches nothing.
 _IntakeScoped = (
     type[ClinicalFactRecord]
@@ -101,7 +101,7 @@ class ErasureResult:
     red_flags: int = 0
     consent_artefacts: int = 0
     raw_payloads: int = 0
-    ayush_profiles: int = 0
+    patient_profiles: int = 0
     identifier_links: int = 0
     #: Storage keys the object store refused to delete. Non-empty means bytes
     #: survive in a bucket after the rows are gone, which the caller must not
@@ -123,7 +123,7 @@ class ErasureResult:
             "red_flags": self.red_flags,
             "consent_artefacts": self.consent_artefacts,
             "raw_payloads": self.raw_payloads,
-            "ayush_profiles": self.ayush_profiles,
+            "patient_profiles": self.patient_profiles,
             "identifier_links": self.identifier_links,
             "complete": self.complete,
         }
@@ -323,14 +323,14 @@ class ErasureService:
 
         profile_clauses = [
             and_(
-                AyushProfileRecord.patient_ref_type == ref_type,
-                AyushProfileRecord.patient_ref_value == ref_value,
+                PatientProfileRecord.patient_ref_type == ref_type,
+                PatientProfileRecord.patient_ref_value == ref_value,
             )
             for ref_type, ref_value in refs
         ]
         profiles = await self._delete_where(
-            AyushProfileRecord,
-            AyushProfileRecord.hospital_id == hospital_id,
+            PatientProfileRecord,
+            PatientProfileRecord.hospital_id == hospital_id,
             or_(*profile_clauses),
         )
 
@@ -357,7 +357,7 @@ class ErasureService:
             red_flags=result.red_flags,
             consent_artefacts=result.consent_artefacts,
             raw_payloads=result.raw_payloads,
-            ayush_profiles=profiles,
+            patient_profiles=profiles,
             identifier_links=links,
             orphaned_objects=result.orphaned_objects,
         )

@@ -1,7 +1,7 @@
 """Erasure means every table, and a new table must not quietly escape it.
 
 The failure this guards against is specific and it is not hypothetical: someone
-adds a table that holds patient data — the way `ayush_profiles` and
+adds a table that holds patient data — the way `patient_profiles` and
 `clinical_timelines` were both added in one week — and nobody thinks about
 erasure, because erasure lives in a different file. The patient presses delete,
 is told their record is gone, and their Prakriti answers are still on a disk.
@@ -24,7 +24,6 @@ from app.core.clock import FrozenClock
 from app.domain.record import PatientRef, PatientRefType
 from app.models import Base
 from app.models.clinical import (
-    AyushProfileRecord,
     ClinicalFactRecord,
     ClinicalTimeline,
     ConsentArtefact,
@@ -33,6 +32,7 @@ from app.models.clinical import (
     IngestRawRecord,
     IntakeRecord,
     PatientIdentifierLink,
+    PatientProfileRecord,
     RedFlagEventRecord,
     ReportRecord,
 )
@@ -44,7 +44,7 @@ NOW = datetime(2026, 9, 16, 9, 0, tzinfo=UTC)
 
 #: Tables `ErasureService` empties for the patient it is erasing.
 ERASED = {
-    AyushProfileRecord.__tablename__,
+    PatientProfileRecord.__tablename__,
     ClinicalFactRecord.__tablename__,
     ClinicalTimeline.__tablename__,
     ConsentArtefact.__tablename__,
@@ -230,7 +230,7 @@ class TestTheAuditRowSurvives:
             "red_flags",
             "consent_artefacts",
             "raw_payloads",
-            "ayush_profiles",
+            "patient_profiles",
             "identifier_links",
             "complete",
         }

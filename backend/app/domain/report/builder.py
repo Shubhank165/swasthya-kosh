@@ -28,7 +28,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from app.domain.ayush_profile import AyushProfileSnapshot
 from app.domain.clinical.enums import SECTION_ORDER, Certainty, ReporterRole, Section
 from app.domain.clinical.sections import DEFAULT_SECTION, section_for
 from app.domain.documents.extraction import (
@@ -38,6 +37,7 @@ from app.domain.documents.extraction import (
     RangeStatus,
 )
 from app.domain.documents.interactions import InteractionFinding
+from app.domain.patient_profile import PatientProfileSnapshot
 from app.domain.record import (
     CanonicalRecord,
     DocumentSource,
@@ -168,8 +168,8 @@ def _effective_section(fact: Fact) -> Section:
     return fact.section
 
 
-def _ayush_lines(
-    profile: AyushProfileSnapshot, labels: FieldLabels
+def _profile_lines(
+    profile: PatientProfileSnapshot, labels: FieldLabels
 ) -> tuple[ReportLine, ...]:
     """The AYUSH/Prakriti self-report as lines of the Ayurveda section.
 
@@ -190,7 +190,7 @@ def _ayush_lines(
         if answer.status != FieldStatus.ANSWERED.value or answer.value is None:
             continue
         label = labels(answer.field_id)
-        rendered = _ayush_value(answer.value)
+        rendered = _profile_value(answer.value)
         if rendered is None:
             continue
         text = f"{label}: {rendered}"
@@ -209,7 +209,7 @@ def _ayush_lines(
     return tuple(lines)
 
 
-def _ayush_value(value: object) -> str | None:
+def _profile_value(value: object) -> str | None:
     """A stored answer as display text.
 
     Deliberately literal. A coded answer prints its code where no label was
@@ -222,7 +222,7 @@ def _ayush_value(value: object) -> str | None:
     if isinstance(value, (int, float, str)):
         return str(value)
     if isinstance(value, list):
-        parts = [_ayush_value(item) for item in value]
+        parts = [_profile_value(item) for item in value]
         kept = [p for p in parts if p]
         return ", ".join(kept) if kept else None
     if isinstance(value, dict):
@@ -538,7 +538,7 @@ def build(
     extractions: Sequence[DocumentExtraction] = (),
     interactions: Sequence[InteractionFinding] = (),
     timeline: TimelineSnapshot | None = None,
-    ayush_profile: AyushProfileSnapshot | None = None,
+    patient_profile: PatientProfileSnapshot | None = None,
     labels: FieldLabels = DEFAULT_LABELS,
     demo: bool = False,
 ) -> PhysicianReport:
@@ -570,8 +570,8 @@ def build(
         # section of its own: a Vaidya reading AYURVEDA wants the constitution
         # and today's answers in one place, and two adjacent sections with
         # similar titles is how a reader learns to skip one.
-        if section is Section.AYURVEDA and ayush_profile is not None:
-            lines.extend(_ayush_lines(ayush_profile, labels))
+        if section is Section.AYURVEDA and patient_profile is not None:
+            lines.extend(_profile_lines(patient_profile, labels))
         sections.append(
             ReportSection(
                 section=section, title=templates.title(section), lines=tuple(lines)

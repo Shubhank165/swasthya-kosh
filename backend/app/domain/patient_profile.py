@@ -2,9 +2,9 @@
 
 A patient-level profile, answered once and outliving any single visit — which
 is why it is not a `ClinicalFactRecord` and has no `intake_id`. See
-`AyushProfileRecord` for that argument in full.
+`PatientProfileRecord` for that argument in full.
 
-`AyushProfileSnapshot` is frozen and reaches `builder.build()` as a finished
+`PatientProfileSnapshot` is frozen and reaches `builder.build()` as a finished
 value, exactly as `TimelineSnapshot` and `DocumentExtraction` already do. The
 builder performs no I/O to obtain it and never calls anything to produce it:
 that is what keeps report output pure and byte-deterministic while the thing it
@@ -19,7 +19,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
-class AyushAnswer(BaseModel):
+class ProfileAnswer(BaseModel):
     """One answered field of the module.
 
     `status` and `certainty` carry the same vocabularies `clinical_facts` uses.
@@ -42,12 +42,12 @@ class AyushAnswer(BaseModel):
     original_text: str | None = None
 
 
-class AyushProfileSnapshot(BaseModel):
+class PatientProfileSnapshot(BaseModel):
     """A profile as of one read. Frozen; the builder only ever prints it."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    answers: tuple[AyushAnswer, ...] = ()
+    answers: tuple[ProfileAnswer, ...] = ()
     language: str = "en"
     #: The bundle version the answers were given against. A profile collected
     #: before the module changed was a different questionnaire, and a report

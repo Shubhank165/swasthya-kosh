@@ -19,11 +19,11 @@ from datetime import datetime
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.ayush_profile import AyushAnswer, AyushProfileSnapshot
-from app.models.clinical import AyushProfileRecord
+from app.domain.patient_profile import PatientProfileSnapshot, ProfileAnswer
+from app.models.clinical import PatientProfileRecord
 
 
-def snapshot_of(row: AyushProfileRecord | None) -> AyushProfileSnapshot | None:
+def snapshot_of(row: PatientProfileRecord | None) -> PatientProfileSnapshot | None:
     """A stored row as the frozen value the report builder is handed.
 
     Returns `None` for no row at all, which the builder reads as "this patient
@@ -33,7 +33,7 @@ def snapshot_of(row: AyushProfileRecord | None) -> AyushProfileSnapshot | None:
     if row is None:
         return None
     answers = tuple(
-        AyushAnswer(
+        ProfileAnswer(
             field_id=entry["field_id"],
             status=entry["status"],
             certainty=entry["certainty"],
@@ -43,7 +43,7 @@ def snapshot_of(row: AyushProfileRecord | None) -> AyushProfileSnapshot | None:
         for entry in row.answers
         if isinstance(entry, dict) and entry.get("field_id")
     )
-    return AyushProfileSnapshot(
+    return PatientProfileSnapshot(
         answers=answers,
         language=row.language,
         content_version=row.content_version,
@@ -51,41 +51,41 @@ def snapshot_of(row: AyushProfileRecord | None) -> AyushProfileSnapshot | None:
     )
 
 
-class AyushProfileRepository:
-    """Reads and writes `ayush_profiles`."""
+class PatientProfileRepository:
+    """Reads and writes `patient_profiles`."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def current(
         self, *, hospital_id: str, patient_ref_type: str, patient_ref_value: str
-    ) -> AyushProfileRecord | None:
+    ) -> PatientProfileRecord | None:
         """The live revision for one patient at one hospital.
 
         "The row nothing supersedes" rather than "the newest row": with an
         append-only table those are the same until they are not, and the case
         where they differ is the one that matters.
         """
-        superseded = select(AyushProfileRecord.supersedes).where(
-            AyushProfileRecord.hospital_id == hospital_id,
-            AyushProfileRecord.supersedes.is_not(None),
+        superseded = select(PatientProfileRecord.supersedes).where(
+            PatientProfileRecord.hospital_id == hospital_id,
+            PatientProfileRecord.supersedes.is_not(None),
         )
         result = await self._session.execute(
-            select(AyushProfileRecord)
+            select(PatientProfileRecord)
             .where(
-                AyushProfileRecord.hospital_id == hospital_id,
-                AyushProfileRecord.patient_ref_type == patient_ref_type,
-                AyushProfileRecord.patient_ref_value == patient_ref_value,
-                AyushProfileRecord.id.not_in(superseded),
+                PatientProfileRecord.hospital_id == hospital_id,
+                PatientProfileRecord.patient_ref_type == patient_ref_type,
+                PatientProfileRecord.patient_ref_value == patient_ref_value,
+                PatientProfileRecord.id.not_in(superseded),
             )
-            .order_by(AyushProfileRecord.submitted_at.desc())
+            .order_by(PatientProfileRecord.submitted_at.desc())
             .limit(1)
         )
         return result.scalar_one_or_none()
 
     async def current_for_refs(
         self, *, hospital_id: str, refs: tuple[tuple[str, str], ...]
-    ) -> AyushProfileRecord | None:
+    ) -> PatientProfileRecord | None:
         """The live revision under any of one patient's identifiers.
 
         **This is what makes filing under `phone` safe.** A profile is stored
@@ -102,27 +102,27 @@ class AyushProfileRepository:
         """
         if not refs:
             return None
-        superseded = select(AyushProfileRecord.supersedes).where(
-            AyushProfileRecord.hospital_id == hospital_id,
-            AyushProfileRecord.supersedes.is_not(None),
+        superseded = select(PatientProfileRecord.supersedes).where(
+            PatientProfileRecord.hospital_id == hospital_id,
+            PatientProfileRecord.supersedes.is_not(None),
         )
         matches = or_(
             *(
                 and_(
-                    AyushProfileRecord.patient_ref_type == ref_type,
-                    AyushProfileRecord.patient_ref_value == ref_value,
+                    PatientProfileRecord.patient_ref_type == ref_type,
+                    PatientProfileRecord.patient_ref_value == ref_value,
                 )
                 for ref_type, ref_value in refs
             )
         )
         result = await self._session.execute(
-            select(AyushProfileRecord)
+            select(PatientProfileRecord)
             .where(
-                AyushProfileRecord.hospital_id == hospital_id,
+                PatientProfileRecord.hospital_id == hospital_id,
                 matches,
-                AyushProfileRecord.id.not_in(superseded),
+                PatientProfileRecord.id.not_in(superseded),
             )
-            .order_by(AyushProfileRecord.submitted_at.desc())
+            .order_by(PatientProfileRecord.submitted_at.desc())
             .limit(1)
         )
         return result.scalar_one_or_none()
@@ -139,9 +139,9 @@ class AyushProfileRepository:
         answers: list[dict[str, object]],
         submitted_at: datetime,
         supersedes: str | None,
-    ) -> AyushProfileRecord:
+    ) -> PatientProfileRecord:
         """Insert one revision. Never updates an existing row."""
-        row = AyushProfileRecord(
+        row = PatientProfileRecord(
             id=profile_id,
             hospital_id=hospital_id,
             patient_ref_type=patient_ref_type,

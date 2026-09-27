@@ -29,7 +29,6 @@ from app.db import get_session
 from app.db.tenancy import reset_tenant, set_tenant
 from app.domain.report.builder import FieldLabels
 from app.events.bus import EventBus, get_event_bus
-from app.repositories.ayush_profiles import AyushProfileRepository
 from app.repositories.consent import (
     AuditRepository,
     ConsentRepository,
@@ -40,6 +39,7 @@ from app.repositories.consent import (
 )
 from app.repositories.documents import DocumentRepository
 from app.repositories.intakes import IntakeRepository
+from app.repositories.patient_profiles import PatientProfileRepository
 from app.repositories.patients import (
     HospitalRepository,
     PatientLinkRepository,
@@ -47,12 +47,12 @@ from app.repositories.patients import (
 )
 from app.repositories.terminology import TerminologyRepository
 from app.repositories.timelines import TimelineRepository
-from app.services.ayush_profile import AyushProfileService
 from app.services.documents import DocumentService
 from app.services.erasure import ErasureService
 from app.services.identity import IdentityService
 from app.services.ingest import IngestService
 from app.services.patient_auth import PatientAuthService
+from app.services.patient_profile import PatientProfileService
 from app.services.prefill import PrefillService
 from app.services.reports import ReportService
 from app.services.terminology import TerminologyService
@@ -245,7 +245,7 @@ async def get_report_service(
             max_events=settings.timeline_max_events,
             min_relevance=settings.timeline_min_relevance,
         ),
-        ayush_profiles=AyushProfileRepository(session),
+        patient_profiles=PatientProfileRepository(session),
         max_prior_intakes=settings.timeline_max_prior_intakes,
         facility_timezone=settings.facility_timezone,
         demo=settings.demo_mode,
@@ -270,18 +270,18 @@ async def get_erasure_service(
     )
 
 
-async def get_ayush_profile_service(
+async def get_patient_profile_service(
     session: SessionDep,
     clock: ClockDep,
     ids: IdsDep,
     hospital_id: TenantDep,
-) -> AyushProfileService:
+) -> PatientProfileService:
     """`hospital_id` is depended on rather than used: resolving it is what puts
     the tenant in the session context, and the repository's queries filter on
     the value the caller passes from the principal. Dropping the dependency
     would leave the guard unarmed for this request."""
-    return AyushProfileService(
-        profiles=AyushProfileRepository(session),
+    return PatientProfileService(
+        profiles=PatientProfileRepository(session),
         clock=clock,
         ids=ids,
     )
@@ -353,8 +353,8 @@ WorkerDocumentServiceDep = Annotated[DocumentService, Depends(get_worker_documen
 
 ReportServiceDep = Annotated[ReportService, Depends(get_report_service)]
 IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
-AyushProfileServiceDep = Annotated[
-    AyushProfileService, Depends(get_ayush_profile_service)
+PatientProfileServiceDep = Annotated[
+    PatientProfileService, Depends(get_patient_profile_service)
 ]
 ErasureServiceDep = Annotated[ErasureService, Depends(get_erasure_service)]
 WorklistServiceDep = Annotated[WorklistService, Depends(get_worklist_service)]

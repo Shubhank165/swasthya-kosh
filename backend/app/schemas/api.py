@@ -256,11 +256,11 @@ class PrefillResponse(ApiModel):
     suggestions: list[PrefillSuggestionOut] = Field(default_factory=list)
 
 
-class AyushAnswerIn(ApiModel):
+class ProfileAnswerIn(ApiModel):
     """One answered field of the AYUSH module, as the app sends it.
 
     The vocabularies are the record's own — `FieldStatus` and `Certainty` —
-    and are validated in `services/ayush_profile.py` rather than narrowed to an
+    and are validated in `services/patient_profile.py` rather than narrowed to an
     enum here, so the error a client gets names the field that was wrong rather
     than failing the whole body with a schema message.
     """
@@ -272,7 +272,7 @@ class AyushAnswerIn(ApiModel):
     original_text: str | None = None
 
 
-class AyushProfileRequest(ApiModel):
+class PatientProfileRequest(ApiModel):
     """A patient's completed AYUSH/Prakriti module.
 
     No patient and no hospital in the body: both come from the session token,
@@ -284,10 +284,10 @@ class AyushProfileRequest(ApiModel):
     #: The question-bundle version these were answered against, so a profile
     #: collected before the module changed can be told apart from a current one.
     content_version: str | None = None
-    answers: list[AyushAnswerIn] = Field(default_factory=list)
+    answers: list[ProfileAnswerIn] = Field(default_factory=list)
 
 
-class AyushProfileResponse(ApiModel):
+class PatientProfileResponse(ApiModel):
     profile_id: str
     #: The revision this one replaced, or `None` for a first submission. Echoed
     #: because an append-only table is only auditable if the client can see the
@@ -345,7 +345,7 @@ class ErasureResponse(ApiModel):
     red_flags: int = 0
     consent_artefacts: int = 0
     raw_payloads: int = 0
-    ayush_profiles: int = 0
+    patient_profiles: int = 0
     identifier_links: int = 0
     complete: bool = True
 
