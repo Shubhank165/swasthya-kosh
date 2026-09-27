@@ -89,14 +89,6 @@ def render(report: dict, language: str, fonts: dict[str, Path | None] | None = N
     flags = [f.get("message") or f.get("rule_id") for f in report.get("red_flags") or []]
     if flags:
         line(local("Urgent findings", "तत्काल संकेत") + ": " + "; ".join(map(str, flags)), 28)
-    prakriti = report.get("prakriti") or {}
-    if prakriti.get("prakriti"):
-        line(
-            local("Prakriti (provisional)", "प्रकृति (अस्थायी)")
-            + f": {prakriti.get('prakriti_hi') if hi else prakriti['prakriti']}",
-            28,
-        )
-
     y += 12
     encounter = str(report.get("encounter_id") or "")[:8]
     hospital = report.get("hospital_intake_id")

@@ -27,7 +27,6 @@ from pathlib import Path
 from medikiosk.languages import LanguageProfile, profile
 from medikiosk.providers.local_tts import FliteTTS, PiperTTS
 
-
 # One utterance's target. RMS carries perceived loudness; the ceiling leaves headroom so a peak
 # that lands on a loud syllable does not square off against full scale the way Piper's does.
 TARGET_RMS = 0.12

@@ -6,10 +6,9 @@ from starlette.websockets import WebSocketDisconnect
 from test_offline_workflow import Driver, receive
 from test_offline_workflow import settings as _settings  # noqa: F401
 
-from medikiosk.clinical.translations import prompt as prompt_text
 from medikiosk.app import _is_yes, create_app
 from medikiosk.clinical.questions import QUESTIONS
-from medikiosk.kiosk import ayurveda
+from medikiosk.clinical.translations import prompt as prompt_text
 
 
 def test_health_reports_demo_fallbacks(settings):
@@ -69,7 +68,7 @@ def test_ws_session_hands_off_when_interview_ends(settings):
         driver = Driver(ws)
         driver.reach_service("clinical")
         complete_interview(driver)
-        assert driver.screen["stage"] == "ayurveda"
+        assert driver.screen["stage"] == "consent"
 
 
 def test_ws_drives_the_full_kiosk_workflow(settings):
@@ -77,12 +76,8 @@ def test_ws_drives_the_full_kiosk_workflow(settings):
         driver = Driver(ws)
         driver.reach_service("clinical", abha="12-3456-7890-1234")
         complete_interview(driver)
-        for index, question in enumerate(ayurveda.QUESTIONS, 1):
-            assert driver.screen["question_id"] == question.id
-            assert driver.screen["progress"] == [index, len(ayurveda.QUESTIONS)]
-            driver.act("choose", driver.screen["options"][0]["value"])
-        assert driver.screen["gate"] is True
-        driver.act("choose", "yes")
+        # The interview hands off through the document-reading consent, and this patient
+        # declines it — which is why `documents` is empty below.
         assert driver.screen["stage"] == "consent"
         driver.act("choose", "no")
         assert driver.screen["stage"] == "review"
@@ -93,7 +88,6 @@ def test_ws_drives_the_full_kiosk_workflow(settings):
         assert report["patient"]["abha_last4"] == "1234"
         assert report["patient"]["reported_by"] == "self"
         assert report["clinical"]["complaint"] == "abdominal pain"
-        assert report["ayurveda"]["answered"] == len(ayurveda.QUESTIONS)
         assert report["documents"] == []
         assert "12345678901234" not in str(report)
         ws.send_json(driver.envelope("answer", "new patient"))

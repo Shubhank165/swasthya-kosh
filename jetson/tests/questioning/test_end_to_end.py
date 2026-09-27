@@ -54,10 +54,10 @@ class TestAFeverAndHeadache:
         "general.severity": "7",
         "history.current_medications": "paracetamol, and Giloy kadha in the morning",
         "history.allergies": "none that I know of",
-        "ayush.appetite": "poor",
-        "ayush.after_eating": "heaviness and bloating",
-        "ayush.bowel_habit": "constipated",
-        "ayush.sleep_quality": "disturbed",
+        "lifestyle.appetite": "poor",
+        "lifestyle.after_eating": "heaviness and bloating",
+        "lifestyle.bowel_habit": "constipated",
+        "lifestyle.sleep_quality": "disturbed",
     }
 
     def test_the_case_carries_what_the_patient_said(
@@ -312,7 +312,7 @@ class TestItWorksWithNoDiseaseModel:
         domains = {slot.domain for slot in agent.slots.all}
         assert domains == {d.id for d in agent.slots.domains} | {
             "general",
-            "ayush",
+            "lifestyle",
             "assessment",
         }
 

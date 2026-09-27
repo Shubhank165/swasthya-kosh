@@ -6,7 +6,7 @@ guard the distinctions the report depends on.
 
 import pytest
 
-from medikiosk.kiosk.flow import KioskFlow, Stage
+from medikiosk.kiosk.flow import KioskFlow
 from medikiosk.kiosk.provenance import Ledger, Source
 
 
@@ -82,22 +82,15 @@ def test_a_representative_is_recorded_as_second_hand() -> None:
     assert direct.spoken_source is Source.PATIENT_REPORTED
 
 
-def test_flow_records_questionnaire_and_document_sources() -> None:
-    from medikiosk.kiosk import ayurveda
-
+def test_flow_records_document_sources() -> None:
     flow = KioskFlow()
     flow.choose_language("hi")
     flow.set_abha(None)
     flow.set_who("self")
-    flow.advance()
-    assert flow.stage is Stage.AYURVEDA
-
-    first = ayurveda.QUESTIONS[0]
-    flow.answer_ayurveda(first.id, first.options[0].value)
-    assert flow.ledger.entries[-1].source is Source.QUESTIONNAIRE
 
     flow.add_document(["Tab Augmentin 625 mg BD"], seconds=1.7, confidence=0.8)
     document_entry = flow.ledger.entries[-1]
+
     assert document_entry.source is Source.OCR
     assert document_entry.confidence == 0.8
 

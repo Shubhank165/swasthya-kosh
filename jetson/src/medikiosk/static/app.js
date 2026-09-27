@@ -287,9 +287,6 @@ function addFlowButton(label, handler) {
 function chooseFlowOption(value) {
   if (flowStage === "language") sendJson({ type: "flow.language", value });
   else if (flowStage === "who") sendJson({ type: "flow.who", value });
-  else if (flowStage === "ayurveda") {
-    sendJson({ type: "flow.ayurveda", question_id: flowQuestionId, value });
-  }
 }
 
 async function scanDocument() {

@@ -35,7 +35,6 @@ from __future__ import annotations
 import argparse
 import csv
 import ctypes
-import io
 import json
 import os
 import platform
@@ -46,7 +45,7 @@ import threading
 import time
 import urllib.request
 from collections import deque
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path

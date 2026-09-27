@@ -98,51 +98,6 @@ def _outcome(value: Any, language: str | None, original: str | None = None) -> d
     return field
 
 
-# The Ayurveda answers, under ids the backend files in its AYURVEDA section (an `ayurveda_`
-# prefix, or the exact id `prakriti_self_report`). Our own names are kept rather than mapped
-# onto agni/koshtha/nidra/mala/mutra: those are specific classical parameters, and claiming we
-# asked about Koshtha because we asked about appetite would put a finding on a physician's
-# sheet that no question established.
-AYURVEDA_FIELDS = ("ahara_shakti", "vyayama_shakti", "satva", "satmya")
-
-
-def _ayurveda_fields(report: dict[str, Any], language: str | None) -> dict[str, dict[str, Any]]:
-    """What the Dashavidha and Prakriti questionnaires found, if either was run.
-
-    Prakriti is sent as `prakriti_self_report` - self-report is what it is. It stays provisional
-    until a vaidya signs off the item weights, and `scoring_reviewed` travels with it so the
-    hospital cannot mistake a kiosk tally for a clinician's classification. Answers that did not
-    support a Prakriti are sent as `unresolved`, not as an absent field: the patient sat through
-    the instrument, and a record that omits it cannot be told apart from one never asked.
-    """
-
-    fields: dict[str, dict[str, Any]] = {}
-    ayurveda = report.get("ayurveda") or {}
-    prakriti = report.get("prakriti") or {}
-
-    for name in AYURVEDA_FIELDS:
-        if ayurveda.get(name) is not None:
-            fields[f"ayurveda_{name}"] = _outcome(ayurveda[name], language)
-    if ayurveda.get("prakriti_tendency"):
-        fields["ayurveda_dosha_tendency"] = _outcome(ayurveda["prakriti_tendency"], language)
-
-    if prakriti:
-        name = prakriti.get("prakriti")
-        if name:
-            entry = _outcome(name, language)
-            entry["scoring_reviewed"] = bool(prakriti.get("scoring_reviewed"))
-            entry["answered"] = prakriti.get("answered")
-            entry["asked_total"] = prakriti.get("asked_total")
-            # A qualifier on this reading, not a finding of its own. Sent as an attribute so a
-            # renderer that prints one bullet per field cannot turn "Provisional: item weights
-            # are reconstructed..." into a line that reads as something found in the patient.
-            if prakriti.get("note"):
-                entry["note"] = prakriti["note"]
-            fields["prakriti_self_report"] = entry
-        else:
-            fields["prakriti_self_report"] = {"status": UNRESOLVED}
-    return fields
-
 
 def _vitals_fields(report: dict[str, Any], language: str | None) -> dict[str, dict[str, Any]]:
     """The camera heart rate, if one was attempted.
@@ -273,7 +228,6 @@ def kiosk_envelope(
             fields[FIELD_IDS[key]] = _outcome(list(clinical[key]), language)
     if patient.get("reported_by"):
         fields["reporter"] = _outcome(patient["reported_by"], language)
-    fields.update(_ayurveda_fields(report, language))
     fields.update(_vitals_fields(report, language))
     for name in clinical.get("not_established") or []:
         fields.setdefault(FIELD_IDS.get(name, name), {"status": UNRESOLVED})

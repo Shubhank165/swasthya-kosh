@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from medikiosk.edge.heart_rate import (
-    CanvasBroadcaster,
     FACE_EXCLUDE,
     FACE_OVAL,
     FS,
+    CanvasBroadcaster,
     analyze_window,
-    bandpass,
-    detrend_ratio,
     face_mask,
     pos,
     selftest,

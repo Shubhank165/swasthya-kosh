@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 
 from medikiosk.app import create_app
 from medikiosk.config import Settings
-from medikiosk.kiosk import prakriti
 from medikiosk.kiosk.consent import ConsentLedger
 from medikiosk.kiosk.flow import KioskFlow, Stage
 from medikiosk.kiosk.protocol import SessionGuard
@@ -24,7 +23,6 @@ from medikiosk.kiosk.voice_actions import (
     parse_command,
     parse_decision,
 )
-from medikiosk.models import PatientState
 from medikiosk.storage import EncryptedSessionStore
 
 
@@ -84,7 +82,7 @@ class Driver:
         assert result["type"] == "flow.ack", result
         return envelope
 
-    def reach_service(self, service="prakriti", language="en", abha=None):
+    def reach_service(self, service="clinical", language="en", abha=None):
         self.act("choose", language)
         self.act("choose", "self")
         self.act("choose", "yes")
@@ -93,6 +91,24 @@ class Driver:
             self.act("unknown")
         self.act("answer", abha) if abha else self.act("skip")
         self.act("choose", service)
+
+    def reach_documents(self, language="en", abha=None):
+        """Stand at the documents stage.
+
+        There used to be a shortcut here: pick the constitutional questionnaire at the hub, say
+        you had filled it on a previous visit, and the kiosk went straight to documents without
+        asking anything clinical. That service no longer exists, so the only route is through
+        the interview, which is also the only route a real patient ever had.
+        """
+
+        self.reach_service("clinical", language=language, abha=abha)
+        for answer in ("three days", "four", "no", "no", "no", "no", "I am 40"):
+            if self.turn(answer)["next_question_id"] is None:
+                break
+        # The interview hands off through the document-reading consent.
+        assert self.screen["stage"] == "consent", self.screen["stage"]
+        self.act("choose", "yes")
+        assert self.screen["stage"] == "documents", self.screen["stage"]
 
     def turn(self, text):
         before = len(self.events)
@@ -196,87 +212,6 @@ def test_registration_zero_binds_without_a_readback():
         flow.action("answer", "")  # an empty answer is not an answer; skip must be explicit
 
 
-def test_full_prakriti_with_unknown_never_claims_complete():
-    flow = consented_flow()
-    for _ in range(3):
-        flow.action("unknown")
-    flow.action("skip")
-    flow.action("choose", "prakriti")
-    flow.action("choose", "no")
-    seen = []
-    for index, item in enumerate(prakriti.ITEMS):
-        screen = flow.screen(PatientState())
-        assert screen["question_id"] == item.id
-        assert screen["progress"] == [index + 1, 68]
-        seen.append(item.id)
-        flow.action(
-            "unknown" if index == 0 else "choose",
-            screen["options"][0]["value"],
-            question_id=item.id,
-        )
-    assert len(set(seen)) == 68
-    assert flow.prakriti_record["complete"] is False
-    assert flow.prakriti_record["prakriti"] is None
-    assert flow.stage is Stage.CONSENT
-    assert flow.consent_purpose == "local_documents"
-    flow.action("choose", "no")
-    assert flow.stage is Stage.REVIEW
-    restored = KioskFlow.from_snapshot(flow.snapshot())
-    assert restored.snapshot() == flow.snapshot()
-
-
-@pytest.mark.parametrize("outcome", ["unknown", "refuse"])
-def test_previous_completion_edit_keeps_unknown_distinct_and_cancellable(outcome):
-    flow = consented_flow()
-    for _ in range(3):
-        flow.action("unknown")
-    flow.action("skip")
-    flow.action("choose", "prakriti")
-    flow.action("choose", "yes")
-    flow.action("choose", "no")
-    flow.action("edit", "prakriti.previous")
-    flow.action("cancel")
-    assert flow.stage is Stage.REVIEW
-    assert flow.prakriti_previously_filled is True
-    flow.action("edit", "prakriti.previous")
-    flow.action(outcome)
-    assert flow.edit_target is None
-    assert flow.prakriti_previously_filled is None
-    assert flow.screen(PatientState())["question_id"] == prakriti.ITEMS[0].id
-    report = flow.finish(PatientState(), [])
-    assert report["previous_prakriti"]["self_reported"] is None
-    assert report["previous_prakriti"]["status"] == (
-        "refused" if outcome == "refuse" else "unresolved"
-    )
-
-
-def test_completed_questionnaire_edits_recompute_without_overflow():
-    flow = consented_flow()
-    for _ in range(3):
-        flow.action("unknown")
-    flow.action("skip")
-    flow.action("choose", "prakriti")
-    flow.action("choose", "no")
-    for item in prakriti.ITEMS:
-        flow.action("choose", flow.screen(PatientState())["options"][0]["value"], item.id)
-    flow.action("choose", "no")
-    assert flow.prakriti_record["complete"] is True
-    target = prakriti.ITEMS[0].id
-    flow.action("edit", target)
-    assert flow.screen(PatientState())["progress"] == [1, 68]
-    assert "cancel" in flow.screen(PatientState())["allowed_actions"]
-    flow.action("unknown", question_id=target)
-    assert flow.stage is Stage.REVIEW
-    assert flow.prakriti_record["complete"] is False
-    assert flow.prakriti_record["prakriti"] is None
-    assert target not in flow.prakriti_answers
-    assert flow.ledger.current(target) is None
-    flow.action("edit", "prakriti.previous")
-    flow.action("unknown")
-    assert flow.stage is Stage.REVIEW
-    assert flow.edit_target is None
-
-
 def test_workflow_and_queue_payloads_are_encrypted(settings):
     store = EncryptedSessionStore(settings.session_store_path, settings.session_encryption_key)
     guard = SessionGuard()
@@ -332,7 +267,6 @@ def test_protocol_rejects_bypass_and_duplicate_does_not_grant_consent_twice(sett
         ("registration", "unknown", None),
         ("clinical", "answer", "stomach pain"),
         ("clinical", "refuse", None),
-        ("prakriti", "unknown", None),
     ],
 )
 def test_answer_requires_current_question_identity(settings, stage, action, value, question_id):
@@ -346,8 +280,6 @@ def test_answer_requires_current_question_identity(settings, stage, action, valu
                 driver.act("choose", "yes")
         else:
             driver.reach_service(stage)
-            if stage == "prakriti":
-                driver.act("choose", "no")
         expected = driver.question
         assert expected
         envelope = driver.envelope(action, value)
@@ -405,103 +337,6 @@ def test_spoken_registration_age_is_conservative(text, expected):
     assert parse_age(text, "hi") == expected
 
 
-def test_full_prakriti_voice_path_uses_pcm_and_real_dispatch(settings, monkeypatch):
-    import struct
-    import threading
-    from collections import deque
-
-    from medikiosk.edge.vad import FRAME_BYTES
-
-    utterances = deque()
-    condition = threading.Condition()
-    spoken_prompts = []
-
-    class Vad:
-        def __init__(self, *args):
-            pass
-
-        def reset(self):
-            pass
-
-        def probability(self, frame):
-            return 1.0 if any(frame) else 0.0
-
-    def transcribe(self, wav, language):
-        assert wav.startswith(b"RIFF")
-        with condition:
-            assert utterances, "Unexpected ASR call"
-            return utterances.popleft(), language or "en"
-
-    def synthesize(self, text, language):
-        spoken_prompts.append(text)
-        from medikiosk.edge.runtime import pcm_to_wav
-
-        return pcm_to_wav(bytes(320))
-
-    monkeypatch.setattr("medikiosk.app.WhisperCppSTT.health", lambda _: True)
-    monkeypatch.setattr("medikiosk.app.WhisperCppSTT.transcribe", transcribe)
-    monkeypatch.setattr("medikiosk.app.SileroVAD", Vad)
-    monkeypatch.setattr("medikiosk.app.VoiceBank.available", lambda *args: True)
-    monkeypatch.setattr("medikiosk.app.VoiceBank.synthesize", synthesize)
-    sound = struct.pack("<h", 1500) * (FRAME_BYTES // 2) * 10 + bytes(FRAME_BYTES * 24)
-
-    with TestClient(create_app(settings)) as client, client.websocket_connect("/ws/session") as ws:
-        driver = Driver(ws)
-
-        def say(text, readback=False):
-            driver.until("tts.end")
-            # Simulate native completion, not just synthesis completion.
-            ws.send_json(
-                {
-                    "type": "playback.state",
-                    "session_id": driver.session_id,
-                    "revision": driver.revision,
-                    "playing": False,
-                }
-            )
-            with condition:
-                utterances.append(text)
-            ws.send_json(
-                {
-                    "type": "audio.start",
-                    "session_id": driver.session_id,
-                    "revision": driver.revision,
-                }
-            )
-            ws.send_bytes(sound)
-            event = driver.until("flow.screen" if not readback else "tts.start")
-            assert event["type"] != "error", event
-
-        say("English")
-        say("Myself")
-        say("yes")  # one explicit yes to the read-aloud notice; no second "confirm" step
-        say("Synthetic Person")
-        say("forty two")
-        say("prefer not to answer")
-        say("skip")
-        say("Full Prakriti questionnaire")
-        say("no")
-        for index in range(68):
-            assert driver.screen["stage"] == "prakriti"
-            assert driver.screen["progress"] == [index + 1, 68]
-            say("unknown" if index == 0 else "option one")
-        say("no")  # Refuse optional document permission.
-        assert driver.screen["stage"] == "review"
-        say("edit answer 2")
-        assert driver.screen["stage"] == "registration"
-        say("forty three")
-        assert driver.screen["stage"] == "review"
-        say("confirm")
-        assert driver.report["completion"] == "saved_local"
-        assert driver.report["registration"]["age"] == 43
-        assert driver.report["prakriti"]["complete"] is False
-        assert driver.report["prakriti"]["prakriti"] is None
-        assert len(driver.report["questionnaire_outcomes"]["prakriti"]) == 68
-        assert all(a["method"] == "voice" for a in driver.report["accepted_answers"])
-        assert any("Synthetic Person" in text and "43" in text for text in spoken_prompts)
-        assert not utterances
-
-
 def clinical_review(driver):
     driver.reach_service("clinical")
     driver.turn("stomach pain")
@@ -510,13 +345,8 @@ def clinical_review(driver):
         if driver.screen["stage"] != "interview":
             break
         driver.act("unknown")
-    assert driver.screen["stage"] == "ayurveda"
-    for _ in range(30):
-        if driver.screen["stage"] != "ayurveda":
-            break
-        driver.act("unknown")
-    assert driver.screen["stage"] == "prakriti"
-    driver.act("choose", "yes")
+    # The interview hands off through the document-reading consent, declined here.
+    assert driver.screen["stage"] == "consent"
     driver.act("choose", "no")
     assert driver.screen["stage"] == "review"
 
@@ -761,9 +591,8 @@ def test_finalization_failure_never_publishes_queue_and_retry_is_idempotent(
 
     with TestClient(create_app(settings)) as client, client.websocket_connect("/ws/session") as ws:
         driver = Driver(ws)
-        driver.reach_service()
-        driver.act("choose", "yes")
-        driver.act("choose", "no")
+        driver.reach_documents()
+        driver.act("done")  # No papers to scan; straight on to review.
         envelope = driver.envelope("confirm")
         monkeypatch.setattr(owner, name, fail)
         before = len(driver.events)
@@ -792,9 +621,8 @@ def test_committed_report_recovers_queue_publication_after_restart(settings, mon
 
     with TestClient(create_app(settings)) as client, client.websocket_connect("/ws/session") as ws:
         driver = Driver(ws)
-        driver.reach_service()
-        driver.act("choose", "yes")
-        driver.act("choose", "no")
+        driver.reach_documents()
+        driver.act("done")  # No papers to scan; straight on to review.
         monkeypatch.setattr(QueueStore, "publish", fail)
         driver.act("confirm")
         assert driver.report["completion"] == "saved_local"
@@ -815,9 +643,8 @@ def test_committed_report_recovers_queue_publication_after_restart(settings, mon
 def test_saved_receipt_survives_backend_restart_without_duplicate_queue(settings):
     with TestClient(create_app(settings)) as client, client.websocket_connect("/ws/session") as ws:
         driver = Driver(ws)
-        driver.reach_service()
-        driver.act("choose", "yes")  # Self-reported previous completion; no invented result.
-        driver.act("choose", "no")  # Refuse document reading.
+        driver.reach_documents()
+        driver.act("done")  # No papers to scan; straight on to review.
         assert driver.screen["stage"] == "review"
         driver.act("confirm")
         assert driver.report["completion"] == "saved_local"

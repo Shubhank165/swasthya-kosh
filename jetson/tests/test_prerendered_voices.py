@@ -105,40 +105,20 @@ def test_prompts_are_unique_per_language_and_text():
     assert len(keys) == len(set(keys))
 
 
-# The two corpora that are not translated into all nine languages: screen text (English and Hindi
-# in flow.SCREEN_TEXT) and the Prakriti form (English and Hindi on the CCRAS form itself).
-PARTLY_TRANSLATED = ("screen:", "prakriti:")
 
 
-def test_untranslated_text_is_spoken_by_the_english_voice():
-    """Where there is no translation the kiosk shows the English sentence.
+def test_every_prompt_is_spoken_by_its_own_voice():
+    """No prompt falls back to the English voice any more.
 
-    Reading English orthography with a Tamil voice is barely intelligible; the render step is
-    where that pairing gets fixed, so the fallback is rendered in the English voice instead.
+    There used to be one corpus that could: the Prakriti form, printed in English and Hindi only,
+    which the render step spoke in the English voice for the other seven languages. That form is
+    gone, so every remaining prompt has all nine translations and is spoken in its own language.
+    A prompt that mismatches now is a missing translation, not a known gap.
     """
 
-    mismatched = [p for p in spoken_prompts() if p.voice_language != p.language]
-    assert mismatched, "expected at least the untranslated screen text"
-    assert all(p.voice_language == "en" for p in mismatched)
-    assert all(p.source.startswith(PARTLY_TRANSLATED) for p in mismatched)
-
-
-def test_fully_translated_text_is_spoken_by_its_own_voice():
-    translated = [
-        p for p in spoken_prompts() if not p.source.startswith(PARTLY_TRANSLATED)
-    ]
-    assert translated
-    assert all(p.voice_language == p.language for p in translated)
-
-
-def test_hindi_prakriti_is_spoken_in_hindi():
-    """Hindi is on the form, so it must not fall back to the English voice."""
-
-    hindi = [
-        p for p in spoken_prompts() if p.language == "hi" and p.source.startswith("prakriti:")
-    ]
-    assert hindi
-    assert all(p.voice_language == "hi" for p in hindi)
+    prompts = list(spoken_prompts())
+    assert prompts
+    assert all(p.voice_language == p.language for p in prompts)
 
 
 def test_screen_text_uses_the_translation_where_one_exists():

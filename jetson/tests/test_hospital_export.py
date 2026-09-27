@@ -141,7 +141,6 @@ def test_every_answered_field_traces_back_to_the_turn_that_asked_it(settings, ho
 
     # Each of the 58 Prakriti items is on the record, but none of them claims to be the source
     # of the constitution: that is scored from all of them together.
-    assert all(t["bound_field"] != "prakriti_self_report" for t in record["turns"])
 
 
 def test_the_record_says_which_kiosk_took_it_and_what_was_running(settings, hospital):

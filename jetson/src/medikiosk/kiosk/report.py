@@ -50,17 +50,12 @@ ROUTING: tuple[tuple[tuple[str, ...], str], ...] = (
 )
 
 
-def route(
-    state: PatientState,
-    red_flags: list[RedFlagAlert],
-    prefers_ayush: bool = False,
-) -> dict:
-    """Which queue, and why. Emergency always wins; an Ayush request never overrides it.
+def route(state: PatientState, red_flags: list[RedFlagAlert]) -> dict:
+    """Which queue, and why. Emergency always wins.
 
-    Answering the Dashavidha questionnaire is not the same as asking for an Ayurvedic
-    consultation - the questionnaire runs for everyone at an Ayush facility. Only an explicit
-    patient preference moves them off the clinical specialist queue, or a knee complaint would be
-    routed away from Orthopaedics purely because the patient answered eight constitution questions.
+    Routing is on the complaint and on whether a red-flag rule fired, and on nothing else. A
+    queue chosen from anything the patient did not present with is a queue the doctor has to
+    argue with.
     """
 
     if any(flag.urgency is Urgency.EMERGENCY for flag in red_flags):
@@ -80,15 +75,6 @@ def route(
             break
 
     urgent = any(flag.urgency is Urgency.URGENT for flag in red_flags)
-    if prefers_ayush:
-        # A patient who came for Ayurvedic care still gets the specialist noted, so the vaidya can
-        # refer without a second intake.
-        return {
-            "queue": "Ayush OPD",
-            "priority": Urgency.URGENT.value if urgent else Urgency.ROUTINE.value,
-            "reason": f"Patient chose Ayurvedic consultation. {reason}",
-            "also_indicated": matched,
-        }
     return {
         "queue": matched,
         "priority": Urgency.URGENT.value if urgent else Urgency.ROUTINE.value,
@@ -109,13 +95,10 @@ def missing_fields(state: PatientState) -> list[str]:
 def build(
     state: PatientState,
     red_flags: list[RedFlagAlert],
-    ayurveda: dict | None = None,
-    prakriti: dict | None = None,
     documents: list[dict] | None = None,
     abha_number: str | None = None,
     on_behalf_of: str | None = None,
     past_visits: list[dict] | None = None,
-    prefers_ayush: bool = False,
     ledger: Ledger | None = None,
 ) -> dict:
     documents = documents or []
@@ -158,12 +141,10 @@ def build(
         # doctor; it never decides triage - that stays with the red-flag rules.
         "differential": differential,
         "fhir": fhir,
-        "ayurveda": ayurveda,
         # Constitution, from the once-in-a-lifetime Ayush questionnaire. May have been
         # recorded on an earlier visit - "recorded_at" says which.
-        "prakriti": prakriti,
         "documents": documents,
-        "routing": route(state, red_flags, prefers_ayush),
+        "routing": route(state, red_flags),
         # Where each value came from, and which of them a clinician should check before
         # relying on it. A sheet that flattens a spoken answer and an OCR guess into one
         # list invites the reader to trust them equally.

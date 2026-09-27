@@ -22,7 +22,6 @@ from __future__ import annotations
 import copy
 from enum import Enum
 
-from medikiosk.kiosk import ayurveda, prakriti
 from medikiosk.kiosk.abha import normalise
 from medikiosk.kiosk.consent import BOOTSTRAP, ConsentLedger, notice
 from medikiosk.kiosk.i18n import LANGUAGE_CODES, t
@@ -44,8 +43,6 @@ class Stage(str, Enum):
     FINALIZING = "finalizing"
     DECLINED = "declined"
     INTERVIEW = "interview"
-    AYURVEDA = "ayurveda"
-    PRAKRITI = "prakriti"
     DOCUMENTS = "documents"
     REPORT = "report"
     EMERGENCY = "emergency"
@@ -56,8 +53,6 @@ ORDER = (
     Stage.ABHA,
     Stage.WHO,
     Stage.INTERVIEW,
-    Stage.AYURVEDA,
-    Stage.PRAKRITI,
     Stage.DOCUMENTS,
     Stage.REPORT,
 )
@@ -142,17 +137,6 @@ SCREEN_TEXT: dict[str, dict[str, str]] = {
         "kn": "ನಾನು ಬೇರೊಬ್ಬರ ಪರವಾಗಿ ಉತ್ತರಿಸುತ್ತಿದ್ದೇನೆ",
         "pa": "ਮੈਂ ਕਿਸੇ ਹੋਰ ਵੱਲੋਂ ਜਵਾਬ ਦੇ ਰਿਹਾ ਹਾਂ",
     },
-    "ayurveda_intro": {
-        "en": "A few questions about your constitution, for the Ayurveda doctor.",
-        "hi": "आयुर्वेद चिकित्सक के लिए आपकी प्रकृति से जुड़े कुछ प्रश्न।",
-        "bn": "আয়ুর্বেদ চিকিৎসকের জন্য আপনার প্রকৃতি সম্পর্কে কয়েকটি প্রশ্ন।",
-        "mr": "आयुर्वेद डॉक्टरांसाठी तुमच्या प्रकृतीबद्दल काही प्रश्न.",
-        "te": "ఆయుర్వేద వైద్యుని కోసం మీ ప్రకృతి గురించి కొన్ని ప్రశ్నలు.",
-        "ta": "ஆயுர்வேத மருத்துவருக்காக உங்கள் பிரகிருதி பற்றிய சில கேள்விகள்.",
-        "gu": "આયુર્વેદ ડૉક્ટર માટે તમારી પ્રકૃતિ વિશે થોડા પ્રશ્નો.",
-        "kn": "ಆಯುರ್ವೇದ ವೈದ್ಯರಿಗಾಗಿ ನಿಮ್ಮ ಪ್ರಕೃತಿಯ ಬಗ್ಗೆ ಕೆಲವು ಪ್ರಶ್ನೆಗಳು.",
-        "pa": "ਆਯੁਰਵੇਦ ਡਾਕਟਰ ਲਈ ਤੁਹਾਡੀ ਪ੍ਰਕ੍ਰਿਤੀ ਬਾਰੇ ਕੁਝ ਸਵਾਲ।",
-    },
     "documents": {
         "en": "Place any prescription or report under the camera, then press Scan. Or skip.",
         "hi": "कोई पर्चा या रिपोर्ट कैमरे के नीचे रखें, फिर स्कैन दबाएँ। या छोड़ दें।",
@@ -196,70 +180,6 @@ SCREEN_TEXT: dict[str, dict[str, str]] = {
         "gu": "મેડિકિઓસ્ક તૈયાર છે. શરૂ કરવા સ્ક્રીનને સ્પર્શ કરો.",
         "kn": "ಮೆಡಿಕಿಯೋಸ್ಕ್ ಸಿದ್ಧವಾಗಿದೆ. ಪ್ರಾರಂಭಿಸಲು ಪರದೆಯನ್ನು ಸ್ಪರ್ಶಿಸಿ.",
         "pa": "ਮੈਡੀਕਿਓਸਕ ਤਿਆਰ ਹੈ। ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਸਕਰੀਨ ਨੂੰ ਛੂਹੋ।",
-    },
-    "prakriti_ask": {
-        "en": "Have you filled the Ayush Prakriti questionnaire before, at any clinic?",
-        "hi": "क्या आपने पहले कभी, किसी भी चिकित्सालय में, आयुष प्रकृति प्रश्नावली भरी है?",
-        "bn": "আপনি কি আগে কখনও, কোনো চিকিৎসাকেন্দ্রে, আয়ুষ প্রকৃতি প্রশ্নমালা পূরণ করেছেন?",
-        "mr": "तुम्ही याआधी कधी, कोणत्याही रुग्णालयात, आयुष प्रकृती प्रश्नावली भरली आहे का?",
-        "te": "మీరు ఇంతకు ముందు ఎప్పుడైనా, ఏదైనా ఆసుపత్రిలో, ఆయుష్ ప్రకృతి ప్రశ్నావళిని పూరించారా?",
-        "ta": "நீங்கள் இதற்கு முன், ஏதேனும் மருத்துவமனையில், ஆயுஷ் பிரகிருதி வினாத்தாளை நிரப்பியுள்ளீர்களா?",
-        "gu": "શું તમે પહેલાં ક્યારેય, કોઈ પણ દવાખાનામાં, આયુષ પ્રકૃતિ પ્રશ્નાવલી ભરી છે?",
-        "kn": "ನೀವು ಈ ಹಿಂದೆ ಎಂದಾದರೂ, ಯಾವುದೇ ಆಸ್ಪತ್ರೆಯಲ್ಲಿ, ಆಯುಷ್ ಪ್ರಕೃತಿ ಪ್ರಶ್ನಾವಳಿಯನ್ನು ಭರ್ತಿ ಮಾಡಿದ್ದೀರಾ?",
-        "pa": "ਕੀ ਤੁਸੀਂ ਪਹਿਲਾਂ ਕਦੇ, ਕਿਸੇ ਵੀ ਹਸਪਤਾਲ ਵਿੱਚ, ਆਯੁਸ਼ ਪ੍ਰਕ੍ਰਿਤੀ ਪ੍ਰਸ਼ਨਾਵਲੀ ਭਰੀ ਹੈ?",
-    },
-    "prakriti_yes": {
-        "en": "Yes, I have filled it",
-        "hi": "हाँ, मैंने भरी है",
-        "bn": "হ্যাঁ, আমি পূরণ করেছি",
-        "mr": "होय, मी भरली आहे",
-        "te": "అవును, నేను పూరించాను",
-        "ta": "ஆம், நான் நிரப்பியுள்ளேன்",
-        "gu": "હા, મેં ભરી છે",
-        "kn": "ಹೌದು, ನಾನು ಭರ್ತಿ ಮಾಡಿದ್ದೇನೆ",
-        "pa": "ਹਾਂ, ਮੈਂ ਭਰੀ ਹੈ",
-    },
-    "prakriti_no": {
-        "en": "No, or I am not sure",
-        "hi": "नहीं, या मुझे याद नहीं",
-        "bn": "না, বা আমার মনে নেই",
-        "mr": "नाही, किंवा मला आठवत नाही",
-        "te": "లేదు, లేదా నాకు గుర్తు లేదు",
-        "ta": "இல்லை, அல்லது எனக்கு நினைவில்லை",
-        "gu": "ના, અથવા મને યાદ નથી",
-        "kn": "ಇಲ್ಲ, ಅಥವಾ ನನಗೆ ನೆನಪಿಲ್ಲ",
-        "pa": "ਨਹੀਂ, ਜਾਂ ਮੈਨੂੰ ਯਾਦ ਨਹੀਂ",
-    },
-    "prakriti_intro": {
-        "en": "These questions are about your natural constitution. They are asked only once - "
-        "your answers are kept for every future visit.",
-        "hi": "ये प्रश्न आपकी प्रकृति के बारे में हैं। ये केवल एक बार पूछे जाते हैं - "
-        "आपके उत्तर आगे की हर विज़िट के लिए सुरक्षित रखे जाते हैं।",
-        "bn": "এই প্রশ্নগুলি আপনার সহজাত প্রকৃতি সম্পর্কে। এগুলি একবারই জিজ্ঞাসা করা হয় - "
-        "আপনার উত্তর ভবিষ্যতের প্রতিটি ভিজিটের জন্য রাখা হয়।",
-        "mr": "हे प्रश्न तुमच्या नैसर्गिक प्रकृतीबद्दल आहेत. ते फक्त एकदाच विचारले जातात - "
-        "तुमची उत्तरे पुढील प्रत्येक भेटीसाठी जपून ठेवली जातात.",
-        "te": "ఈ ప్రశ్నలు మీ సహజ ప్రకృతి గురించి. ఇవి ఒకసారి మాత్రమే అడగబడతాయి - "
-        "మీ సమాధానాలు భవిష్యత్ సందర్శనలన్నింటికీ భద్రపరచబడతాయి.",
-        "ta": "இந்தக் கேள்விகள் உங்கள் இயற்கையான பிரகிருதி பற்றியவை. இவை ஒருமுறை மட்டுமே கேட்கப்படும் - "
-        "உங்கள் பதில்கள் எதிர்கால வருகைகள் அனைத்திற்கும் சேமிக்கப்படும்.",
-        "gu": "આ પ્રશ્નો તમારી કુદરતી પ્રકૃતિ વિશે છે. તે ફક્ત એક જ વાર પૂછવામાં આવે છે - "
-        "તમારા જવાબો ભવિષ્યની દરેક મુલાકાત માટે રાખવામાં આવે છે.",
-        "kn": "ಈ ಪ್ರಶ್ನೆಗಳು ನಿಮ್ಮ ಸಹಜ ಪ್ರಕೃತಿಯ ಬಗ್ಗೆ. ಇವು ಒಮ್ಮೆ ಮಾತ್ರ ಕೇಳಲಾಗುತ್ತವೆ - "
-        "ನಿಮ್ಮ ಉತ್ತರಗಳು ಮುಂದಿನ ಪ್ರತಿ ಭೇಟಿಗೂ ಉಳಿಸಲಾಗುತ್ತವೆ.",
-        "pa": "ਇਹ ਸਵਾਲ ਤੁਹਾਡੀ ਕੁਦਰਤੀ ਪ੍ਰਕ੍ਰਿਤੀ ਬਾਰੇ ਹਨ। ਇਹ ਸਿਰਫ਼ ਇੱਕ ਵਾਰ ਪੁੱਛੇ ਜਾਂਦੇ ਹਨ - "
-        "ਤੁਹਾਡੇ ਜਵਾਬ ਅੱਗੇ ਦੀ ਹਰ ਮੁਲਾਕਾਤ ਲਈ ਰੱਖੇ ਜਾਂਦੇ ਹਨ।",
-    },
-    "prakriti_known": {
-        "en": "Your constitution is already on record. These questions will not be asked again.",
-        "hi": "आपकी प्रकृति पहले से दर्ज है। ये प्रश्न दोबारा नहीं पूछे जाएँगे।",
-        "bn": "আপনার প্রকৃতি আগে থেকেই নথিভুক্ত আছে। এই প্রশ্নগুলি আর জিজ্ঞাসা করা হবে না।",
-        "mr": "तुमची प्रकृती आधीच नोंदवलेली आहे. हे प्रश्न पुन्हा विचारले जाणार नाहीत.",
-        "te": "మీ ప్రకృతి ఇప్పటికే నమోదైంది. ఈ ప్రశ్నలు మళ్ళీ అడగబడవు.",
-        "ta": "உங்கள் பிரகிருதி ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது. இந்தக் கேள்விகள் மீண்டும் கேட்கப்படாது.",
-        "gu": "તમારી પ્રકૃતિ પહેલેથી નોંધાયેલી છે. આ પ્રશ્નો ફરી પૂછવામાં આવશે નહીં.",
-        "kn": "ನಿಮ್ಮ ಪ್ರಕೃತಿ ಈಗಾಗಲೇ ದಾಖಲಾಗಿದೆ. ಈ ಪ್ರಶ್ನೆಗಳನ್ನು ಮತ್ತೆ ಕೇಳಲಾಗುವುದಿಲ್ಲ.",
-        "pa": "ਤੁਹਾਡੀ ਪ੍ਰਕ੍ਰਿਤੀ ਪਹਿਲਾਂ ਹੀ ਦਰਜ ਹੈ। ਇਹ ਸਵਾਲ ਦੁਬਾਰਾ ਨਹੀਂ ਪੁੱਛੇ ਜਾਣਗੇ।",
     },
     "skip": {
         "en": "Skip",
@@ -386,26 +306,13 @@ def control_for(question_id: str | None) -> dict | None:
 class KioskFlow:
     """Sequences the nine steps. Owns no clinical logic - it only decides which stage is current."""
 
-    def __init__(self, ayush_track: bool = True, prefers_ayush: bool = False) -> None:
+    def __init__(self) -> None:
         self.stage = Stage.LANGUAGE
         self.language: str | None = None
         self.abha_number: str | None = None
         self.past_visits: list[dict] = []
         self.on_behalf_of: str | None = None
-        self.ayurveda_answers: dict[str, str] = {}
-        # Prakriti is fixed for life, so it is asked once and then read back. `prakriti_record`
-        # holds either what a previous visit stored or what this visit just collected;
-        # `prakriti_previously_filled` is the patient's own answer to whether they have done it
-        # before, which is the only signal available when they have no ABHA to look up.
-        self.prakriti_answers: dict[str, str] = {}
-        self.prakriti_record: dict | None = None
-        self.prakriti_previously_filled: bool | None = None
-        self.prakriti_previous_status: str | None = None
         self.documents: list[dict] = []
-        # ayush_track runs the Dashavidha questionnaire; prefers_ayush is the patient asking to be
-        # seen by a vaidya. The first must not imply the second - see report.route.
-        self.ayush_track = ayush_track
-        self.prefers_ayush = prefers_ayush
         # Every value the encounter learns, with where it came from. Written as facts arrive
         # rather than reconstructed at the end, because the source is only knowable at the
         # moment of capture.
@@ -418,8 +325,6 @@ class KioskFlow:
         self.consent_purpose = "local_intake"
         self.restart_confirm = False
         self.registration_index = 0
-        self.prakriti_outcomes: dict[str, str] = {}
-        self.ayurveda_outcomes: dict[str, str] = {}
         self.edit_return: dict | None = None
         self.document_preview: dict | None = None
         self.withdraw_confirm = False
@@ -501,15 +406,16 @@ class KioskFlow:
         )
 
     def complete_interview(self) -> None:
+        """Hand off from the interview to documents, via the consent that gates them.
+
+        The questionnaires that used to sit between the two asked this consent on their way out.
+        Removing them must not remove the gate with them: a patient reaches the camera only after
+        being asked whether their papers may be read on this device.
+        """
+
         if self.stage is not Stage.INTERVIEW:
             raise ValueError("Not in interview")
-        self.stage = Stage.AYURVEDA if self.ayush_track else Stage.PRAKRITI
-
-    @property
-    def _previous_question_pending(self) -> bool:
-        return self.edit_target == "prakriti.previous" or (
-            self.prakriti_previous_status is None and self.prakriti_previously_filled is None
-        )
+        self._documents_permission()
 
     def registration_prompt(self, key: str) -> str:
         return t(f"registration_{key}", self.language)
@@ -682,13 +588,9 @@ class KioskFlow:
                 raise ValueError("Enter or skip identity")
             self.stage = Stage.HUB
         elif self.stage is Stage.HUB:
-            if action != "choose" or value not in {"clinical", "prakriti", "vitals"}:
+            if action != "choose" or value not in {"clinical", "vitals"}:
                 raise ValueError("Choose a service")
-            if value == "vitals":
-                self.stage = Stage.VITALS
-            else:
-                self.prefers_ayush = value == "prakriti"
-                self.stage = Stage.INTERVIEW if value == "clinical" else Stage.PRAKRITI
+            self.stage = Stage.VITALS if value == "vitals" else Stage.INTERVIEW
         elif self.stage is Stage.VITALS:
             if self.vitals_busy:
                 raise ValueError("A measurement is already running")
@@ -708,99 +610,6 @@ class KioskFlow:
                 self.stage = Stage.HUB
             else:
                 raise ValueError("Measure or skip")
-        elif self.stage in {Stage.AYURVEDA, Stage.PRAKRITI}:
-            if self.stage is Stage.PRAKRITI and self._previous_question_pending:
-                if action == "choose" and value in {"yes", "no"}:
-                    status = "answered"
-                    self.prakriti_previously_filled = value == "yes"
-                elif action in {"unknown", "skip", "refuse"}:
-                    status = "refused" if action == "refuse" else "unresolved"
-                    self.prakriti_previously_filled = None
-                else:
-                    raise ValueError("Answer previous-completion question")
-                self.prakriti_previous_status = status
-                self.record_answer(
-                    "prakriti.previous",
-                    current["headline"],
-                    str(value) if status == "answered" else "",
-                    status,
-                    value=self.prakriti_previously_filled,
-                    method=method,
-                )
-                editing = self.edit_target == "prakriti.previous"
-                self.edit_target = None
-                if editing and (
-                    self.prakriti_previously_filled is True
-                    or len(self.prakriti_outcomes) == len(prakriti.ITEMS)
-                ):
-                    self.stage = Stage.REVIEW
-                elif self.prakriti_previously_filled is True:
-                    self._documents_permission()
-                # Unknown history is not a negative answer or a verified assessment.
-                # Offer the full instrument, with unknown/refused outcomes available.
-                return None
-            is_prakriti = self.stage is Stage.PRAKRITI
-            outcomes = self.prakriti_outcomes if is_prakriti else self.ayurveda_outcomes
-            items = prakriti.ITEMS if is_prakriti else ayurveda.QUESTIONS
-            item = (
-                next((i for i in items if i.id == self.edit_target), None)
-                if self.edit_target
-                else next((i for i in items if i.id not in outcomes), None)
-            )
-            if item is None:
-                raise ValueError("Questionnaire is complete")
-            status = "answered"
-            if action in {"skip", "unknown", "refuse"}:
-                status = "refused" if action == "refuse" else "unresolved"
-            elif action != "choose" or value not in {
-                o["value"] for o in current.get("options", [])
-            }:
-                raise ValueError("Choose a current option")
-            outcomes[item.id] = status
-            answers = self.prakriti_answers if is_prakriti else self.ayurveda_answers
-            for entry in self.ledger.entries:
-                if entry.key == item.id and entry.superseded_by is None:
-                    entry.superseded_by = f"answer:{len(self.answers) + 1}"
-            if status == "answered":
-                answers[item.id] = value
-                self.ledger.record(
-                    item.id, value, Source.QUESTIONNAIRE, evidence=current["headline"]
-                )
-            else:
-                answers.pop(item.id, None)
-            self.record_answer(
-                item.id,
-                current["headline"],
-                str(value) if status == "answered" else "",
-                status,
-                value=value,
-                method=method,
-            )
-            editing = self.edit_target is not None
-            if len(outcomes) == len(items):
-                if is_prakriti:
-                    if all(s == "answered" for s in outcomes.values()):
-                        self.prakriti_record = {
-                            **prakriti.summarize(self.prakriti_answers),
-                            "complete": True,
-                        }
-                    else:
-                        self.prakriti_record = {"complete": False, "prakriti": None}
-                    self.prakriti_record.update(
-                        {
-                            "answers": self.prakriti_answers.copy(),
-                            "outcomes": outcomes.copy(),
-                            "instrument_version": "58-entry-68-screen",
-                            "scoring_reviewed": False,
-                            "reported_by": self.on_behalf_of or "self",
-                        }
-                    )
-                    self._documents_permission()
-                else:
-                    self.stage = Stage.PRAKRITI
-            if editing:
-                self.edit_target = None
-                self.stage = Stage.REVIEW
         elif self.stage is Stage.DOCUMENTS:
             if self.document_preview is not None:
                 raise ValueError("Keep, discard, or retake the current preview first")
@@ -825,15 +634,6 @@ class KioskFlow:
                     )
                     self.stage = Stage.REGISTRATION
                     return None
-                if self.edit_target in {i.id for i in prakriti.ITEMS}:
-                    self.stage = Stage.PRAKRITI
-                    return None
-                if self.edit_target in ayurveda.BY_ID:
-                    self.stage = Stage.AYURVEDA
-                    return None
-                if self.edit_target == "prakriti.previous":
-                    self.stage = Stage.PRAKRITI
-                    return None
                 return "edit"
             raise ValueError("Review before saving")
         elif self.stage is Stage.FINALIZING and action in {"confirm", "next"}:
@@ -851,10 +651,6 @@ class KioskFlow:
             return self.stage
         position = ORDER.index(self.stage)
         self.stage = ORDER[position + 1]
-        if self.stage is Stage.AYURVEDA and not self.ayush_track:
-            self.stage = Stage.PRAKRITI
-        if self.stage is Stage.PRAKRITI and not self.needs_prakriti:
-            self.stage = Stage.DOCUMENTS
         return self.stage
 
     def back(self) -> Stage:
@@ -864,11 +660,6 @@ class KioskFlow:
             return self.stage
         position = ORDER.index(self.stage)
         target = ORDER[position - 1]
-        if target is Stage.PRAKRITI and not self.needs_prakriti:
-            target = ORDER[position - 2]
-            position -= 1
-        if target is Stage.AYURVEDA and not self.ayush_track:
-            target = ORDER[position - 2]
         self.stage = target
         # Clear what the stage being re-entered is about to ask for again, so going back actually
         # undoes the answer instead of skipping straight past it.
@@ -876,10 +667,6 @@ class KioskFlow:
             self.abha_number, self.past_visits = None, []
         elif target is Stage.WHO:
             self.on_behalf_of = None
-        elif target is Stage.AYURVEDA and self.ayurveda_answers:
-            self.ayurveda_answers.pop(list(self.ayurveda_answers)[-1], None)
-        elif target is Stage.PRAKRITI and self.prakriti_answers:
-            self.prakriti_answers.pop(list(self.prakriti_answers)[-1], None)
         return self.stage
 
     def raise_emergency(self) -> Stage:
@@ -907,8 +694,6 @@ class KioskFlow:
                 Stage.ABHA: ["answer", "scan", "skip"],
                 Stage.VITALS: [] if self.vitals_busy else ["measure", "skip"],
                 Stage.INTERVIEW: ["answer", "unknown", "refuse", "cancel"],
-                Stage.AYURVEDA: ["unknown", "refuse"],
-                Stage.PRAKRITI: ["unknown", "refuse"],
                 Stage.DOCUMENTS: ["keep", "retake", "discard"]
                 if self.document_preview
                 else ["scan", "done"],
@@ -1008,7 +793,6 @@ class KioskFlow:
                 "headline": t("hub", self.language),
                 "options": [
                     {"value": "clinical", "label": t("hub_clinical", self.language)},
-                    {"value": "prakriti", "label": t("hub_prakriti", self.language)},
                     {"value": "vitals", "label": t("hub_vitals", self.language)},
                 ],
             }
@@ -1097,74 +881,6 @@ class KioskFlow:
             # ordering and language. Duplicating it here would create a second source of truth.
             return {"stage": self.stage.value, "input": "voice"}
 
-        if self.stage is Stage.AYURVEDA:
-            question = (
-                ayurveda.BY_ID.get(self.edit_target)
-                if self.edit_target
-                else next(
-                    (q for q in ayurveda.QUESTIONS if q.id not in self.ayurveda_outcomes), None
-                )
-            )
-            if question is None:
-                return {"stage": self.stage.value, "input": "touch", "complete": True}
-            return {
-                "stage": self.stage.value,
-                "input": "touch",
-                "question_id": question.id,
-                "parameter": question.parameter,
-                "headline": question.text_for(self.language),
-                "options": question.options_for(self.language),
-                "progress": [
-                    next(i for i, q in enumerate(ayurveda.QUESTIONS, 1) if q.id == question.id),
-                    len(ayurveda.QUESTIONS),
-                ],
-            }
-
-        if self.stage is Stage.PRAKRITI:
-            # Three states: never asked whether they have filled it, told us they have not (so we
-            # ask the questions), and finished. A patient who says they have filled it before is
-            # believed - the record is somewhere the kiosk cannot reach, and making them answer
-            # 46 questions to prove otherwise is worse than a vaidya asking them.
-            if self._previous_question_pending:
-                return {
-                    "stage": self.stage.value,
-                    "input": "touch",
-                    "gate": True,
-                    "headline": text("prakriti_ask", self.language),
-                    "options": [
-                        {
-                            "value": "yes",
-                            "label": text("prakriti_yes", self.language),
-                            "icon": "check",
-                        },
-                        {
-                            "value": "no",
-                            "label": text("prakriti_no", self.language),
-                            "icon": "cross",
-                        },
-                    ],
-                }
-            item = (
-                next((q for q in prakriti.ITEMS if q.id == self.edit_target), None)
-                if self.edit_target
-                else next((q for q in prakriti.ITEMS if q.id not in self.prakriti_outcomes), None)
-            )
-            if item is None:
-                return {"stage": self.stage.value, "input": "touch", "complete": True}
-            return {
-                "stage": self.stage.value,
-                "input": "touch",
-                "question_id": item.id,
-                "parameter": item.section,
-                "intro": text("prakriti_intro", self.language),
-                "headline": item.text_for(self.language),
-                "options": item.options_for(self.language),
-                "progress": [
-                    next(i for i, q in enumerate(prakriti.ITEMS, 1) if q.id == item.id),
-                    len(prakriti.ITEMS),
-                ],
-            }
-
         if self.stage is Stage.DOCUMENTS:
             if self.document_preview is not None:
                 return {
@@ -1229,96 +945,6 @@ class KioskFlow:
 
         return Source.REPRESENTATIVE_REPORTED if self.on_behalf_of else Source.PATIENT_REPORTED
 
-    def answer_ayurveda(self, question_id: str, value: str) -> bool:
-        """Record one questionnaire answer. Returns True when the questionnaire is finished."""
-
-        question = ayurveda.BY_ID.get(question_id)
-        if question is None:
-            raise ValueError(f"unknown ayurveda question: {question_id}")
-        if value not in {option.value for option in question.options}:
-            raise ValueError(f"unknown option {value!r} for {question_id}")
-        self.ayurveda_answers[question_id] = value
-        self.ledger.record(
-            f"dashavidha.{question.parameter}",
-            value,
-            Source.QUESTIONNAIRE,
-            evidence=question.text_for(self.language),
-        )
-        if ayurveda.next_question(self.ayurveda_answers) is None:
-            self.advance()
-            return True
-        return False
-
-    @property
-    def needs_prakriti(self) -> bool:
-        """Whether this patient still has to answer the Prakriti questionnaire.
-
-        A record loaded from a previous visit settles it, and so does the patient saying they have
-        filled it before. Otherwise it is asked - which is what makes it mandatory for anyone who
-        has not done it.
-        """
-
-        if self.prakriti_record is not None:
-            return False
-        return self.prakriti_previously_filled is not True
-
-    def load_prakriti(self, record: dict | None) -> None:
-        """Attach the Prakriti stored for this patient's ABHA, if a previous visit recorded one."""
-
-        if not record:
-            return
-        self.prakriti_record = record
-        self.prakriti_previously_filled = True
-        self.ledger.record(
-            "prakriti",
-            str(record.get("prakriti") or "recorded"),
-            Source.ABHA,
-            evidence=f"recorded {record.get('recorded_at', 'previously')}",
-        )
-
-    def answer_prakriti_gate(self, answer: str) -> bool:
-        """Record whether the patient has filled the questionnaire before.
-
-        Returns True when the stage is done (they have), False when the questions now follow.
-        """
-
-        if answer not in {"yes", "no"}:
-            raise ValueError(f"unknown prakriti gate answer: {answer!r}")
-        self.prakriti_previously_filled = answer == "yes"
-        if self.prakriti_previously_filled:
-            self.ledger.record(
-                "prakriti",
-                "filled previously, not on this kiosk",
-                self.spoken_source,
-                evidence=text("prakriti_ask", self.language),
-            )
-            self.advance()
-            return True
-        return False
-
-    def answer_prakriti(self, item_id: str, value: str) -> bool:
-        """Record one Prakriti answer. Returns True when the questionnaire is finished."""
-
-        item = prakriti.validate(item_id, value)
-        self.prakriti_answers[item_id] = value
-        self.ledger.record(
-            f"prakriti.{item.section}",
-            value,
-            Source.QUESTIONNAIRE,
-            evidence=item.text_for(self.language),
-        )
-        if prakriti.next_item(self.prakriti_answers) is None:
-            self.prakriti_record = prakriti.summarize(self.prakriti_answers)
-            self.ledger.record(
-                "prakriti",
-                str(self.prakriti_record.get("prakriti") or "insufficient answers"),
-                Source.QUESTIONNAIRE,
-                evidence="Ayush Prakriti questionnaire, 58 items",
-            )
-            self.advance()
-            return True
-        return False
-
     def add_document(
         self,
         lines: list[str],
@@ -1363,17 +989,10 @@ class KioskFlow:
         self.report = report_module.build(
             state=state,
             red_flags=red_flags,
-            ayurveda=(
-                ayurveda.summarize(self.ayurveda_answers, state.age_years)
-                if self.ayurveda_answers
-                else None
-            ),
-            prakriti=self.prakriti_record,
             documents=self.documents,
             abha_number=self.abha_number,
             on_behalf_of=self.on_behalf_of,
             past_visits=self.past_visits,
-            prefers_ayush=self.prefers_ayush,
             ledger=self.ledger,
         )
         self.report.update(
@@ -1383,15 +1002,6 @@ class KioskFlow:
                     [a for a in self.answers if not a.get("superseded")]
                 ),
                 "answer_history": copy.deepcopy(self.answers),
-                "questionnaire_outcomes": {
-                    "ayurveda": self.ayurveda_outcomes.copy(),
-                    "prakriti": self.prakriti_outcomes.copy(),
-                },
-                "previous_prakriti": {
-                    "self_reported": self.prakriti_previously_filled,
-                    "status": self.prakriti_previous_status or "not_asked",
-                    "record_verified": False,
-                },
             }
         )
         return self.report

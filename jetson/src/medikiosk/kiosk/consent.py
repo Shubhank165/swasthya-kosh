@@ -12,7 +12,6 @@ PURPOSES = (
     "local_intake",
     "local_documents",
     "history_linkage",
-    "lifetime_prakriti",
     "cloud_intake",
     "cloud_documents",
 )

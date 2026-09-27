@@ -17,7 +17,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from medikiosk.clinical.translations import PROMPT_TEXT, QUESTION_TEXT
-from medikiosk.kiosk import ayurveda, prakriti
 from medikiosk.kiosk.flow import SCREEN_TEXT
 from medikiosk.languages import LANGUAGES
 
@@ -58,19 +57,6 @@ def spoken_prompts() -> list[Prompt]:
         for key, table in PROMPT_TEXT.items():
             if language in table:
                 add(language, table[language], language, f"prompt:{key}")
-        for question in ayurveda.QUESTIONS:
-            if language in question.text:
-                add(language, question.text[language], language, f"ayurveda:{question.id}")
-        # Prakriti is printed on the CCRAS form in English and Hindi only, so every other language
-        # is rendered from the English wording in the English voice - same rule as screen text.
-        for item in prakriti.ITEMS:
-            translated = language == "hi"
-            add(
-                language,
-                item.hi if translated else item.en,
-                language if translated else "en",
-                f"prakriti:{item.id}",
-            )
         for key, table in SCREEN_TEXT.items():
             # Untranslated screen text falls back to English wording, so it gets the English voice.
             translated = language in table

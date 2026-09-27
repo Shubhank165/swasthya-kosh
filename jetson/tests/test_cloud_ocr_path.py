@@ -41,9 +41,7 @@ def capture(monkeypatch):
 
 
 def documents(driver):
-    driver.reach_service()
-    driver.act("choose", "yes")
-    driver.act("choose", "yes")
+    driver.reach_documents()
     assert driver.screen["stage"] == "documents"
 
 
