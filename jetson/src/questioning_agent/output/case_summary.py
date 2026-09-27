@@ -86,7 +86,7 @@ def build(state: PatientState, slots: SlotRegistry) -> CaseSummary:
     if state.chief_complaint:
         order.append(state.chief_complaint)
     order.extend(d for d in state.active_domains if d not in order)
-    order.extend(d for d in ("general", "ayush") if d in by_domain and d not in order)
+    order.extend(d for d in ("general", "lifestyle") if d in by_domain and d not in order)
     order.extend(d for d in sorted(by_domain) if d not in order)
 
     sections = tuple(

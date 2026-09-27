@@ -168,10 +168,10 @@ def _load_slots(path: Path, domains: dict[str, Domain]) -> dict[str, Information
             )
 
     # 3. The flat sections. Their ids are already fully qualified, and the
-    #    domain is the prefix — `general`, `ayush`, `assessment`.
+    #    domain is the prefix — `general`, `lifestyle`, `assessment`.
     for section, observable in (
         ("general", True),
-        ("ayush", True),
+        ("lifestyle", True),
         ("clinician_assessed", False),
     ):
         for entry in body.get(section) or []:
