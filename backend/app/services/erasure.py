@@ -54,6 +54,7 @@ from app.core.clock import Clock
 from app.core.logging import get_logger
 from app.domain.record import PatientRef, PatientRefType
 from app.models.clinical import (
+    CareOrderRecord,
     ClinicalFactRecord,
     ClinicalTimeline,
     ConsentArtefact,
@@ -81,6 +82,7 @@ _IntakeScoped = (
     type[ClinicalFactRecord]
     | type[ClinicalTimeline]
     | type[DocumentRecordRow]
+    | type[CareOrderRecord]
     | type[RedFlagEventRecord]
     | type[ReportRecord]
 )
@@ -97,6 +99,10 @@ class ErasureResult:
     documents: int = 0
     document_objects: int = 0
     reports: int = 0
+    #: Lab, imaging, referral and prescription orders issued on those
+    #: intakes. A referral naming a patient outlives the intake it came
+    #: from unless it is deleted with it.
+    care_orders: int = 0
     timelines: int = 0
     red_flags: int = 0
     consent_artefacts: int = 0
@@ -119,6 +125,7 @@ class ErasureResult:
             "documents": self.documents,
             "document_objects": self.document_objects,
             "reports": self.reports,
+            "care_orders": self.care_orders,
             "timelines": self.timelines,
             "red_flags": self.red_flags,
             "consent_artefacts": self.consent_artefacts,
@@ -263,6 +270,7 @@ class ErasureService:
         red_flags = await self._delete_by_intake(
             RedFlagEventRecord, intake_ids, hospital_id
         )
+        orders = await self._delete_by_intake(CareOrderRecord, intake_ids, hospital_id)
         reports = await self._delete_by_intake(ReportRecord, intake_ids, hospital_id)
         timelines = await self._delete_by_intake(
             ClinicalTimeline, intake_ids, hospital_id
@@ -295,6 +303,7 @@ class ErasureService:
             documents=documents,
             document_objects=deleted_objects,
             reports=reports,
+            care_orders=orders,
             timelines=timelines,
             red_flags=red_flags,
             consent_artefacts=consents,
@@ -353,6 +362,7 @@ class ErasureService:
             documents=result.documents,
             document_objects=result.document_objects,
             reports=result.reports,
+            care_orders=result.care_orders,
             timelines=result.timelines,
             red_flags=result.red_flags,
             consent_artefacts=result.consent_artefacts,

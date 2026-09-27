@@ -84,6 +84,19 @@ EXPECTED: dict[tuple[str, str], set[Role]] = {
     ("GET", "/api/v1/intakes/{intake_id}/documents"): {Role.STAFF},
     ("GET", "/api/v1/documents/content/{key:path}"): {Role.STAFF},
     ("GET", "/api/v1/patients/{ref}/history"): {Role.STAFF},
+    # Issuing an order is a physician's act, recorded against their id, for the
+    # same reason verification is: an order nobody signed is an order nobody
+    # owns. Reading them back is staff work — a nurse walking a patient to
+    # radiology needs to see the slot.
+    ("POST", "/api/v1/intakes/{intake_id}/orders"): {Role.PHYSICIAN},
+    ("GET", "/api/v1/intakes/{intake_id}/orders"): {Role.STAFF},
+    # Stock and queue position carry no clinical content: a medicine name and
+    # a count, a position and a number of minutes. Staff, like the worklist.
+    ("GET", "/api/v1/pharmacy/alerts"): {Role.STAFF},
+    ("GET", "/api/v1/intakes/{intake_id}/wait"): {Role.STAFF},
+    # The operations view is aggregate across every department, which is a
+    # wider read than any one clinician needs. Admin.
+    ("GET", "/api/v1/operations"): {Role.ADMIN},
     ("GET", "/api/v1/worklist"): {Role.STAFF},
     ("GET", "/api/v1/alerts"): {Role.STAFF},
     ("POST", "/api/v1/alerts/{intake_id}/acknowledge"): {Role.STAFF},

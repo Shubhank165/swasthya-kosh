@@ -709,6 +709,89 @@ class PatientSession(Base, TimestampMixin):
 #:
 #: Two kinds of thing qualify, and the distinction matters:
 #:
+class CareOrderRecord(Base, TimestampMixin):
+    """What the doctor asked for after the consultation.
+
+    Four acts that used to leave the building as paper: a lab test, a scan, a
+    referral, a prescription. Each one is a row so it can be followed, and so a
+    referral can carry a booked slot rather than an instruction to go and ask.
+
+    `status` is `requested` when this system creates it and is only ever moved
+    by something telling it what happened. A status this system invented would
+    be a claim about the world it cannot check.
+    """
+
+    __tablename__ = "care_orders"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    hospital_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    intake_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("intakes.id"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    #: The coded thing asked for, and how to show it. Both, because a code
+    #: nobody can read is not a handover and a label nobody can resolve is not
+    #: a record.
+    code: Mapped[str] = mapped_column(String(128), nullable=False)
+    display: Mapped[str] = mapped_column(String(256), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    #: Where it goes: a department for a referral, a modality for a scan, the
+    #: pharmacy for a prescription.
+    destination: Mapped[str | None] = mapped_column(String(64), index=True)
+    slot_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    slot_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    #: Who issued it. Orders are acts by a named person, like verification.
+    ordered_by: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    note: Mapped[str | None] = mapped_column(Text)
+
+
+class ServiceSlotRecord(Base, TimestampMixin):
+    """Declared capacity at a destination.
+
+    Not a booking engine and not a calendar. It exists so a referral can name a
+    time the receiving department has actually said it has, instead of sending
+    a patient across a hospital to find out.
+
+    `booked` is a counter this system increments when it fills a slot. It does
+    not reconcile against the destination's own diary, which remains the system
+    of record for whether the appointment is real.
+    """
+
+    __tablename__ = "service_slots"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    hospital_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    destination: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    starts_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, index=True)
+    capacity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    booked: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class PharmacyStockRecord(Base, TimestampMixin):
+    """What the pharmacy says it holds, so a prescription can check.
+
+    A count and an expiry date. Deliberately not goods receipt, batch tracking,
+    consumption reconciliation or reorder workflow — the hospital's pharmacy
+    system is the system of record, and a second one that disagrees with it is
+    worse than none. This answers one question at one moment: is the thing
+    being prescribed on the shelf today.
+    """
+
+    __tablename__ = "pharmacy_stock"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    hospital_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    display: Mapped[str] = mapped_column(String(256), nullable=False)
+    on_hand: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    reorder_level: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    expires_on: Mapped[date | None] = mapped_column(Date)
+
+    __table_args__ = (
+        UniqueConstraint("hospital_id", "code", name="uq_pharmacy_stock_hospital_code"),
+    )
+
+
 #: - **Reference data and the tenant list.** `hospitals` is the tenant list
 #:   itself; the terminology tables are code systems, which no hospital owns.
 #: - **Patient identity, which belongs to the patient.** A person signs into

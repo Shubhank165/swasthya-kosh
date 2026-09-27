@@ -47,6 +47,7 @@ from app.repositories.patients import (
 )
 from app.repositories.terminology import TerminologyRepository
 from app.repositories.timelines import TimelineRepository
+from app.services.coordination import CoordinationService
 from app.services.documents import DocumentService
 from app.services.erasure import ErasureService
 from app.services.identity import IdentityService
@@ -306,6 +307,17 @@ async def get_identity_service(
     )
 
 
+async def get_coordination_service(
+    session: SessionDep,
+    clock: ClockDep,
+    ids: IdsDep,
+    hospital_id: TenantDep,
+) -> CoordinationService:
+    return CoordinationService(
+        session=session, clock=clock, ids=ids, hospital_id=hospital_id
+    )
+
+
 async def get_worklist_service(
     session: SessionDep,
     content: ContentDep,
@@ -358,6 +370,9 @@ PatientProfileServiceDep = Annotated[
 ]
 ErasureServiceDep = Annotated[ErasureService, Depends(get_erasure_service)]
 WorklistServiceDep = Annotated[WorklistService, Depends(get_worklist_service)]
+CoordinationServiceDep = Annotated[
+    CoordinationService, Depends(get_coordination_service)
+]
 TerminologyServiceDep = Annotated[TerminologyService, Depends(get_terminology_service)]
 ConsentRepoDep = Annotated[ConsentRepository, Depends(get_consent_repository)]
 AuditRepoDep = Annotated[AuditRepository, Depends(get_audit_repository)]

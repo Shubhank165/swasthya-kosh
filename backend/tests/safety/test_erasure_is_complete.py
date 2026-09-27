@@ -24,6 +24,7 @@ from app.core.clock import FrozenClock
 from app.domain.record import PatientRef, PatientRefType
 from app.models import Base
 from app.models.clinical import (
+    CareOrderRecord,
     ClinicalFactRecord,
     ClinicalTimeline,
     ConsentArtefact,
@@ -44,6 +45,7 @@ NOW = datetime(2026, 9, 16, 9, 0, tzinfo=UTC)
 
 #: Tables `ErasureService` empties for the patient it is erasing.
 ERASED = {
+    CareOrderRecord.__tablename__,
     PatientProfileRecord.__tablename__,
     ClinicalFactRecord.__tablename__,
     ClinicalTimeline.__tablename__,
@@ -61,6 +63,17 @@ ERASED = {
 #: belongs here only when keeping it cannot reconstruct the patient's history.
 KEPT: dict[str, str] = {
     "hospitals": "the facility itself, which is not anybody's record",
+    "service_slots": (
+        "declared capacity at a department: a time and a count of places. A "
+        "slot survives an erasure with its booked counter intact, which is "
+        "correct — the appointment was real and the department planned around "
+        "it. No row here names a patient or points at an intake."
+    ),
+    "pharmacy_stock": (
+        "what the pharmacy holds: a medicine, a count and an expiry date. It "
+        "describes a shelf, not a person, and is identical whichever patients "
+        "the hospital has seen."
+    ),
     "terminology_concepts": "NAMASTE and ICD-11 reference data, the same for every patient",
     "terminology_mappings": "NAMASTE and ICD-11 reference data, the same for every patient",
     "alembic_version": "schema bookkeeping, which holds one migration id and nothing else",
@@ -226,6 +239,8 @@ class TestTheAuditRowSurvives:
             "documents",
             "document_objects",
             "reports",
+            # A count of orders deleted. Not what was ordered — a number.
+            "care_orders",
             "timelines",
             "red_flags",
             "consent_artefacts",

@@ -8,7 +8,7 @@ what stops a screenshot from claiming something the system did not do.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -572,3 +572,87 @@ class HospitalOut(ApiModel):
 
 class HospitalListResponse(ApiModel):
     hospitals: list[HospitalOut] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------- coordination
+
+
+class CareOrderOut(ApiModel):
+    """One thing the doctor asked for, and whether it has a time."""
+
+    id: str
+    intake_id: str
+    kind: str
+    code: str
+    display: str
+    status: str
+    destination: str | None = None
+    slot_at: datetime | None = None
+    ordered_by: str
+    note: str | None = None
+    created_at: datetime
+
+
+class CareOrderRequest(ApiModel):
+    """Issue one order.
+
+    `intake_id` is in the path and the hospital comes from the principal, so a
+    body cannot name either. Decision 21's rule, applied here.
+    """
+
+    kind: str
+    code: str
+    display: str
+    destination: str | None = None
+    note: str | None = None
+
+
+class CareOrderListOut(ApiModel):
+    intake_id: str
+    orders: tuple[CareOrderOut, ...] = ()
+
+
+class StockAlertOut(ApiModel):
+    """One item a pharmacist should see before the patient arrives."""
+
+    code: str
+    display: str
+    on_hand: int
+    reorder_level: int
+    expires_on: date | None = None
+    state: str
+
+
+class StockAlertListOut(ApiModel):
+    generated_at: datetime
+    alerts: tuple[StockAlertOut, ...] = ()
+
+
+class WaitEstimateOut(ApiModel):
+    """Position, and a time only when the data supports one.
+
+    `minutes` is null and `confident` false when the department has not seen
+    enough patients today to average over. A waiting room told a number that
+    turns out to be wrong stops believing the screen.
+    """
+
+    intake_id: str
+    position: int
+    ahead: int
+    minutes: int | None = None
+    confident: bool
+
+
+class DepartmentLoadOut(ApiModel):
+    department_code: str
+    waiting: int
+    flagged: int
+    longest_wait_minutes: int
+    unfilled_orders: int
+
+
+class OperationsOut(ApiModel):
+    """Where the time is going. Counted, never modelled."""
+
+    generated_at: datetime
+    departments: tuple[DepartmentLoadOut, ...] = ()
