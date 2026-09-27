@@ -1,10 +1,9 @@
 """The worklist and red-flag acknowledgement — §8.4.
 
-Ordering is arrival time. A fired red-flag criterion raises an alert and pulls
-the row into `pending_alerts`; it does **not** move the intake up the list.
-Reordering a waiting room on a machine's reading of a symptom is a triage
-decision, and this system does not make triage decisions — a person acknowledges
-the alert and decides what happens next.
+Ordering is priority class, then arrival. A fired red-flag criterion raises an
+alert, pulls the row into `pending_alerts`, **and** moves the intake up the
+list — decision 77, which reversed the rule this docstring used to state. The
+rules live in `domain/queue/priority.py`; nothing here decides anything.
 """
 
 from __future__ import annotations
@@ -219,10 +218,17 @@ class WorklistService:
     ) -> dict[str, object]:
         """A human acknowledges a red-flag event.
 
-        Acknowledgement is a record of a person having looked. It does not
-        escalate anything, reorder anything or notify anything automatically —
-        what the acknowledging clinician does next is their decision, made
-        outside this system.
+        Acknowledgement is a record of a person having looked, and since
+        decision 77 it is also the release valve on the fast lane: an
+        unacknowledged event is what holds an intake at the front, so
+        acknowledging one returns it to arrival order. That is the intended
+        direction — once a human has seen the flag, the software stops
+        deciding for them, and a false positive cannot hold the top of the
+        list indefinitely.
+
+        It still escalates nothing and notifies nothing automatically. What
+        the acknowledging clinician does next is their decision, made outside
+        this system.
 
         Re-acknowledging is a conflict rather than a silent no-op: two people
         each believing the other has seen it is the failure mode worth being
