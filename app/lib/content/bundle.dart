@@ -268,8 +268,8 @@ class ContentBundle {
     required this.sections,
     required this.core,
     required this.branches,
-    required this.ayurveda,
-    this.ayurvedaCurrentState = const [],
+    required this.lifestyle,
+    this.lifestyleCurrentState = const [],
     required this.questions,
     required this.redFlagRules,
   });
@@ -291,8 +291,8 @@ class ContentBundle {
         for (final entry in (json['branches'] as Map<String, dynamic>? ?? {}).entries)
           entry.key: (entry.value as List<dynamic>).map((v) => v.toString()).toList(),
       },
-      ayurveda: (json['ayurveda'] as List<dynamic>? ?? []).map((v) => v.toString()).toList(),
-      ayurvedaCurrentState: (json['ayurveda_current_state'] as List<dynamic>? ?? [])
+      lifestyle: (json['lifestyle'] as List<dynamic>? ?? []).map((v) => v.toString()).toList(),
+      lifestyleCurrentState: (json['lifestyle_current_state'] as List<dynamic>? ?? [])
           .map((v) => v.toString())
           .toList(),
       questions: questions,
@@ -316,15 +316,15 @@ class ContentBundle {
 
   /// Chief-complaint value to the question ids that complaint adds.
   final Map<String, List<String>> branches;
-  final List<String> ayurveda;
+  final List<String> lifestyle;
 
-  /// The Ayurveda questions a returning patient is asked again — §5 screen 8.
+  /// The Lifestyle questions a returning patient is asked again — §5 screen 8.
   ///
   /// Empty on a bundle from a backend that predates the field, which is why the
   /// walker treats empty as "ask the full set": a returning patient answering
   /// nine questions instead of three is slower, and a returning patient
   /// answering none of them loses Agni, Nidra and Koshtha for today.
-  final List<String> ayurvedaCurrentState;
+  final List<String> lifestyleCurrentState;
   final Map<String, Question> questions;
   final List<RedFlagRule> redFlagRules;
 

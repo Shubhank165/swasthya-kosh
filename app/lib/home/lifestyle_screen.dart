@@ -1,4 +1,4 @@
-/// The Ayurveda self-report — review items 3/4.
+/// The Lifestyle self-report — review items 3/4.
 ///
 /// This used to be "Section 4": the last few questions of every symptom
 /// intake, asked whether or not the patient wanted them, on top of whatever
@@ -13,13 +13,13 @@
 /// ever shown here. **This is deliberately not a Prakriti assessment.**
 /// Prakriti determination is a clinical act performed by the Vaidya through
 /// observation and examination; a kiosk cannot do it, and showing a patient a
-/// computed "type" would be exactly the overreach `ayurveda_module.yaml`
+/// computed "type" would be exactly the overreach `lifestyle_module.yaml`
 /// already warns against. What this screen collects is handed to the Vaidya
 /// as the patient's own words, the same as every other self-report in this
 /// app.
 ///
 /// **Storage, for now.** These answers are saved on the device only, under a
-/// fixed id (`_ayushProfileId`) in the same encrypted local store a visit's
+/// fixed id (`_lifestyleProfileId`) in the same encrypted local store a visit's
 /// draft uses — never queued, never submitted, never purged by
 /// `LocalDatabase.purgeIntake` (that only ever runs against a real intake's
 /// id). Getting them into the record the Vaidya actually opens needs a
@@ -51,16 +51,16 @@ import '../storage/database.dart';
 /// intake's id. Versioned so a future change to the module's questions can
 /// tell an old saved profile apart from a current one (`contentVersion`
 /// already does this for real drafts; the same check applies here).
-const _ayushProfileId = 'ayush_profile_v1';
+const _lifestyleProfileId = 'lifestyle_profile_v1';
 
-class AyushScreen extends ConsumerStatefulWidget {
-  const AyushScreen({super.key});
+class LifestyleScreen extends ConsumerStatefulWidget {
+  const LifestyleScreen({super.key});
 
   @override
-  ConsumerState<AyushScreen> createState() => _AyushScreenState();
+  ConsumerState<LifestyleScreen> createState() => _LifestyleScreenState();
 }
 
-class _AyushScreenState extends ConsumerState<AyushScreen> {
+class _LifestyleScreenState extends ConsumerState<LifestyleScreen> {
   bool _loading = true;
   Draft? _existing;
   bool _redoing = false;
@@ -76,7 +76,7 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
 
   Future<void> _loadExisting() async {
     final db = await ref.read(databaseProvider.future);
-    final draft = await db.draftFor(_ayushProfileId);
+    final draft = await db.draftFor(_lifestyleProfileId);
     if (!mounted) return;
     setState(() {
       _existing = draft;
@@ -89,17 +89,17 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
     final strings = Strings.of(context);
     final bundle = ref.watch(currentBundleProvider);
     final language = ref.watch(languageProvider);
-    final ids = bundle?.ayurveda ?? const <String>[];
+    final ids = bundle?.lifestyle ?? const <String>[];
 
     if (bundle == null || ids.isEmpty) {
-      // No content yet, or this build carries no Ayurveda module at all — the
+      // No content yet, or this build carries no Lifestyle module at all — the
       // same honest placeholder this screen showed before the module existed.
       return _placeholder(context, strings);
     }
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: Text(strings.ayushTitle)),
+        appBar: AppBar(title: Text(strings.lifestyleTitle)),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -115,7 +115,7 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
     final question = bundle.questions[ids[_index]]!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(strings.ayushProgress(_index + 1, ids.length)),
+        title: Text(strings.lifestyleProgress(_index + 1, ids.length)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -124,9 +124,9 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_index == 0) ...[
-                Text(strings.ayurvedaTitle, style: Theme.of(context).textTheme.titleLarge),
+                Text(strings.lifestyleSubtitle, style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: Sizes.gap),
-                Text(strings.ayushIntro, style: Theme.of(context).textTheme.bodyMedium),
+                Text(strings.lifestyleIntro, style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: Sizes.gutter),
                 const Divider(),
                 const SizedBox(height: Sizes.gap),
@@ -179,7 +179,7 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
       language: language,
     );
     final bundle = ref.read(currentBundleProvider)!;
-    final atEnd = _index + 1 >= bundle.ayurveda.length;
+    final atEnd = _index + 1 >= bundle.lifestyle.length;
     setState(() => _index++);
     if (atEnd) {
       unawaited(_save(bundle, language));
@@ -190,7 +190,7 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
     final db = await ref.read(databaseProvider.future);
     final now = DateTime.now();
     await db.saveDraft(DraftsCompanion.insert(
-      intakeId: _ayushProfileId,
+      intakeId: _lifestyleProfileId,
       // Not a hospital visit — there is no hospital to name.
       hospitalId: '',
       language: language,
@@ -203,14 +203,14 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
       updatedAt: now,
       // Never actually submitted, so never actually retried — a fixed value
       // is fine where a real intake needs a fresh one per attempt (§9).
-      idempotencyKey: _ayushProfileId,
+      idempotencyKey: _lifestyleProfileId,
     ));
     if (!mounted) return;
     setState(() => _finished = true);
   }
 
   Widget _placeholder(BuildContext context, Strings strings) => Scaffold(
-        appBar: AppBar(title: Text(strings.ayushTitle)),
+        appBar: AppBar(title: Text(strings.lifestyleTitle)),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(Sizes.gutter),
@@ -226,7 +226,7 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
                 const SizedBox(height: Sizes.gutter),
                 Text(
                   strings.notAvailableYet,
-                  key: const Key('ayush.notAvailable'),
+                  key: const Key('lifestyle.notAvailable'),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
@@ -237,7 +237,7 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
       );
 
   Widget _completed(BuildContext context, Strings strings) => Scaffold(
-        appBar: AppBar(title: Text(strings.ayushTitle)),
+        appBar: AppBar(title: Text(strings.lifestyleTitle)),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(Sizes.gutter),
@@ -252,26 +252,26 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
                 ),
                 const SizedBox(height: Sizes.gutter),
                 Text(
-                  strings.ayushCompletedTitle,
+                  strings.lifestyleCompletedTitle,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: Sizes.gap),
                 Text(
-                  strings.ayushCompletedBody,
+                  strings.lifestyleCompletedBody,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: Sizes.gutter),
                 OutlinedButton(
-                  key: const Key('ayush.redo'),
+                  key: const Key('lifestyle.redo'),
                   onPressed: () => setState(() {
                     _redoing = true;
                     _finished = false;
                     _index = 0;
                     _answers.clear();
                   }),
-                  child: Text(strings.ayushRedo),
+                  child: Text(strings.lifestyleRedo),
                 ),
               ],
             ),
@@ -280,7 +280,7 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
       );
 
   Widget _thanks(BuildContext context, Strings strings) => Scaffold(
-        appBar: AppBar(title: Text(strings.ayushTitle)),
+        appBar: AppBar(title: Text(strings.lifestyleTitle)),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(Sizes.gutter),
@@ -295,13 +295,13 @@ class _AyushScreenState extends ConsumerState<AyushScreen> {
                 ),
                 const SizedBox(height: Sizes.gutter),
                 Text(
-                  strings.ayushCompletedTitle,
+                  strings.lifestyleCompletedTitle,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: Sizes.gutter),
                 FilledButton(
-                  key: const Key('ayush.done'),
+                  key: const Key('lifestyle.done'),
                   onPressed: () => Navigator.of(context).pop(),
                   child: Text(strings.doneLabel),
                 ),

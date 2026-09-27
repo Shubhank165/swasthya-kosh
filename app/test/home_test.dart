@@ -10,7 +10,7 @@
 ///
 /// 1. `Root` sends the patient to the right place, and remembers the language.
 /// 2. An unusable bundle stops the intake and **only** the intake.
-/// 3. The AYUSH card says it is not ready before it is tapped, not after.
+/// 3. The Lifestyle card says it is not ready before it is tapped, not after.
 /// 4. A tab that cannot load its records shows an empty tab, not an error.
 library;
 
@@ -87,7 +87,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('home.newIntake')), findsOneWidget);
-      expect(find.byKey(const Key('home.ayush')), findsOneWidget);
+      expect(find.byKey(const Key('home.lifestyle')), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('tab.visits')));
       await tester.pumpAndSettle();
@@ -123,7 +123,7 @@ void main() {
     });
   });
 
-  group('the AYUSH card', () {
+  group('the Lifestyle card', () {
     testWidgets('says it is not ready before it is tapped', (tester) async {
       // A card that looks live and then apologises has already wasted the tap,
       // and this app's rule for a mocked integration (§7.2) is that it says so
@@ -132,13 +132,13 @@ void main() {
       await tester.pumpAndSettle();
 
       final subtitle = AppLocalizations.of(
-        tester.element(find.byKey(const Key('home.ayush'))),
+        tester.element(find.byKey(const Key('home.lifestyle'))),
       ).notAvailableYet;
       expect(find.text(subtitle), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('home.ayush')));
+      await tester.tap(find.byKey(const Key('home.lifestyle')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('ayush.notAvailable')), findsOneWidget);
+      expect(find.byKey(const Key('lifestyle.notAvailable')), findsOneWidget);
     });
   });
 

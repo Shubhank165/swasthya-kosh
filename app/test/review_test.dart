@@ -20,7 +20,7 @@ ContentBundle bundle() => ContentBundle.parse(jsonEncode({
       'sections': ['chief_complaint', 'medications', 'allergies'],
       'core': <String>[],
       'branches': <String, dynamic>{},
-      'ayurveda': <String>[],
+      'lifestyle': <String>[],
       'questions': [
         {
           'question_id': 'q.cc',

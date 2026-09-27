@@ -23,27 +23,27 @@ class ErasureSummary {
   const ErasureSummary({
     required this.intakes,
     required this.documents,
-    required this.ayushProfiles,
+    required this.lifestyleProfiles,
     required this.complete,
   });
 
   factory ErasureSummary.fromJson(Map<String, dynamic> json) => ErasureSummary(
         intakes: (json['intakes'] as num?)?.toInt() ?? 0,
         documents: (json['documents'] as num?)?.toInt() ?? 0,
-        ayushProfiles: (json['ayush_profiles'] as num?)?.toInt() ?? 0,
+        lifestyleProfiles: (json['lifestyle_profiles'] as num?)?.toInt() ?? 0,
         complete: json['complete'] as bool? ?? false,
       );
 
   final int intakes;
   final int documents;
-  final int ayushProfiles;
+  final int lifestyleProfiles;
 
   /// False when a scanned document could not be removed from storage. The rows
   /// are gone either way; the image is not, and a screen that said "deleted"
   /// over the top of that would be a lie the patient cannot detect.
   final bool complete;
 
-  bool get erasedNothing => intakes == 0 && documents == 0 && ayushProfiles == 0;
+  bool get erasedNothing => intakes == 0 && documents == 0 && lifestyleProfiles == 0;
 }
 
 class ErasureRepository {

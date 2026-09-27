@@ -99,7 +99,7 @@ void main() {
           'sections': ['hpi'],
           'core': <String>[],
           'branches': <String, dynamic>{},
-          'ayurveda': <String>[],
+          'lifestyle': <String>[],
           'questions': <dynamic>[],
           'red_flag_rules': <dynamic>[],
         });

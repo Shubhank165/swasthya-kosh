@@ -38,12 +38,12 @@
   "somethingElse": "ਕੁਝ ਹੋਰ",
   "suggestedAnswer": "ਤੁਸੀਂ ਜੋ ਦੱਸਿਆ ਉਸ ਦੇ ਆਧਾਰ 'ਤੇ",
   "sectionProgress": "{total} ਵਿੱਚੋਂ {done} ਭਾਗ",
-  "ayurvedaTitle": "ਤੁਹਾਡੀ ਰੋਜ਼ਾਨਾ ਰੁਟੀਨ ਬਾਰੇ ਕੁਝ ਸਵਾਲ",
-  "ayushIntro": "ਇਹ ਕੁਝ ਵਿਕਲਪਿਕ ਸਵਾਲ ਹਨ ਤੁਹਾਡੀਆਂ ਰੋਜ਼ਾਨਾ ਆਦਤਾਂ ਅਤੇ ਆਮ ਸਿਹਤ ਬਾਰੇ — ਅੱਜ ਦੀ ਤਕਲੀਫ਼ ਬਾਰੇ ਨਹੀਂ। ਤੁਹਾਡੇ ਵੈਦ ਤੁਹਾਡੇ ਜਵਾਬ ਦੇਖਣਗੇ; ਐਪ ਇਨ੍ਹਾਂ ਤੋਂ ਕੋਈ ਬਿਮਾਰੀ ਨਹੀਂ ਦੱਸਦੀ।",
-  "ayushProgress": "ਸਵਾਲ {done} ਵਿੱਚੋਂ {total}",
-  "ayushCompletedTitle": "ਪਹਿਲਾਂ ਹੀ ਸਾਂਝਾ ਕੀਤਾ",
-  "ayushCompletedBody": "ਤੁਸੀਂ ਇਹ ਪਹਿਲਾਂ ਹੀ ਭਰ ਦਿੱਤੇ ਹਨ। ਤੁਹਾਡੇ ਵੈਦ ਇਨ੍ਹਾਂ ਨੂੰ ਦੇਖ ਸਕਦੇ ਹਨ — ਤੁਸੀਂ ਕਿਸੇ ਵੀ ਸਮੇਂ ਅੱਪਡੇਟ ਕਰ ਸਕਦੇ ਹੋ।",
-  "ayushRedo": "ਮੇਰੇ ਜਵਾਬ ਅੱਪਡੇਟ ਕਰੋ",
+  "lifestyleSubtitle": "ਤੁਹਾਡੀ ਰੋਜ਼ਾਨਾ ਰੁਟੀਨ ਬਾਰੇ ਕੁਝ ਸਵਾਲ",
+  "lifestyleIntro": "ਇਹ ਕੁਝ ਵਿਕਲਪਿਕ ਸਵਾਲ ਹਨ ਤੁਹਾਡੀਆਂ ਰੋਜ਼ਾਨਾ ਆਦਤਾਂ ਅਤੇ ਆਮ ਸਿਹਤ ਬਾਰੇ — ਅੱਜ ਦੀ ਤਕਲੀਫ਼ ਬਾਰੇ ਨਹੀਂ। ਤੁਹਾਡੇ ਡਾਕਟਰ ਤੁਹਾਡੇ ਜਵਾਬ ਦੇਖਣਗੇ; ਐਪ ਇਨ੍ਹਾਂ ਤੋਂ ਕੋਈ ਬਿਮਾਰੀ ਨਹੀਂ ਦੱਸਦੀ।",
+  "lifestyleProgress": "ਸਵਾਲ {done} ਵਿੱਚੋਂ {total}",
+  "lifestyleCompletedTitle": "ਪਹਿਲਾਂ ਹੀ ਸਾਂਝਾ ਕੀਤਾ",
+  "lifestyleCompletedBody": "ਤੁਸੀਂ ਇਹ ਪਹਿਲਾਂ ਹੀ ਭਰ ਦਿੱਤੇ ਹਨ। ਤੁਹਾਡੇ ਡਾਕਟਰ ਇਨ੍ਹਾਂ ਨੂੰ ਦੇਖ ਸਕਦੇ ਹਨ — ਤੁਸੀਂ ਕਿਸੇ ਵੀ ਸਮੇਂ ਅੱਪਡੇਟ ਕਰ ਸਕਦੇ ਹੋ।",
+  "lifestyleRedo": "ਮੇਰੇ ਜਵਾਬ ਅੱਪਡੇਟ ਕਰੋ",
   "documentsTitle": "ਪੁਰਾਣੀਆਂ ਪਰਚੀਆਂ ਅਤੇ ਰਿਪੋਰਟਾਂ",
   "takePhoto": "ਫ਼ੋਟੋ ਲਓ",
   "chooseFromGallery": "ਗੈਲਰੀ ਤੋਂ ਚੁਣੋ",
@@ -119,8 +119,8 @@
   "@newIntakeSubtitle": {
     "description": ""
   },
-  "ayushTitle": "ਆਯੂਸ਼ ਮੁਲਾਂਕਣ",
-  "@ayushTitle": {
+  "lifestyleTitle": "ਜੀਵਨ ਸ਼ੈਲੀ ਅਤੇ ਆਦਤਾਂ",
+  "@lifestyleTitle": {
     "description": ""
   },
   "notAvailableYet": "ਅਜੇ ਉਪਲਬਧ ਨਹੀਂ",
@@ -154,7 +154,7 @@
   "profileDeleteHistory": "Delete my history",
   "profileDeleteSubtitle": "Remove everything this hospital has recorded about you",
   "deleteHistoryTitle": "Delete your history?",
-  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Ayurveda assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
+  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Lifestyle assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
   "deleteHistoryConfirm": "Delete everything",
   "deleteHistoryCancel": "Keep my history",
   "deleteHistoryDone": "Your history has been deleted.",

@@ -161,17 +161,17 @@
       }
     }
   },
-  "ayurvedaTitle": "A few questions about your daily routine",
-  "@ayurvedaTitle": {
+  "lifestyleSubtitle": "A few questions about your daily routine",
+  "@lifestyleSubtitle": {
     "description": ""
   },
-  "ayushIntro": "A few optional questions about your daily habits and how you generally feel — not about today's problem. Your Vaidya reviews your answers; the app does not diagnose anything from them.",
-  "@ayushIntro": {
-    "description": "Explanation shown before the standalone, optional Ayurveda self-report reachable from the home screen."
+  "lifestyleIntro": "A few optional questions about your daily habits and how you generally feel — not about today's problem. Your doctor reviews your answers; the app does not diagnose anything from them.",
+  "@lifestyleIntro": {
+    "description": "Explanation shown before the standalone, optional Lifestyle self-report reachable from the home screen."
   },
-  "ayushProgress": "Question {done} of {total}",
-  "@ayushProgress": {
-    "description": "Progress counter on the standalone Ayurveda self-report screen.",
+  "lifestyleProgress": "Question {done} of {total}",
+  "@lifestyleProgress": {
+    "description": "Progress counter on the standalone Lifestyle self-report screen.",
     "placeholders": {
       "done": {
         "type": "int"
@@ -181,16 +181,16 @@
       }
     }
   },
-  "ayushCompletedTitle": "Already shared",
-  "@ayushCompletedTitle": {
+  "lifestyleCompletedTitle": "Already shared",
+  "@lifestyleCompletedTitle": {
     "description": ""
   },
-  "ayushCompletedBody": "You've already answered these. Your Vaidya can see them — you can update them any time.",
-  "@ayushCompletedBody": {
+  "lifestyleCompletedBody": "You've already answered these. Your doctor can see them — you can update them any time.",
+  "@lifestyleCompletedBody": {
     "description": ""
   },
-  "ayushRedo": "Update my answers",
-  "@ayushRedo": {
+  "lifestyleRedo": "Update my answers",
+  "@lifestyleRedo": {
     "description": ""
   },
   "documentsTitle": "Old prescriptions and reports",
@@ -375,8 +375,8 @@
   "@newIntakeSubtitle": {
     "description": ""
   },
-  "ayushTitle": "AYUSH assessment",
-  "@ayushTitle": {
+  "lifestyleTitle": "Lifestyle & habits",
+  "@lifestyleTitle": {
     "description": ""
   },
   "notAvailableYet": "Not available yet",
@@ -419,7 +419,7 @@
   "@deleteHistoryTitle": {
     "description": "Confirmation dialog title"
   },
-  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Ayurveda assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
+  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Lifestyle assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
   "@deleteHistoryBody": {
     "description": "Names exactly what goes, before the patient confirms"
   },

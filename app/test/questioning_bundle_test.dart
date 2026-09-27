@@ -249,16 +249,16 @@ void main() {
       // §5 screen 8 — agni, koshtha and nidra are what a Vaidya wants today's
       // answer to; the rest of the module does not move between two visits.
       final full = IntakeWalker(bundle: bundle, language: 'en').plan
-          .where((id) => id.startsWith('ayush.'))
+          .where((id) => id.startsWith('lifestyle.'))
           .toSet();
       final returning =
           IntakeWalker(bundle: bundle, language: 'en', returnVisit: true)
               .plan
-              .where((id) => id.startsWith('ayush.'))
+              .where((id) => id.startsWith('lifestyle.'))
               .toSet();
       expect(returning, isNotEmpty);
       expect(returning.length, lessThan(full.length));
-      expect(returning, contains('ayush.appetite'));
+      expect(returning, contains('lifestyle.appetite'));
     });
   });
 }

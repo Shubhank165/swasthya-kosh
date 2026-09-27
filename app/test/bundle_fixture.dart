@@ -16,8 +16,8 @@ ContentBundle bundleWith({
   List<Map<String, dynamic>> rules = const [],
   List<String> core = const [],
   Map<String, List<String>> branches = const {},
-  List<String> ayurveda = const [],
-  List<String> ayurvedaCurrentState = const [],
+  List<String> lifestyle = const [],
+  List<String> lifestyleCurrentState = const [],
   List<String> sections = const ['chief_complaint', 'hpi', 'red_flag_screen'],
   // What a current backend actually serves: `GET /content/bundle` advertises
   // the newest contract the backend accepts, and that has been 0.2 since the
@@ -33,8 +33,8 @@ ContentBundle bundleWith({
     'sections': sections,
     'core': core,
     'branches': branches,
-    'ayurveda': ayurveda,
-    'ayurveda_current_state': ayurvedaCurrentState,
+    'lifestyle': lifestyle,
+    'lifestyle_current_state': lifestyleCurrentState,
     'questions': questions,
     'red_flag_rules': rules,
   }));

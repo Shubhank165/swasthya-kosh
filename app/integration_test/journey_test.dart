@@ -124,7 +124,7 @@ void main() {
         hospitalsProvider.overrideWith((ref) async => [
               const Hospital(
                 id: 'aiia-delhi',
-                displayName: 'All India Institute of Ayurveda',
+                displayName: 'All India Institute of Lifestyle',
                 timezone: 'Asia/Kolkata',
                 defaultLanguage: 'en',
                 departments: [Department(code: 'opd', display: 'General OPD')],

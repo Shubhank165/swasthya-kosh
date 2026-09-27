@@ -33,7 +33,7 @@ import 'test_sqlite.dart';
 /// Chest pain plus breathlessness, which is the rule the brief opens §6 with.
 ContentBundle cardiacBundle({String schemaVersion = '0.2'}) => bundleWith(
       schemaVersion: schemaVersion,
-      sections: const ['chief_complaint', 'hpi', 'ayurveda'],
+      sections: const ['chief_complaint', 'hpi', 'lifestyle'],
       questions: [
         question(
           'chief_complaint',
@@ -43,14 +43,14 @@ ContentBundle cardiacBundle({String schemaVersion = '0.2'}) => bundleWith(
         ),
         question('dyspnoea'),
         question('duration', type: 'number'),
-        question('digestion', section: 'ayurveda'),
+        question('digestion', section: 'lifestyle'),
       ],
       core: ['chief_complaint'],
       branches: {
         'chest_pain': ['dyspnoea', 'duration'],
         'fever': ['duration'],
       },
-      ayurveda: ['digestion'],
+      lifestyle: ['digestion'],
       rules: [
         {
           'rule_id': 'acute_chest_pain_with_dyspnoea',
@@ -103,7 +103,7 @@ void main() {
         bundle: bundle ?? cardiacBundle(),
         language: language,
         hospitalId: 'aiia-delhi',
-        hospitalName: 'All India Institute of Ayurveda',
+        hospitalName: 'All India Institute of Lifestyle',
         reporter: reporter,
         appVersion: '1.0.0',
       );
@@ -394,7 +394,7 @@ void main() {
         'sections': ['hpi'],
         'core': ['chief_complaint'],
         'branches': <String, dynamic>{},
-        'ayurveda': <String>[],
+        'lifestyle': <String>[],
         'questions': [question('chief_complaint')],
         'red_flag_rules': <dynamic>[],
       }));
@@ -552,7 +552,7 @@ void main() {
         ),
       ]);
       await flow.answer(const CodedValue('fever'), 'Fever');
-      await flow.answer(const BoolValue(true), 'Yes'); // the Ayurveda question
+      await flow.answer(const BoolValue(true), 'Yes'); // the Lifestyle question
       flow.continueToReview();
       await flow.submit();
 

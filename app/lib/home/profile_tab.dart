@@ -136,7 +136,7 @@ class ProfileTab extends ConsumerWidget {
 
   /// Ask, then erase, then say what happened.
   ///
-  /// The dialog names what goes — visits, answers, documents, the Ayurveda
+  /// The dialog names what goes — visits, answers, documents, the Lifestyle
   /// assessment — rather than asking "are you sure?", because a patient cannot
   /// consent to a consequence nobody has stated. The destructive action is the
   /// second button and is not the default; the safe one is worded as a choice

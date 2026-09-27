@@ -43,7 +43,7 @@ void main() {
       db.saveDraft(DraftsCompanion.insert(
         intakeId: id,
         hospitalId: 'aiia-delhi',
-        hospitalName: const Value('All India Institute of Ayurveda'),
+        hospitalName: const Value('All India Institute of Lifestyle'),
         language: 'hi',
         reporter: 'self',
         answersJson: '{}',
@@ -89,7 +89,7 @@ void main() {
       final receipt = await db.receiptFor('intake-1');
       expect(receipt, isNotNull);
       expect(receipt!.referenceCode, referenceCodeFor('intake-1'));
-      expect(receipt.hospitalName, 'All India Institute of Ayurveda');
+      expect(receipt.hospitalName, 'All India Institute of Lifestyle');
       expect(await db.draftFor('intake-1'), isNull);
     });
 

@@ -15,7 +15,7 @@ import '../intake/intake_host.dart';
 import '../intake/screens/hospital_screen.dart';
 import '../l10n/strings.dart';
 import '../storage/database.dart';
-import 'ayush_screen.dart';
+import 'lifestyle_screen.dart';
 
 class HomeTab extends ConsumerWidget {
   const HomeTab({super.key});
@@ -69,16 +69,16 @@ class HomeTab extends ConsumerWidget {
         ),
         const SizedBox(height: Sizes.gap),
         _ActionCard(
-          buttonKey: const Key('home.ayush'),
+          buttonKey: const Key('home.lifestyle'),
           icon: Icons.spa_outlined,
-          title: strings.ayushTitle,
+          title: strings.lifestyleTitle,
           // Says what it is before it is tapped, same principle as when this
           // read "Not available yet" — the card now says the thing itself is
           // real and optional, rather than claiming a result it does not
-          // compute (review items 3/4; see `ayush_screen.dart`).
-          subtitle: strings.ayurvedaTitle,
+          // compute (review items 3/4; see `lifestyle_screen.dart`).
+          subtitle: strings.lifestyleSubtitle,
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const AyushScreen()),
+            MaterialPageRoute<void>(builder: (_) => const LifestyleScreen()),
           ),
         ),
       ],

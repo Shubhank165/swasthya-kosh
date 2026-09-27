@@ -193,7 +193,7 @@ class IntakeFlow extends ChangeNotifier {
         language: draft.language,
         // A resumed intake keeps the plan it started with. Re-deciding it here
         // would change which questions remain halfway through, and a patient
-        // who answered six Ayurveda questions before the app died must not come
+        // who answered six Lifestyle questions before the app died must not come
         // back to a shorter list that drops three of them from the record.
         returnVisit: draft.returnVisit,
         answers: answers,

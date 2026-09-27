@@ -238,7 +238,7 @@ void main() {
         'sections': ['hpi'],
         'core': ['a'],
         'branches': <String, dynamic>{},
-        'ayurveda': <String>[],
+        'lifestyle': <String>[],
         'questions': [
           {
             'question_id': 'a',
@@ -428,7 +428,7 @@ void main() {
     });
   });
 
-  group('the Ayurveda section on a return visit', () {
+  group('the Lifestyle section on a return visit', () {
     ContentBundle module() => bundleWith(
           questions: [
             question('complaint', field: 'chief_complaint', type: 'single_choice',
@@ -438,8 +438,8 @@ void main() {
             question('vihara', section: 'hpi'),
           ],
           core: ['complaint'],
-          ayurveda: ['agni', 'nidra', 'vihara'],
-          ayurvedaCurrentState: ['agni', 'nidra'],
+          lifestyle: ['agni', 'nidra', 'vihara'],
+          lifestyleCurrentState: ['agni', 'nidra'],
         );
 
     test('a first visit gets the full module', () {
@@ -463,7 +463,7 @@ void main() {
       // them arrives with no Agni, Nidra or Koshtha at all.
       final older = bundleWith(
         questions: [question('agni'), question('vihara')],
-        ayurveda: ['agni', 'vihara'],
+        lifestyle: ['agni', 'vihara'],
       );
       final walker =
           IntakeWalker(bundle: older, language: 'en', returnVisit: true);

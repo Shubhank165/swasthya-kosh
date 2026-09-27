@@ -235,7 +235,7 @@ class _ReturningPatientGateState extends ConsumerState<ReturningPatientGate> {
       confirmed: confirmed,
       patientRef: patientRef,
       // A hospital that already holds facts about this patient has seen them
-      // before, which is what makes the Ayurveda section the current-state
+      // before, which is what makes the Lifestyle section the current-state
       // subset rather than the full module (§5 screen 8).
       returnVisit: confirmed.isNotEmpty || ref.read(carryForwardProvider).valueOrNull?.isNotEmpty == true,
       prefill: ref.read(prefillRepositoryProvider),

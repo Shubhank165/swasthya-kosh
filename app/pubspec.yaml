@@ -1,6 +1,6 @@
 name: medikiosk_app
 description: >
-  MediKiosk patient app — touch-only pre-consultation intake for AYUSH hospital
+  MediKiosk patient app — touch-only pre-consultation intake for hospital
   OPDs. Walks the same question content the kiosk's Jetson walks and produces
   the same versioned record.
 publish_to: none

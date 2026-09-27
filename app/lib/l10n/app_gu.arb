@@ -38,12 +38,12 @@
   "somethingElse": "બીજું કંઈક",
   "suggestedAnswer": "તમે જે કહ્યું તેના આધારે",
   "sectionProgress": "{total} માંથી {done} વિભાગ",
-  "ayurvedaTitle": "તમારી દિનચર્યા વિશે થોડા પ્રશ્નો",
-  "ayushIntro": "આ થોડા વૈકલ્પિક પ્રશ્નો છે તમારી રોજિંદી ટેવો અને સામાન્ય તબિયત વિશે — આજની તકલીફ વિશે નહીં. તમારા વૈદ્ય તમારા જવાબો જોશે; એપ તેમાંથી કોઈ નિદાન કરતી નથી.",
-  "ayushProgress": "પ્રશ્ન {done} માંથી {total}",
-  "ayushCompletedTitle": "પહેલેથી શેર કર્યું",
-  "ayushCompletedBody": "તમે આ પહેલેથી જવાબ આપ્યા છે. તમારા વૈદ્ય તેમને જોઈ શકે છે — તમે ગમે ત્યારે અપડેટ કરી શકો છો.",
-  "ayushRedo": "મારા જવાબો અપડેટ કરો",
+  "lifestyleSubtitle": "તમારી દિનચર્યા વિશે થોડા પ્રશ્નો",
+  "lifestyleIntro": "આ થોડા વૈકલ્પિક પ્રશ્નો છે તમારી રોજિંદી ટેવો અને સામાન્ય તબિયત વિશે — આજની તકલીફ વિશે નહીં. તમારા ડૉક્ટર તમારા જવાબો જોશે; એપ તેમાંથી કોઈ નિદાન કરતી નથી.",
+  "lifestyleProgress": "પ્રશ્ન {done} માંથી {total}",
+  "lifestyleCompletedTitle": "પહેલેથી શેર કર્યું",
+  "lifestyleCompletedBody": "તમે આ પહેલેથી જવાબ આપ્યા છે. તમારા ડૉક્ટર તેમને જોઈ શકે છે — તમે ગમે ત્યારે અપડેટ કરી શકો છો.",
+  "lifestyleRedo": "મારા જવાબો અપડેટ કરો",
   "documentsTitle": "જૂના પ્રિસ્ક્રિપ્શન અને રિપોર્ટ",
   "takePhoto": "ફોટો લો",
   "chooseFromGallery": "ગેલેરીમાંથી પસંદ કરો",
@@ -119,8 +119,8 @@
   "@newIntakeSubtitle": {
     "description": ""
   },
-  "ayushTitle": "આયુષ મૂલ્યાંકન",
-  "@ayushTitle": {
+  "lifestyleTitle": "જીવનશૈલી અને આદતો",
+  "@lifestyleTitle": {
     "description": ""
   },
   "notAvailableYet": "હજી ઉપલબ્ધ નથી",
@@ -154,7 +154,7 @@
   "profileDeleteHistory": "Delete my history",
   "profileDeleteSubtitle": "Remove everything this hospital has recorded about you",
   "deleteHistoryTitle": "Delete your history?",
-  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Ayurveda assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
+  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Lifestyle assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
   "deleteHistoryConfirm": "Delete everything",
   "deleteHistoryCancel": "Keep my history",
   "deleteHistoryDone": "Your history has been deleted.",

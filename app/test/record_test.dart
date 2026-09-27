@@ -27,7 +27,7 @@ ContentBundle testBundle() => ContentBundle.parse(jsonEncode({
       'sections': ['chief_complaint', 'hpi'],
       'core': ['core_intake.chief_complaint'],
       'branches': <String, dynamic>{},
-      'ayurveda': <String>[],
+      'lifestyle': <String>[],
       'questions': <dynamic>[],
       'red_flag_rules': <dynamic>[],
     }));

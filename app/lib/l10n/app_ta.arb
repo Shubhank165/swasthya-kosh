@@ -38,12 +38,12 @@
   "somethingElse": "வேறு ஏதாவது",
   "suggestedAnswer": "நீங்கள் கூறியதன் அடிப்படையில்",
   "sectionProgress": "{total} இல் {done} ஆம் பகுதி",
-  "ayurvedaTitle": "உங்கள் அன்றாட வழக்கம் பற்றி சில கேள்விகள்",
-  "ayushIntro": "இவை உங்கள் அன்றாட பழக்கவழக்கங்கள் மற்றும் பொதுவான உடல்நிலை பற்றிய சில விருப்பமான கேள்விகள் — இன்றைய பிரச்சனை பற்றியது அல்ல. உங்கள் வைத்தியர் உங்கள் பதில்களைப் பார்ப்பார்; ஆப் இதிலிருந்து எந்த நோயறிதலும் செய்யாது.",
-  "ayushProgress": "கேள்வி {total} இல் {done}",
-  "ayushCompletedTitle": "ஏற்கனவே பகிரப்பட்டது",
-  "ayushCompletedBody": "நீங்கள் ஏற்கனவே இவற்றுக்கு பதிலளித்துவிட்டீர்கள். உங்கள் வைத்தியர் இவற்றைப் பார்க்க முடியும் — நீங்கள் எப்போது வேண்டுமானாலும் புதுப்பிக்கலாம்.",
-  "ayushRedo": "எனது பதில்களைப் புதுப்பிக்கவும்",
+  "lifestyleSubtitle": "உங்கள் அன்றாட வழக்கம் பற்றி சில கேள்விகள்",
+  "lifestyleIntro": "இவை உங்கள் அன்றாட பழக்கவழக்கங்கள் மற்றும் பொதுவான உடல்நிலை பற்றிய சில விருப்பமான கேள்விகள் — இன்றைய பிரச்சனை பற்றியது அல்ல. உங்கள் வைத்தியர் உங்கள் பதில்களைப் பார்ப்பார்; ஆப் இதிலிருந்து எந்த நோயறிதலும் செய்யாது.",
+  "lifestyleProgress": "கேள்வி {total} இல் {done}",
+  "lifestyleCompletedTitle": "ஏற்கனவே பகிரப்பட்டது",
+  "lifestyleCompletedBody": "நீங்கள் ஏற்கனவே இவற்றுக்கு பதிலளித்துவிட்டீர்கள். உங்கள் வைத்தியர் இவற்றைப் பார்க்க முடியும் — நீங்கள் எப்போது வேண்டுமானாலும் புதுப்பிக்கலாம்.",
+  "lifestyleRedo": "எனது பதில்களைப் புதுப்பிக்கவும்",
   "documentsTitle": "பழைய மருந்துச் சீட்டுகள் மற்றும் அறிக்கைகள்",
   "takePhoto": "புகைப்படம் எடு",
   "chooseFromGallery": "கேலரியிலிருந்து தேர்ந்தெடு",
@@ -119,8 +119,8 @@
   "@newIntakeSubtitle": {
     "description": ""
   },
-  "ayushTitle": "ஆயுஷ் மதிப்பீடு",
-  "@ayushTitle": {
+  "lifestyleTitle": "வாழ்க்கை முறை மற்றும் பழக்கங்கள்",
+  "@lifestyleTitle": {
     "description": ""
   },
   "notAvailableYet": "இன்னும் கிடைக்கவில்லை",
@@ -154,7 +154,7 @@
   "profileDeleteHistory": "Delete my history",
   "profileDeleteSubtitle": "Remove everything this hospital has recorded about you",
   "deleteHistoryTitle": "Delete your history?",
-  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Ayurveda assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
+  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Lifestyle assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
   "deleteHistoryConfirm": "Delete everything",
   "deleteHistoryCancel": "Keep my history",
   "deleteHistoryDone": "Your history has been deleted.",

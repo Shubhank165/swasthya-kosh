@@ -170,7 +170,7 @@ class IntakeWalker {
 
   /// Whether this hospital has seen this patient before — §5 screen 8.
   ///
-  /// Changes one thing: the Ayurveda section becomes the current-state subset
+  /// Changes one thing: the Lifestyle section becomes the current-state subset
   /// the content marks, rather than the full module. Which questions those are
   /// is the content's decision and not this file's; all that happens here is
   /// choosing between two lists the bundle supplies.
@@ -202,11 +202,11 @@ class IntakeWalker {
 
   /// Every question id this intake will walk, in order.
   ///
-  /// Core first, then the branch for the chosen complaint. Ayurveda is
+  /// Core first, then the branch for the chosen complaint. Lifestyle is
   /// deliberately **not** appended here any more — review items 3/4: it used to
   /// ride along on every visit as an unlabelled extra section, which made a
   /// symptom intake longer than the symptom warranted. It now lives on its own
-  /// screen (`home/ayush_screen.dart`), answered once, whenever the patient
+  /// screen (`home/lifestyle_screen.dart`), answered once, whenever the patient
   /// chooses, rather than folded into every visit's required questions. The
   /// branch only appears once a complaint has been chosen, which is why this is
   /// recomputed rather than fixed at the start.
