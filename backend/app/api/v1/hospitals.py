@@ -23,10 +23,10 @@ router = APIRouter(prefix="/hospitals", tags=["hospitals"])
 #: one-without reads as unfinished, and the one left bare is the one a patient
 #: who does not know the word most needs help with.
 #:
-#: The Sanskrit names stay. At an AYUSH institute the board outside the OPD
-#: says "Kayachikitsa", and a patient is looking for the word that matches the
-#: sign they walked past — anglicising it here would make the screen easier to
-#: read and harder to use.
+#: The Sanskrit names stay. At the institutes this was built against, the
+#: board outside the OPD says "Kayachikitsa", and a patient is looking for the
+#: word that matches the sign they walked past — anglicising it here would make
+#: the screen easier to read and harder to use.
 _DISPLAY = {
     "kayachikitsa": "Kayachikitsa (General medicine)",
     "panchakarma": "Panchakarma (cleansing therapies)",

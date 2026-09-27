@@ -258,7 +258,7 @@ async def my_documents(
 @router.post(
     "/me/profile",
     response_model=PatientProfileResponse,
-    summary="Store the signed-in patient's AYUSH/Prakriti self-report",
+    summary="Store the signed-in patient's lifestyle self-report",
 )
 async def submit_patient_profile(
     principal: RequirePatient,

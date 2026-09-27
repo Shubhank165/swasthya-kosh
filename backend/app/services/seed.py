@@ -43,7 +43,7 @@ from app.services.terminology import seed_terminology
 logger = get_logger(__name__)
 
 HOSPITAL_ID = "aiia-delhi"
-#: A realistic AYUSH OPD rather than a sample of one. Four departments left a
+#: A realistic OPD rather than a sample of one. Four departments left a
 #: woman needing gynaecology and a parent with a sick child no destination but
 #: the escape hatch — which is a routing failure, not a cosmetic one. Display
 #: names for all eight already existed in `api/v1/hospitals.py`; only the seed

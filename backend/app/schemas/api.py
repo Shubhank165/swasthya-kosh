@@ -257,7 +257,7 @@ class PrefillResponse(ApiModel):
 
 
 class ProfileAnswerIn(ApiModel):
-    """One answered field of the AYUSH module, as the app sends it.
+    """One answered field of the patient profile, as the app sends it.
 
     The vocabularies are the record's own — `FieldStatus` and `Certainty` —
     and are validated in `services/patient_profile.py` rather than narrowed to an
@@ -273,7 +273,7 @@ class ProfileAnswerIn(ApiModel):
 
 
 class PatientProfileRequest(ApiModel):
-    """A patient's completed AYUSH/Prakriti module.
+    """A patient's completed lifestyle profile.
 
     No patient and no hospital in the body: both come from the session token,
     per decision 21. A profile can only ever be submitted for the holder of the

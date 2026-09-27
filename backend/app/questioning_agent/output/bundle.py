@@ -327,7 +327,7 @@ def _plan(bank: QuestionBank) -> list[str]:
     The engine would rank these per turn against what is already known. A fixed
     order cannot, so it is chosen to read like a consultation instead: what is
     wrong, then the things that apply to all of it, then each problem in turn,
-    then the history every patient is asked for, then the AYUSH module.
+    then the history every patient is asked for, then the lifestyle module.
 
     Within a group, priority descending and then id — descending because a
     question a case should not arrive without is worth asking before a patient

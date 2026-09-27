@@ -40,7 +40,7 @@ DEFAULT_SPECIALTIES: tuple[str, ...] = (
     "Dermatology",
     "Dentistry",
     "Obstetrics and Gynaecology",
-    "Ayush OPD",
+    "General OPD",
 )
 
 # Bands, most urgent first. REVIEW is deliberately not a priority level - it is a different list.

@@ -141,8 +141,6 @@ def build(
         # doctor; it never decides triage - that stays with the red-flag rules.
         "differential": differential,
         "fhir": fhir,
-        # Constitution, from the once-in-a-lifetime Ayush questionnaire. May have been
-        # recorded on an earlier visit - "recorded_at" says which.
         "documents": documents,
         "routing": route(state, red_flags),
         # Where each value came from, and which of them a clinician should check before

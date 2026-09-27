@@ -49,7 +49,7 @@ domains:
   - id: bowel
     label_key: domain.bowel
     # Separate from `digestive` because patients report them separately and
-    # because bowel habit is core AYUSH history asked of everyone anyway.
+    # because bowel habit is core history asked of everyone anyway.
     priority: 8
 
   - id: urinary

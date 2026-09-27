@@ -8,7 +8,7 @@ HMAC (`phone_ref`), the code becomes a hash, the session token becomes a hash.
 A dump of `otp_challenges` and `patient_sessions` tells an attacker neither who
 was signing in, nor what code to type, nor how to impersonate anyone. This is
 stronger than the usual bar because the population is identifiable as patients
-of an AYUSH hospital, which is itself health-adjacent information.
+of a particular hospital, which is itself health-adjacent information.
 
 **Why a pepper and not a plain hash.** An Indian mobile number is ten digits
 with a known prefix set — under a billion candidates. A plain SHA-256 of one is

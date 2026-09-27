@@ -164,8 +164,8 @@ def _turns(report: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, int]
 def _bound_field(entry: dict[str, Any]) -> str | None:
     """Which key in `fields` this turn answered, or None when it answered no single field.
 
-    The 58 Prakriti items are the honest None: they are scored together into one constitution,
-    so no single item is the source of it.
+    A turn that contributes to no single stored field is the honest None: some questions
+    are read together rather than bound one-to-one, so naming a source would invent one.
     """
 
     question_id = entry.get("id") or ""

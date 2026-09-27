@@ -1,8 +1,7 @@
-"""The eight-step kiosk workflow, as one state machine.
+"""The six-step kiosk workflow, as one state machine.
 
     1 language   2 ABHA   3 who is answering   4+5 describe issue and interview
-    6 Ayurvedic questionnaire   7 Prakriti (once in a lifetime)   8 documents
-    9 report and queue
+    6 documents   7 report and queue
 
 Steps 4 and 5 are one stage here, not two: "describe the issue" is already the first question the
 ClinicalStateMachine asks, and splitting it would mean two components owning the same slot. That
@@ -10,8 +9,8 @@ existing machine, the red-flag rules and the extractors are untouched - this onl
 them, so nothing about the clinical safety path changes shape.
 
 Red flags short-circuit from any stage straight to EMERGENCY. That is the whole point of them: a
-patient describing crushing chest pain during the Ayurvedic questionnaire must not be walked
-through four more screens before anyone is told.
+patient describing crushing chest pain midway through the interview must not be walked through
+four more screens before anyone is told.
 
 Each stage declares how it takes input - touch, voice, or camera - so a client (browser now, Kivy
 app next) can render the right control without knowing anything about clinical logic.
@@ -60,7 +59,7 @@ ORDER = (
 # Screen text for the stages that are not driven by the clinical question table.
 #
 # These are navigation and status lines - "Skip", "Scan", "Show your ABHA card" - not clinical
-# wording, which is why they are translated here while the Prakriti questionnaire still is not.
+# wording, which is why they are translated here while the clinical question table is not.
 # A patient who cannot read English could not move through the kiosk at all without them: before
 # this, seven of the nine languages fell back to English for every one of these lines, and the
 # pre-render step then spoke them in the English voice, so 87 of the 112 prompts a Tamil patient

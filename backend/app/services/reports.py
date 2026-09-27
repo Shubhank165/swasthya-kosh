@@ -148,7 +148,7 @@ class ReportService:
     async def _patient_profile_for(
         self, record: CanonicalRecord
     ) -> PatientProfileSnapshot | None:
-        """The patient's AYUSH module answers, if they have filled it.
+        """The patient's lifestyle profile answers, if they have filled it.
 
         **This is where the reading happens, and it happens here on purpose.**
         The builder is pure and byte-deterministic — that is what lets the
@@ -157,14 +157,14 @@ class ReportService:
 
         `None` on three paths that mean different things to nobody downstream:
         no repository configured, a guest with no patient reference, or a
-        patient who has not filled the module. All three render as an Ayurveda
-        section without profile lines, which is what "we do not have this" looks
-        like.
+        patient who has not filled the module. All three render a
+        personal-history section without profile lines, which is what "we do not
+        have this" looks like.
 
         A guest is excluded rather than looked up. `guest` is not an identity —
         it is the absence of one — so expanding it through the link table would
         match every other guest at this hospital and hand one patient's
-        constitution to another.
+        profile to another.
         """
         if self._patient_profiles is None:
             return None

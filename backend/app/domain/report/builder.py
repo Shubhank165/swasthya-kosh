@@ -171,7 +171,7 @@ def _effective_section(fact: Fact) -> Section:
 def _profile_lines(
     profile: PatientProfileSnapshot, labels: FieldLabels
 ) -> tuple[ReportLine, ...]:
-    """The AYUSH/Prakriti self-report as lines of the Ayurveda section.
+    """The patient's lifestyle profile, as lines of the personal-history section.
 
     **Answered fields only**, and in field-id order so the section is
     byte-stable across reads. A profile is answered in one sitting rather than

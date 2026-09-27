@@ -1,4 +1,4 @@
-"""The AYUSH/Prakriti self-report, as the report reads it.
+"""The patient's lifestyle profile, as the report reads it.
 
 A patient-level profile, answered once and outliving any single visit — which
 is why it is not a `ClinicalFactRecord` and has no `intake_id`. See

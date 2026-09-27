@@ -1,4 +1,4 @@
-"""The AYUSH/Prakriti self-report, read and written as whole revisions.
+"""The patient's lifestyle profile, read and written as whole revisions.
 
 **Append-only, like every other record in this system.** There is no update
 path here: a patient who answers the module again inserts a new row whose

@@ -12,7 +12,7 @@ Two deliberate limits:
   interact — please review"*, never as a recommendation, never as a
   contraindication.
 - **No herb–drug prediction.** The evidence base is thin, mostly in vitro, and
-  frequently contradictory. An AYUSH product would make a herb–drug flag look
+  frequently contradictory. A herbal product would make a herb–drug flag look
   like the headline feature, and it would be the least defensible thing in the
   build. Ayurvedic preparations are listed on the report as medicines the
   patient is taking, and the physician draws their own conclusions.

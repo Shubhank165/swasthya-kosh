@@ -320,10 +320,10 @@ class ErasureService:
     ) -> ErasureResult:
         """The two tables keyed to the person rather than to a visit.
 
-        The AYUSH profile is the clearest case for erasure in the whole
+        The lifestyle profile is the clearest case for erasure in the whole
         service: it is answered once, is about the person rather than any
         consultation, and outlives every visit. A patient who deletes their
-        history and keeps their Prakriti answers has not deleted their history.
+        history and keeps their profile answers has not deleted their history.
         """
         from sqlalchemy import and_, or_
 

@@ -1,4 +1,4 @@
-"""Accepting an AYUSH/Prakriti self-report from a patient's own device.
+"""Accepting a lifestyle self-report from a patient's own device.
 
 ```
 patient's answers + the session's identity -> validation -> a new revision
@@ -46,12 +46,12 @@ _STATUSES: frozenset[str] = frozenset(status.value for status in FieldStatus)
 
 #: Every field this module may carry. A submission naming anything else is
 #: rejected whole rather than filtered: a client sending `general.*` into an
-#: AYUSH profile has misunderstood something, and silently dropping the strays
+#: lifestyle profile has misunderstood something, and silently dropping strays
 #: would hide it.
 _NAMESPACE = "lifestyle."
 
-#: One patient's constitution is 62 questions today and will not plausibly be
-#: thousands. A cap here is what stops a malformed or hostile client writing an
+#: One patient's profile is a handful of questions today and will not
+#: plausibly be thousands. A cap here is what stops a malformed or hostile client writing an
 #: unbounded JSON document into a row nobody reads until a physician opens it.
 _MAX_ANSWERS = 200
 

@@ -33,10 +33,12 @@ pathways/
                          questions whose answers the rules in redflags/ read
   ros/                   review-of-systems groups, pulled in by a pathway's
                          `review_of_systems` list
-  (removed — the constitutional module is no longer part of this system)
-                         Prakriti assessment — that is a clinical act performed
-                         by the Vaidya, and a kiosk claiming to do it would be
-                         exactly the overreach this project refuses
+  lifestyle.yaml         appetite, sleep, bowel habit, diet, activity and
+                         stress — asked of everyone. Patient-reported only: the
+                         kiosk records what a patient can say about themselves
+                         and computes no constitutional type from it, because
+                         that is a clinical act and a kiosk claiming to do it
+                         would be exactly the overreach this project refuses
 redflags/                the rules. Every rule carries a `clinical_source`, and
                          a rule without one fails to load
 ```

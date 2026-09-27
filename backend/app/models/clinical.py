@@ -202,12 +202,12 @@ class ClinicalTimeline(Base, TimestampMixin):
 
 
 class PatientProfileRecord(Base, TimestampMixin):
-    """A patient's AYUSH/Prakriti self-report, filed against the patient.
+    """A patient's lifestyle self-report, filed against the patient.
 
     **Not an intake, and deliberately not modelled as one.** Every
     `ClinicalFactRecord` belongs to a visit — `intake_id` is NOT NULL — because
     every other fact in this system is something a patient said on a day. A
-    Prakriti profile is not: it is answered once, describes the person rather
+    lifestyle profile is not: it is answered once, describes the person rather
     than today's complaint, and outlives any single OPD attendance. Giving it a
     synthetic intake to live in would make it a phantom visit in the worklist,
     the metrics and the purge path, and the bugs would surface months later
@@ -220,11 +220,11 @@ class PatientProfileRecord(Base, TimestampMixin):
     under `phone` is still found after an ABHA is linked, because
     `PatientIdentifierLink` exists to resolve exactly that.
 
-    **Hospital-scoped, like everything else.** A Prakriti arguably belongs to
+    **Hospital-scoped, like everything else.** A profile arguably belongs to
     the person rather than to the clinic that asked, but `TENANT_EXEMPT_TABLES`
-    is a short list with a written justification per entry, and "constitution
-    does not vary by hospital" is a clinical argument for sharing patient data
-    across tenants — which is not a trade this table gets to make on its own.
+    is a short list with a written justification per entry, and "appetite and
+    sleep do not vary by hospital" is a clinical argument for sharing patient
+    data across tenants — not a trade this table gets to make on its own.
 
     **Answers are one JSON document, not a row each.** `clinical_facts` needs a
     row per fact because an interview appends them one at a time; a profile
@@ -669,8 +669,8 @@ class OTPChallenge(Base, TimestampMixin):
     **No plaintext phone number and no plaintext code is stored.** The phone is
     a peppered HMAC and the code is hashed, so this table leaking tells an
     attacker neither who was signing in nor what to type. That matters more here
-    than in most auth tables: the population is patients of an AYUSH hospital,
-    and the mere fact that a number appears is itself health-adjacent.
+    than in most auth tables: the population is the patients of a hospital, and
+    the mere fact that a number appears is itself health-adjacent.
     """
 
     __tablename__ = "otp_challenges"

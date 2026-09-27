@@ -10,19 +10,18 @@
 /// answered once, whenever the patient chooses, from the home screen rather
 /// than folded into a visit. It asks nothing a patient cannot honestly say
 /// about themselves, and it computes no result — no Vata/Pitta/Kapha type is
-/// ever shown here. **This is deliberately not a Prakriti assessment.**
-/// Prakriti determination is a clinical act performed by the Vaidya through
+/// ever shown here. **This screen deliberately derives no constitutional
+/// type.** Determining one is a clinical act performed by a physician through
 /// observation and examination; a kiosk cannot do it, and showing a patient a
-/// computed "type" would be exactly the overreach `lifestyle_module.yaml`
-/// already warns against. What this screen collects is handed to the Vaidya
-/// as the patient's own words, the same as every other self-report in this
-/// app.
+/// computed "type" would be exactly the overreach the clinical content already
+/// warns against. What this screen collects is handed to the physician as the
+/// patient's own words, the same as every other self-report in this app.
 ///
 /// **Storage, for now.** These answers are saved on the device only, under a
 /// fixed id (`_lifestyleProfileId`) in the same encrypted local store a visit's
 /// draft uses — never queued, never submitted, never purged by
 /// `LocalDatabase.purgeIntake` (that only ever runs against a real intake's
-/// id). Getting them into the record the Vaidya actually opens needs a
+/// id). Getting them into the record the physician actually opens needs a
 /// decision about how a standalone, one-time, patient-level profile fits
 /// the visit-shaped submission contract, which is exactly the kind of
 /// content-and-contract call this codebase's own conventions leave to the

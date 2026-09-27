@@ -10,7 +10,7 @@ place that knows both. Content authors write `concept`, `skippable` and
 `answer: {type: quantity, unit: years}`; the bundle carries `field_id`,
 `allow_skip` and `answer_type: number`. Translating here means a content author
 never has to think about the wire format, and the app never has to know what a
-Vaidya's YAML looks like.
+clinician's YAML looks like.
 """
 
 from __future__ import annotations

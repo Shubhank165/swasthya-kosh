@@ -358,10 +358,13 @@ menstrual_history:
   section: personal_history
   needs_clinical_review: true
 
-# --- Ayurveda module (patient-reported only) --------------------------------------
-# These are patient-reported observations, not a Prakriti assessment. Prakriti
-# determination is a clinical act performed by the Vaidya; the kiosk only
-# collects what the patient can report about themselves.
+# --- Lifestyle observations (patient-reported only) -------------------------------
+# What a patient can say about their own appetite, digestion, sleep and routine.
+# No constitutional type is derived from them: that is a clinical act performed
+# by a physician, and the kiosk only collects what the patient reports.
+#
+# The Sanskrit ids stay. They are what stored facts are already filed under, and
+# renaming them would orphan every record taken before this.
 agni_appetite:
   display: Appetite and digestion (Agni)
   section: personal_history
@@ -474,7 +477,7 @@ heart_rate_bpm:
 # --- Dashavidha parameters the kiosk asks the patient about -------------------------
 # Patient-reported capacities from the kiosk's Dashavidha Pariksha module. Each
 # names the classical parameter it asks about and says, in its own display text,
-# that the answer is the patient's. None of them is a Vaidya's assessment, and
+# that the answer is the patient's. None of them is a clinician's assessment, and
 
 # --- documents and confirmation ----------------------------------------------------
 has_prior_documents:

@@ -38,7 +38,7 @@ class Weights:
     #: 12 was chosen by looking at where the ranking stops being worth a screen.
     #: For a patient whose only complaint is poor sleep it ends the interview at
     #: 22 questions; what falls below the line is family history, past surgery,
-    #: alcohol and the peripheral AYUSH items — real questions, none of which
+    #: alcohol and the peripheral lifestyle items — real questions, none of which
     #: changes what a practitioner does about insomnia. Every slot marked
     #: `required` scores in the twenties and clears it comfortably, which is what
     #: makes the floor safe to set at all.
