@@ -10,11 +10,12 @@ What is left is the one thing the dashboard actually needs: intakes for a
 department, in arrival order, each with a status, and red-flag-pending surfaced
 separately for a human to acknowledge.
 
-Ordering is arrival time. It is not clinical triage and does not pretend to be:
-a fired red-flag criterion does **not** move an intake up the list. It raises an
-alert a person acknowledges, and that person decides what happens next. Software
-that reorders a waiting room on its own reading of a symptom has made a triage
-decision, and this system is not permitted to make one.
+Ordering is priority class first, then arrival time. This reverses what this
+module used to do and used to argue for — see decision 77 — and the reversal is
+narrow: the only thing that moves an intake up is a red-flag criterion the
+device fired and nobody has acknowledged. `domain/queue/priority.py` holds the
+rules, they are hand-written and total, and no model touches them. Everything
+else still waits its turn in the order it arrived.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.domain.queue.priority import PRIORITY_RANK, PriorityClass
 from app.domain.record import IntakeStatus
 
 
@@ -59,6 +61,9 @@ class WorklistEntry(BaseModel):
     department_code: str | None = None
     state: WorklistState
     intake_status: IntakeStatus
+    #: Why this row sits where it does. Sent to the dashboard so a doctor can
+    #: see that a patient was moved up, and by what.
+    priority: PriorityClass = PriorityClass.WALKIN
     arrived_at: datetime
     language: str = "en"
     #: How many red-flag events are still unacknowledged.
@@ -120,12 +125,21 @@ def state_for(
 
 
 def order(entries: Sequence[WorklistEntry]) -> tuple[WorklistEntry, ...]:
-    """Arrival order, oldest first.
+    """Priority class first, then arrival, oldest first.
+
+    Within a class the order is exactly what it always was, so a patient is
+    only ever overtaken by someone the device flagged — never by someone who
+    simply arrived with a better-looking record.
 
     `intake_id` breaks ties so the ordering is total and the list does not
     shuffle between polls when two kiosks submit in the same second.
     """
-    return tuple(sorted(entries, key=lambda e: (e.arrived_at, e.intake_id)))
+    return tuple(
+        sorted(
+            entries,
+            key=lambda e: (PRIORITY_RANK[e.priority], e.arrived_at, e.intake_id),
+        )
+    )
 
 
 def assemble(

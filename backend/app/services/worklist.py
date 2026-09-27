@@ -19,6 +19,7 @@ from app.core.logging import get_logger
 from app.domain.contradictions import detector
 from app.domain.documents.alignment import align_medications
 from app.domain.documents.ingredients import EMPTY_INDEX, IngredientIndex
+from app.domain.queue.priority import priority_for
 from app.domain.record import IntakeStatus
 from app.domain.worklist import Worklist, WorklistEntry, assemble, state_for
 from app.events.bus import EventBus
@@ -111,6 +112,11 @@ class WorklistService:
                         needs_review=needs_review,
                     ),
                     intake_status=IntakeStatus(row.status),
+                    priority=priority_for(
+                        status=IntakeStatus(row.status),
+                        unacknowledged_alerts=unacknowledged,
+                        seen_at=row.seen_at,
+                    ),
                     arrived_at=row.received_at,
                     language=row.language,
                     unacknowledged_alerts=unacknowledged,

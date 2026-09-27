@@ -241,9 +241,21 @@ class TestSeedingTheMigratedDatabase:
         worklist = seeded["worklist"]
         assert worklist.total == len(seeded_intake_ids())
         assert {entry.intake_id for entry in worklist.entries} == set(seeded_intake_ids())
-        # Arrival order, oldest first. Not triage order — see `domain/worklist.py`.
-        arrivals = [(e.arrived_at, e.intake_id) for e in worklist.entries]
-        assert arrivals == sorted(arrivals)
+        # Priority class first, then arrival oldest-first — decision 77. The
+        # ordering that matters here is the second half: within one class it
+        # is still pure arrival order, so nobody is overtaken by a patient who
+        # merely arrived with a better-looking record.
+        from app.domain.queue.priority import PRIORITY_RANK
+
+        ranks = [PRIORITY_RANK[e.priority] for e in worklist.entries]
+        assert ranks == sorted(ranks), "classes are not grouped"
+        for rank in set(ranks):
+            within = [
+                (e.arrived_at, e.intake_id)
+                for e in worklist.entries
+                if PRIORITY_RANK[e.priority] == rank
+            ]
+            assert within == sorted(within)
 
     def test_the_red_flag_intake_is_surfaced_for_acknowledgement(
         self, seeded: dict[str, Any]

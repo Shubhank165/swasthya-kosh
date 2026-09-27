@@ -1515,3 +1515,57 @@ encoder context and a 400 ms utterance does not give it any. Yes/no and
 single-choice questions have buttons and `option_match.dart` refuses a
 low-confidence match rather than guessing, so the first place a Hindi
 microphone earns its keep is free-text answers — not the short ones.
+
+---
+
+## 77. The queue may reorder itself, for one reason, in one direction
+
+**2026-09-27. This supersedes what `app/domain/worklist.py` said, and it is a
+reversal rather than a refinement, so it is written down as one.**
+
+That module ordered on arrival time and argued for it in its own docstring:
+*"Software that reorders a waiting room on its own reading of a symptom has
+made a triage decision, and this system is not permitted to make one."* The
+argument was sound and the conclusion is now wrong, for a reason the argument
+did not consider: a patient whose interview was stopped by a red-flag criterion
+is already the subject of a decision. The device made it. Leaving them behind
+a routine follow-up does not avoid a triage judgement, it discards one that has
+already been made and recorded.
+
+So the worklist now sorts by priority class, then arrival. `domain/queue/
+priority.py` holds the rules and nothing else may.
+
+**Three bounds, and losing any one of them breaks the feature rather than
+tunes it.**
+
+*No model decides.* The rules are hand-written, ordered and total. The same
+intake yields the same class on every evaluation, for ever. This is the same
+reason red-flag evaluation is deterministic: a probabilistic priority is one
+nobody can answer a complaint about.
+
+*Only what the device already decided.* `EMERGENCY` follows from an
+unacknowledged red-flag event or from `ABORTED_RED_FLAG`. The module reads that
+outcome and does not re-derive it — it has no access to clinical text with
+which to try. A second engine disagreeing with the first is worse than no
+second engine, which is decision 1's reasoning applied to ordering.
+
+*Escalation only.* A rule may move an intake up; none moves one down. `WALKIN`
+is the floor and everyone starts there, so no scoring change can quietly push a
+patient behind people who arrived after them. `test_nothing_is_demoted_below_
+walkin` enumerates the whole input space to hold that.
+
+**What is deliberately not done.** `PRIORITY` and `APPOINTMENT` are declared and
+ranked because `stale/queue/entities.py` declared them and a facility will
+configure against those words. Neither is ever returned. They are classes a
+hospital assigns — a booked slot, an operational category — and nothing in an
+intake record establishes either. Returning one from a guess would be this
+system inventing a status the hospital owns.
+
+**And an acknowledged alert stops jumping the queue.** Acknowledgement is a
+person deciding; once they have, the software stops deciding for them.
+
+**To revisit:** the honest objection is that a device-fired criterion is a
+screening rule, not a clinician's triage, and a facility may want the fast lane
+gated on a human acknowledging the flag rather than on its absence. That is one
+condition in `priority_for` and a policy flag. It is not built because nobody
+has asked for it yet; it is the first thing to build if a clinician does.

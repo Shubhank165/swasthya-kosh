@@ -223,6 +223,9 @@ class TestTheRowCarriesNoClinicalText:
             "department_code",
             "state",
             "intake_status",
+            # An enum naming why the row sits where it does. Four values, none
+            # of them derived from what the patient said.
+            "priority",
             "arrived_at",
             "language",
             "unacknowledged_alerts",
