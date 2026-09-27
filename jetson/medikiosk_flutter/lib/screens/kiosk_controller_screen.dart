@@ -378,7 +378,6 @@ class _WorkflowBodyState extends State<WorkflowBody> {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         PathwayHubScreen(
           onSelectSymptoms: () { if (!_blocked) client.action('choose', 'clinical'); },
-          onSelectPrakriti: () { if (!_blocked) client.action('choose', 'prakriti'); },
           onSelectVitals: optionValues.contains('vitals')
               ? () { if (!_blocked) client.action('choose', 'vitals'); }
               : null,
@@ -422,9 +421,6 @@ class _WorkflowBodyState extends State<WorkflowBody> {
           Text('${queue['specialty']} • ${tr('token', client.language)} ${queue['number']}', style: Theme.of(context).textTheme.headlineMedium),
         if (report['cloud_status'] == 'sent') Text(tr('sent_to_hospital', client.language)),
         Text(tr('not_diagnosis', client.language)),
-        if (report['prakriti'] case final Map prakriti)
-          Text(prakriti['complete'] == false ? tr('prakriti_incomplete', client.language)
-            : '${tr('provisional_prakriti', client.language)}: ${prakriti['prakriti'] ?? tr('not_established', client.language)}'),
         Padding(padding: const EdgeInsets.all(6), child: FilledButton.icon(
           style: FilledButton.styleFrom(minimumSize: const Size(120, 60)),
           onPressed: client.status != ConnectionStatus.connected ? null : _downloadSlip,

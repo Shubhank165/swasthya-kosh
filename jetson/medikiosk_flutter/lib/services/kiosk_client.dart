@@ -287,8 +287,6 @@ class KioskClient extends ChangeNotifier {
   void selectLanguage(String code) => action('choose', code.replaceAll('_', '-').split('-').first);
   void submitAbha(String value) => action(value.isEmpty ? 'skip' : 'answer', value);
   void selectWho(String value) => action('choose', value);
-  void submitAyurvedaAnswer(String questionId, String value) => action('choose', value);
-  void submitPrakritiAnswer(String? questionId, String value) => action('choose', value);
   void submitTranscript(String text) { if (text.trim().isNotEmpty) action('answer', text.trim()); }
   void repeatQuestion() => action('repeat');
   void nextStage() => action('done');

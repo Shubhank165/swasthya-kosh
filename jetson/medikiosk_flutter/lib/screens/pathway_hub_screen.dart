@@ -5,7 +5,6 @@ import '../theme/app_theme.dart';
 class PathwayHubScreen extends StatelessWidget {
   final PatientProfile? profile;
   final VoidCallback onSelectSymptoms;
-  final VoidCallback onSelectPrakriti;
   /// Null when this kiosk's backend does not offer a camera measurement.
   final VoidCallback? onSelectVitals;
   final VoidCallback onBackToRegistration;
@@ -14,7 +13,6 @@ class PathwayHubScreen extends StatelessWidget {
     super.key,
     this.profile,
     required this.onSelectSymptoms,
-    required this.onSelectPrakriti,
     this.onSelectVitals,
     required this.onBackToRegistration,
   });
@@ -106,16 +104,8 @@ class PathwayHubScreen extends StatelessWidget {
                   if (isNarrow) ...[
                     _buildSymptomsCard(isNarrow),
                     const SizedBox(height: 16),
-                    _buildPrakritiCard(isNarrow),
                   ] else ...[
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _buildSymptomsCard(isNarrow)),
-                        const SizedBox(width: 16),
-                        Expanded(child: _buildPrakritiCard(isNarrow)),
-                      ],
-                    ),
+                    _buildSymptomsCard(isNarrow),
                   ],
                   // Full width under the pair, so one card does not have to fit a half column.
                   if (onSelectVitals != null) ...[
@@ -219,93 +209,6 @@ class PathwayHubScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPrakritiCard(bool isNarrow) {
-    return Material(
-      color: AppTheme.surface,
-      elevation: 2,
-      shadowColor: Colors.black12,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        onTap: onSelectPrakriti,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: EdgeInsets.all(isNarrow ? 18 : 24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppTheme.tealAccent.withAlpha(140), width: 2),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Icon & Tag
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.tealAccent.withAlpha(25),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(Icons.spa_rounded, color: AppTheme.tealAccent, size: 28),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.tealAccent.withAlpha(20),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Text(
-                      'AYURVEDA WELLNESS',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.tealAccent),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Title
-              const Text(
-                'आयुर्वेद प्रकृति परीक्षण',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-              ),
-              const SizedBox(height: 2),
-              const Text(
-                'Prakriti Assessment',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.tealAccent),
-              ),
-              const SizedBox(height: 12),
-
-              // Description Bullet Points
-              _buildBullet(Icons.balance_rounded, 'Discover your Vata, Pitta & Kapha constitution'),
-              const SizedBox(height: 6),
-              _buildBullet(Icons.touch_app_rounded, 'Full 58-question CCRAS questionnaire, by touch or voice'),
-              const SizedBox(height: 6),
-              _buildBullet(Icons.health_and_safety_rounded, 'Personalized diet & Ayurvedic lifestyle balance'),
-
-              const SizedBox(height: 18),
-
-              // Button
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: onSelectPrakriti,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.tealAccent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                  label: const Text('प्रकृति जानें (Start Prakriti)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildVitalsCard(bool isNarrow) {
     return Material(

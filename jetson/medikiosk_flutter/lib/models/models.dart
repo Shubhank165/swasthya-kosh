@@ -6,8 +6,6 @@ enum KioskStage {
   abha,
   who,
   interview,
-  ayurveda,
-  prakriti,
   documents,
   report,
   emergency,
@@ -35,10 +33,6 @@ extension KioskStageExtension on KioskStage {
         return 'who';
       case KioskStage.interview:
         return 'interview';
-      case KioskStage.ayurveda:
-        return 'ayurveda';
-      case KioskStage.prakriti:
-        return 'prakriti';
       case KioskStage.documents:
         return 'documents';
       case KioskStage.report:
@@ -74,10 +68,6 @@ extension KioskStageExtension on KioskStage {
         return KioskStage.who;
       case 'interview':
         return KioskStage.interview;
-      case 'ayurveda':
-        return KioskStage.ayurveda;
-      case 'prakriti':
-        return KioskStage.prakriti;
       case 'documents':
         return KioskStage.documents;
       case 'report':

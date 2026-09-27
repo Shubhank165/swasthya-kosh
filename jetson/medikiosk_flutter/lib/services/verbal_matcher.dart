@@ -31,7 +31,6 @@ class VerbalOptionMatcher {
     String? questionId,
     /// Options exactly as the server sent them: `{value, label, icon}`. Previously a
     /// hardcoded Dart questionnaire, which drifted from the server's own list.
-    List<Map<String, dynamic>> ayurvedaOptions = const [],
   }) {
     final text = transcript.toLowerCase().trim();
     if (text.isEmpty) return VerbalMatchResult.none;
@@ -83,15 +82,7 @@ class VerbalOptionMatcher {
       case KioskStage.interview:
         return _matchInterview(text, questionId);
 
-      case KioskStage.ayurveda:
-        return _matchAyurveda(text, questionId, ayurvedaOptions);
 
-      case KioskStage.prakriti:
-        // Same matcher: it works off the options the server put on screen, so it needs to know
-        // nothing about which questionnaire is being asked. That covers the opening
-        // "have you filled this before?" screen too - it is a two-option choice like any other.
-        return _matchAyurveda(text, questionId, ayurvedaOptions)
-            .asAction('prakriti_option');
 
       case KioskStage.documents:
         if (text.contains('done') ||
@@ -283,95 +274,6 @@ class VerbalOptionMatcher {
     return VerbalMatchResult.none;
   }
 
-  static VerbalMatchResult _matchAyurveda(
-    String text,
-    String? questionId,
-    List<Map<String, dynamic>> options,
-  ) {
-    // 1. Direct option number reference ("option 1", "pehla", "first", "1", etc.)
-    final optNum = _matchOptionNumber(text);
-    if (optNum != null) {
-      return VerbalMatchResult(matched: true, action: 'ayurveda_option', value: optNum);
-    }
-
-    // 2. Match against the options the server actually put on screen. The label already
-    // arrives in the patient's chosen language, so this works for every supported language
-    // rather than only the two that were hardcoded.
-    for (int i = 0; i < options.length; i++) {
-      final value = (options[i]['value'] as String? ?? '').toLowerCase();
-      final label = (options[i]['label'] as String? ?? '').toLowerCase();
-
-      if (value.isNotEmpty && text.contains(value)) {
-        return VerbalMatchResult(matched: true, action: 'ayurveda_option', value: i);
-      }
-
-      final keywords = label
-          .split(RegExp(r'[, /]+'))
-          .where((w) => w.length > 2 && !['and', 'the', 'है', 'का', 'की', 'के'].contains(w));
-      for (final keyword in keywords) {
-        if (text.contains(keyword)) {
-          return VerbalMatchResult(matched: true, action: 'ayurveda_option', value: i);
-        }
-      }
-    }
-
-    // 3. Broad Ayurveda keyword matching
-    // Vata / Option 0 keywords
-    if (text.contains('patla') ||
-        text.contains('thin') ||
-        text.contains('sukhi') ||
-        text.contains('dry') ||
-        text.contains('rukhi') ||
-        text.contains('thand') ||
-        text.contains('cold') ||
-        text.contains('kacchi') ||
-        text.contains('light') ||
-        text.contains('anxious') ||
-        text.contains('ghabrahat') ||
-        text.contains('bechaini') ||
-        text.contains('shakahari') ||
-        text.contains('veg')) {
-      return const VerbalMatchResult(matched: true, action: 'ayurveda_option', value: 0);
-    }
-
-    // Pitta / Option 1 keywords
-    if (text.contains('madhyam') ||
-        text.contains('medium') ||
-        text.contains('garmi') ||
-        text.contains('hot') ||
-        text.contains('warm') ||
-        text.contains('gussa') ||
-        text.contains('angry') ||
-        text.contains('chidchida') ||
-        text.contains('moderate') ||
-        text.contains('normal') ||
-        text.contains('non veg') ||
-        text.contains('mixed')) {
-      return const VerbalMatchResult(matched: true, action: 'ayurveda_option', value: 1);
-    }
-
-    // Kapha / Option 2 keywords
-    if (text.contains('bhaari') ||
-        text.contains('heavy') ||
-        text.contains('mota') ||
-        text.contains('mulayam') ||
-        text.contains('soft') ||
-        text.contains('gehri') ||
-        text.contains('deep') ||
-        text.contains('quiet') ||
-        text.contains('chup') ||
-        text.contains('barish') ||
-        text.contains('damp')) {
-      return const VerbalMatchResult(matched: true, action: 'ayurveda_option', value: 2);
-    }
-
-    // Option 3 keywords (Appetite: Poor / Heaviness)
-    if (text.contains('kamzor') || text.contains('poor') || text.contains('bhaari lagta') || text.contains('pachta nahi')) {
-      return const VerbalMatchResult(matched: true, action: 'ayurveda_option', value: 3);
-    }
-
-    return VerbalMatchResult.none;
-  }
 
   /// Extracts option number from phrases like "option 1", "first", "pehla", etc.
   static int? _matchOptionNumber(String text) {

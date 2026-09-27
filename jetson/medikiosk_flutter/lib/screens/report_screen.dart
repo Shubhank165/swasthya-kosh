@@ -23,15 +23,6 @@ class ReportScreen extends StatelessWidget {
     final routing = reportData?['routing'] as Map<String, dynamic>? ?? {};
     final queue = routing['queue'] as String? ?? 'General Medicine OPD';
     final priority = routing['priority'] as String? ?? 'ROUTINE';
-    // Constitution comes from the server's scored 58-item Ayush questionnaire, never from a
-    // tally computed in Dart. `prakriti` is null until enough of it is answered, and the section
-    // is simply absent then - a dosha printed on a slip is a clinical claim.
-    final prakritiData = reportData?['prakriti'] as Map<String, dynamic>?;
-    final prakritiName = prakritiData?['prakriti'] as String?;
-    final prakritiHindi = prakritiData?['prakriti_hi'] as String?;
-    final prakritiMarks = prakritiData?['marks'] as Map<String, dynamic>?;
-    final prakritiReviewed = prakritiData?['scoring_reviewed'] == true;
-    final prakritiRecordedAt = prakritiData?['recorded_at'] as String?;
 
     Color priorityColor = AppTheme.successGreen;
     Color priorityBg = AppTheme.successLight;
@@ -220,8 +211,7 @@ class ReportScreen extends StatelessWidget {
                             Icon(Icons.info_outline, color: AppTheme.textSecondary, size: 20),
                             SizedBox(width: 10),
                             // Expanded, or the sentence overflows the row and the slip prints
-                            // the debug stripes instead. The Prakriti pathway skips the
-                            // interview, so this is the normal state there, not an edge case.
+                            // the debug stripes instead.
                             Expanded(
                               child: Text(
                                 'Standard consultation requested without preliminary triage answers.',
@@ -334,76 +324,6 @@ class ReportScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 24),
                     ],
-
-                    // SECTION 3: Ayurveda Prakriti Summary (if assessed)
-                    if (prakritiName != null) ...[
-                      const Text(
-                        'आयुर्वेद प्रकृति विश्लेषण (Prakriti Analysis)',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: AppTheme.warningLight.withAlpha(40),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: AppTheme.warningOrange.withAlpha(90)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.spa_rounded, color: AppTheme.warningOrange, size: 24),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'प्रकृति (Prakriti): ${prakritiHindi ?? prakritiName} / $prakritiName',
-                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (prakritiMarks != null) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'अंक (Marks) — Vata ${prakritiMarks['vata'] ?? 0} · '
-                                'Pitta ${prakritiMarks['pitta'] ?? 0} · '
-                                'Kapha ${prakritiMarks['kapha'] ?? 0}',
-                                style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.3),
-                              ),
-                            ],
-                            if (prakritiRecordedAt != null) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                'Recorded: ${prakritiRecordedAt.split('T').first} — asked once in a lifetime',
-                                style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                              ),
-                            ],
-                            // The item weights are reconstructed from the classical sources the
-                            // CCRAS manual cites, not its licensed scoring table. Saying so on the
-                            // slip is the difference between a finding and a suggestion.
-                            if (!prakritiReviewed) ...[
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: AppTheme.surfaceBorder),
-                                ),
-                                child: const Text(
-                                  'अनंतिम / Provisional — scoring awaiting vaidya review',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.textPrimary),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                    ],
-
                     // Footer Instructions
                     Center(
                       child: Container(

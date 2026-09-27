@@ -12,7 +12,7 @@ class AppTheme {
   static const Color primaryBlue = Color(0xFF0284C7); // Sky 600 - Clinical Blue
   static const Color primaryDark = Color(0xFF0369A1); // Sky 700
   static const Color accentCyan = Color(0xFF0EA5E9); // Sky 500
-  static const Color tealAccent = Color(0xFF0D9488); // Teal 600 - Ayurveda & Wellness
+  static const Color tealAccent = Color(0xFF0D9488); // Teal 600 - wellness accent
   static const Color tealLight = Color(0xFFCCFBF1); // Teal 100
 
   // Status Accents
