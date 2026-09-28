@@ -8,10 +8,17 @@ evidence-linked history — and can spend the consultation on the patient rather
 than on transcription.
 
 The clinical problem is time. An OPD physician has minutes per patient, and a
-large share of those minutes goes to taking a history that the patient could
-have given to a machine while they were already sitting and waiting. This moves
-that work out of the room, and hands the physician something they can check
-rather than something they have to trust.
+large share of those minutes goes to taking a history the patient could have
+given to a machine while they were already sitting and waiting.
+
+| | Today | With MediKiosk |
+|---|---|---|
+| **History taking** | In the room, against the clock, in whatever language both parties share | In the waiting area, in the patient's own language, at the patient's pace |
+| **Old prescriptions** | A plastic bag handed across the desk and read at a glance | Photographed, read, and reconciled against what the patient said — the *discrepancy* is what gets reported |
+| **What the physician starts with** | A blank page | A draft record, every line clickable to the words it came from |
+| **What the physician does** | Writes the history, then thinks | Corrects what is wrong, then thinks |
+| **"Patient could not say"** | Usually indistinguishable from "no" by the time it is written down | A distinct, preserved status that never renders as "no" |
+| **After the consultation** | Referral, test and prescription leave as paper | Rows that can be followed, with a slot attached where the destination had one |
 
 > **This is not a diagnostic system.** It never states a diagnosis, never gives
 > medical advice, and never tells a patient what is wrong with them. Its output
@@ -33,11 +40,38 @@ Four files, in this order, and you will have seen the argument:
 | [`backend/tests/safety/`](backend/tests/safety/) | Seven suites that fail the build when a clinical promise breaks. |
 | [`backend/evaluation/`](backend/evaluation/) | The numbers, and what they are *not* allowed to claim. |
 
-The one idea worth carrying into the rest: **`answered`, `unresolved`,
-`not_asked`, `not_applicable` and `refused` are five different things, and
-collapsing any two of them is how "I could not say" becomes "no" somewhere
-between a kiosk and a physician.** Almost every design decision here follows
-from refusing to do that.
+The one idea worth carrying into the rest: **these are five different things,
+and collapsing any two of them is how "I could not say" becomes "no" somewhere
+between a kiosk and a physician.**
+
+| Status | What actually happened | What it must never be shown as |
+|---|---|---|
+| `answered` | The patient gave a value | — |
+| `unresolved` | The question was put, and no usable answer came back | `not_asked`, or a "no" |
+| `not_asked` | The question was never put | `unresolved` — one is a gap in the interview, the other a gap in the record |
+| `not_applicable` | The question cannot apply to this patient | `no` |
+| `refused` | The patient was asked and declined to say | `no`, or an absence |
+
+A pipeline that flattens `refused` into "no" has invented a clinical negative
+the patient never gave. Almost every design decision in this repository follows
+from refusing to do that, and `tests/safety/test_status_vocabulary.py` is what
+stops it happening by accident.
+
+## Where this stands
+
+Everything below is reproducible from a clean checkout; nothing here is a
+projection.
+
+| Part | Tests | Also |
+|---|---|---|
+| `backend/` | **870** passing, no network | ruff + mypy clean, **7/7** evaluation scenarios |
+| `dashboard/` | **87** passing | typecheck, lint, production build |
+| `app/` | **248** passing, 3 skipped | `flutter analyze` clean but for one pre-existing warning; release APK builds |
+| `jetson/` | **574** passing | 10 known failures, 8 of them a `kiosk_token` permission check that depends on the local umask |
+
+```bash
+make check     # ruff, mypy, the offline suite, and the evaluation scenarios
+```
 
 ## Run the whole thing in one command
 
@@ -120,39 +154,81 @@ tokens secret).
 
 ## How it fits together
 
-```mermaid
-flowchart LR
-  subgraph edge["At the kiosk — jetson/"]
-    K["Voice interview<br/>question selection<br/>red-flag rules"]
-    OCR["On-device OCR<br/>no image leaves"]
-  end
-  subgraph phone["On the patient's phone — app/"]
-    A["Touch + offline voice<br/>ASR model in the APK"]
-  end
-  subgraph server["Hospital server — backend/"]
-    N["normalize<br/>versioned payload → CanonicalRecord"]
-    D["documents<br/>extract · align · reconcile"]
-    R["report<br/>reviewed templates, per language"]
-    C["coordination<br/>orders · slots · stock · load"]
-    F["FHIR R4<br/>dual-coded bundle"]
-  end
-  subgraph doc["The physician — dashboard/"]
-    V["Verify fact by fact<br/>evidence on every line"]
-  end
+Two pipelines. The **device** conducts the interview; the **server** receives
+the result, reconciles it, and hands it to a physician. The split is deliberate
+and is the single most important thing to understand about this repository.
 
-  K --> N
-  OCR --> N
-  A --> N
-  N --> D --> R --> V
-  V --> C
-  R --> F
-```
+### 1. At the kiosk — camera, documents, and voice
 
-**The backend does not run the interview.** Question selection, red-flag
-evaluation and turn logic live on the device. This service receives results.
-There is no state machine here, and adding one would be a mistake — a second
-engine that disagrees with the first is worse than no second engine. The
-previous build's is in `backend/stale/` with a note explaining why it moved.
+![The kiosk pipeline: camera to heart rate, document photo to OCR, and voice into a deterministic clinical core](docs/images/kiosk-pipeline.jpeg)
+
+Three inputs, all processed on the device.
+
+- **Camera → heart rate.** Face and skin masking, then remote photoplethysmography
+  — POS and CHROM pulse extraction band-passed to 0.7–4 Hz, with the spectral
+  peak as BPM. The two methods must agree within 3 bpm before the reading is
+  called confident; otherwise it is reported as uncertain rather than dropped or
+  guessed. [`jetson/src/medikiosk/edge/heart_rate.py`](jetson/src/medikiosk/edge/heart_rate.py)
+- **Document photo → text.** A quality gate first, while the paper is still in
+  the patient's hand — a blurred or cropped page is worth re-taking *then*, not
+  discovering later. Printed Devanagari goes to PP-OCR; handwriting goes to a
+  vision model, because they fail in different ways.
+- **Voice → answers.** Echo cancellation, noise suppression, speech-to-text, and
+  a small local model that rewrites the *selected* question into plain language.
+  Barge-in is real: VAD detects the patient speaking, stops the synthesised
+  voice mid-sentence, and cancels the echo of it so the system does not
+  transcribe itself.
+
+**The model never chooses the next question and never decides a red flag.** The
+question is selected by a deterministic engine over what is still unknown, and
+the red-flag rules are auditable criteria that either match or do not. The model
+is used to *phrase* what that engine already chose. An interview that stops
+early stopped because a rule fired, not because something inferred it should.
+
+### 2. At the hospital — ingest, reconcile, coordinate
+
+![The server pipeline: ingest and clean, the canonical record and its checks, the doctor dashboard, orders, and the smart queue](docs/images/server-pipeline.jpeg)
+
+This repository's `backend/` is this diagram. A payload is schema-validated and
+repaired if malformed, normalised into one `CanonicalRecord`, then checked —
+contradictions between what was said and what the documents show, lab values
+against the range printed on the same page, drug interactions, urgency. The
+physician verifies it fact by fact, and what they order afterwards becomes rows
+that can be followed rather than paper that cannot.
+
+### Who decides what
+
+The most common wrong assumption about this repository is that the backend runs
+the interview. It does not, and adding a second engine here would be worse than
+having none — two engines disagree eventually, and the one that disagrees with
+the device is the one a physician is reading.
+
+| Decision | Made by | Never made by |
+|---|---|---|
+| Which question to ask next | The deterministic engine on the device | Any model, and not the backend |
+| Whether a red flag fires | Auditable criteria on the device | The backend, which records the event and evaluates nothing |
+| How a question is worded aloud | A small local model, over the question already chosen | — |
+| What a scanned document says | OCR / a vision model, with a confidence floor | The backend, which receives results |
+| Whether two facts contradict | The backend, recomputed on every read | The device, which has not seen the documents |
+| Whether a fact is true | **The physician**, fact by fact, recorded with their id | Everything else in this list |
+| Queue order | Arrival time, moved only by an unacknowledged device-fired flag | Any score derived from clinical content |
+
+The previous build's state machine is in [`backend/stale/`](backend/stale/),
+kept and not maintained, with a note explaining why it moved to the device.
+
+### What still works when the network is gone
+
+A venue with no wifi and a rural OPD with no uplink are the same failure, and it
+is the one worth designing for.
+
+| | Offline | Needs the network |
+|---|---|---|
+| The kiosk interview | ✅ everything — speech, questions, red flags | — |
+| Document reading at the kiosk | ✅ on-device | — |
+| The patient's phone app | ✅ questions read aloud and answered by voice; the recogniser ships in the APK | submitting the finished intake |
+| Submission | queued on the device and retried | eventual delivery |
+| The whole stack on a laptop | ✅ `docker compose up`, no broker, no cloud, no account | — |
+| Cloud document reading | not available | required — and off by default, so nothing reaches a model unless somebody typed so |
 
 ### What each part does
 
@@ -453,28 +529,17 @@ temptation to round these up is strongest ten minutes before a demo.
   visits, in the same order.
 - `docker compose up` produces the entire system offline.
 
-**Cannot:**
+**Cannot** — and the honest version of each:
 
-- **"Nine languages."** Questions exist in nine; the consent notice is English
-  and Hindi only, so seven of the nine stop at the consent screen. That is the
-  correct failure — proceeding without consent would be worse — but the honest
-  claim is *"questions in nine languages, consent in two"* until a native
-  speaker translates the notice.
-- **Question-selection quality.** The evaluation harness measures what the
-  backend does to a record, not which question the device chose. Nothing in this
-  repository measures the latter, and the earlier figures that claimed to
-  described a state machine that no longer lives here.
-- **iOS.** Unverified, and it stays that way without a Mac. Android-only is a
-  reasonable scope statement; implying iOS works is not.
-- **Cloud document reading.** The Vertex processing region is unconfirmed, so
-  the adapters fail closed. It does not block the kiosk path — the device reads
-  documents on-device and sends results up, so no image leaves the building —
-  and blocks only documents uploaded from the phone.
-- **Clinical sign-off.** Every red-flag rule carries `clinical_source: pending`.
-  See `docs/CLINICAL_REVIEW_QUEUE.md`.
-- **Pharmacy and scheduling as production systems.** Stock is a count and an
-  expiry date; slots are declared capacity. Pilot-stage, stated as such in the
-  module docstring, and not a replacement for a hospital's own systems.
+| The claim you might expect | What is actually true |
+|---|---|
+| "Nine languages" | Questions exist in nine; **the consent notice is English and Hindi only**, so seven of the nine stop at the consent screen. That is the correct failure — proceeding without consent would be worse — but the honest claim is *questions in nine languages, consent in two* until a native speaker translates the notice. |
+| "Our question selection scores X" | Nothing in this repository measures it. The evaluation harness measures what the backend does to a record, not which question the device chose, and the earlier figures that claimed to described a state machine that no longer lives here. |
+| "Runs on iOS too" | Unverified, and it stays that way without a Mac. Android-only is a reasonable scope statement; implying iOS works is not. |
+| "Cloud AI reads your documents" | The Vertex processing region is unconfirmed, so those adapters **fail closed**. It does not block the kiosk path — the device reads documents on-device and no image leaves the building — and blocks only documents uploaded from the phone. |
+| "Clinically validated" | Every red-flag rule carries `clinical_source: pending`. See [`docs/CLINICAL_REVIEW_QUEUE.md`](docs/CLINICAL_REVIEW_QUEUE.md). |
+| "Pharmacy and scheduling modules" | Pilot-stage, and the module docstring says so. Stock is a count and an expiry date; slots are declared capacity. Not a replacement for a hospital's own systems. |
+| "AI-powered triage" | No model decides urgency. Queue order is arrival time, moved only by a criterion the device already fired and a human has not yet acknowledged. |
 
 ## Not in this build
 
