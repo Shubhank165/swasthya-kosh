@@ -151,14 +151,14 @@
   "@notLinked": {
     "description": ""
   },
-  "profileDeleteHistory": "Delete my history",
-  "profileDeleteSubtitle": "Remove everything this hospital has recorded about you",
-  "deleteHistoryTitle": "Delete your history?",
-  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Lifestyle assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
-  "deleteHistoryConfirm": "Delete everything",
-  "deleteHistoryCancel": "Keep my history",
-  "deleteHistoryDone": "Your history has been deleted.",
-  "deleteHistoryNothing": "There was nothing recorded to delete.",
-  "deleteHistoryPartial": "Most of your history was deleted, but one scanned document could not be removed. Please tell the registration desk.",
-  "deleteHistoryFailed": "Nothing was deleted. Check your connection and try again."
+  "profileDeleteHistory": "ਮੇਰੀ ਜਾਣਕਾਰੀ ਮਿਟਾਓ",
+  "profileDeleteSubtitle": "ਇਸ ਹਸਪਤਾਲ ਨੇ ਤੁਹਾਡੇ ਬਾਰੇ ਜੋ ਵੀ ਦਰਜ ਕੀਤਾ ਹੈ, ਸਭ ਹਟਾਓ",
+  "deleteHistoryTitle": "ਕੀ ਤੁਹਾਡੀ ਜਾਣਕਾਰੀ ਮਿਟਾ ਦਿੱਤੀ ਜਾਵੇ?",
+  "deleteHistoryBody": "ਇਸ ਨਾਲ ਤੁਹਾਡੀ ਹਰ ਮੁਲਾਕਾਤ, ਤੁਹਾਡੇ ਦਿੱਤੇ ਸਾਰੇ ਜਵਾਬ, ਤੁਹਾਡੇ ਸਕੈਨ ਕੀਤੇ ਸਾਰੇ ਕਾਗਜ਼ ਅਤੇ ਤੁਹਾਡਾ ਜੀਵਨ-ਸ਼ੈਲੀ ਮੁਲਾਂਕਣ ਇਸ ਹਸਪਤਾਲ ਦੇ ਰਿਕਾਰਡ ਵਿੱਚੋਂ ਹਟ ਜਾਣਗੇ। ਤੁਹਾਡੇ ਡਾਕਟਰ ਇਹ ਫਿਰ ਨਹੀਂ ਦੇਖ ਸਕਣਗੇ। ਇਹ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ।",
+  "deleteHistoryConfirm": "ਸਭ ਕੁਝ ਮਿਟਾਓ",
+  "deleteHistoryCancel": "ਮੇਰੀ ਜਾਣਕਾਰੀ ਰਹਿਣ ਦਿਓ",
+  "deleteHistoryDone": "ਤੁਹਾਡੀ ਜਾਣਕਾਰੀ ਮਿਟਾ ਦਿੱਤੀ ਗਈ ਹੈ।",
+  "deleteHistoryNothing": "ਮਿਟਾਉਣ ਲਈ ਕੁਝ ਦਰਜ ਨਹੀਂ ਸੀ।",
+  "deleteHistoryPartial": "ਤੁਹਾਡੀ ਬਹੁਤੀ ਜਾਣਕਾਰੀ ਮਿਟਾ ਦਿੱਤੀ ਗਈ, ਪਰ ਇੱਕ ਸਕੈਨ ਕੀਤਾ ਕਾਗਜ਼ ਨਹੀਂ ਹਟ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਡੈਸਕ ਨੂੰ ਦੱਸੋ।",
+  "deleteHistoryFailed": "ਕੁਝ ਵੀ ਨਹੀਂ ਮਿਟਾਇਆ ਗਿਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
 }

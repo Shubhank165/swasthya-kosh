@@ -124,22 +124,44 @@ void main() {
   });
 
   group('the Lifestyle card', () {
-    testWidgets('says it is not ready before it is tapped', (tester) async {
-      // A card that looks live and then apologises has already wasted the tap,
-      // and this app's rule for a mocked integration (§7.2) is that it says so
-      // on screen rather than behaving as though it were real.
+    testWidgets('says what it is before it is tapped, and opens', (tester) async {
+      // It used to read "Not available yet" and open a placeholder. The screen
+      // is real now, so the card says what the thing is instead — a card that
+      // looks live and then apologises has already wasted the tap, and one that
+      // still apologises when the screen exists wastes the screen.
       await tester.pumpWidget(wrap(const HomeShell(), edges()));
       await tester.pumpAndSettle();
 
-      final subtitle = AppLocalizations.of(
+      final strings = AppLocalizations.of(
         tester.element(find.byKey(const Key('home.lifestyle'))),
-      ).notAvailableYet;
-      expect(find.text(subtitle), findsOneWidget);
+      );
+      expect(find.text(strings.lifestyleSubtitle), findsOneWidget);
+      expect(find.text(strings.notAvailableYet), findsNothing);
 
       await tester.tap(find.byKey(const Key('home.lifestyle')));
       await tester.pumpAndSettle();
+      expect(find.text(strings.lifestyleTitle), findsWidgets);
+    });
+
+    testWidgets('with no content it says so rather than showing an empty form',
+        (tester) async {
+      // §7.2: a build whose bundle carries no module must say that, not render
+      // a questionnaire with nothing in it. The placeholder is the honest
+      // answer, and it is only honest while there is genuinely nothing to ask.
+      await tester.pumpWidget(wrap(const HomeShell(), edges()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('home.lifestyle')));
+      await tester.pumpAndSettle();
+
       expect(find.byKey(const Key('lifestyle.notAvailable')), findsOneWidget);
     });
+
+    // **Not covered here: the populated path.** Driving it needs the screen's
+    // encrypted local store, and an in-memory override does not settle under
+    // `pumpAndSettle` — the loading indicator spins for ever, so the test hangs
+    // rather than fails, which is worse than not having it. `LifestyleScreen`
+    // with a bundle that carries the module has no widget coverage; it is in
+    // docs/CLINICAL_REVIEW_QUEUE.md as a gap rather than left silent.
   });
 
   group('a tab that cannot load', () {

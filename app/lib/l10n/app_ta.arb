@@ -151,14 +151,14 @@
   "@notLinked": {
     "description": ""
   },
-  "profileDeleteHistory": "Delete my history",
-  "profileDeleteSubtitle": "Remove everything this hospital has recorded about you",
-  "deleteHistoryTitle": "Delete your history?",
-  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Lifestyle assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
-  "deleteHistoryConfirm": "Delete everything",
-  "deleteHistoryCancel": "Keep my history",
-  "deleteHistoryDone": "Your history has been deleted.",
-  "deleteHistoryNothing": "There was nothing recorded to delete.",
-  "deleteHistoryPartial": "Most of your history was deleted, but one scanned document could not be removed. Please tell the registration desk.",
-  "deleteHistoryFailed": "Nothing was deleted. Check your connection and try again."
+  "profileDeleteHistory": "எனது தகவலை நீக்கு",
+  "profileDeleteSubtitle": "இந்த மருத்துவமனை உங்களைப் பற்றி பதிவு செய்த அனைத்தையும் நீக்கு",
+  "deleteHistoryTitle": "உங்கள் தகவலை நீக்கவா?",
+  "deleteHistoryBody": "இதனால் உங்கள் ஒவ்வொரு வருகையும், நீங்கள் அளித்த அனைத்து பதில்களும், நீங்கள் ஸ்கேன் செய்த அனைத்து காகிதங்களும், உங்கள் வாழ்க்கைமுறை மதிப்பீடும் இந்த மருத்துவமனையின் பதிவுகளிலிருந்து நீக்கப்படும். உங்கள் மருத்துவர் இவற்றை இனி பார்க்க முடியாது. இதை மீட்டெடுக்க முடியாது.",
+  "deleteHistoryConfirm": "அனைத்தையும் நீக்கு",
+  "deleteHistoryCancel": "எனது தகவலை வைத்திரு",
+  "deleteHistoryDone": "உங்கள் தகவல் நீக்கப்பட்டது.",
+  "deleteHistoryNothing": "நீக்குவதற்கு எதுவும் பதிவாகியிருக்கவில்லை.",
+  "deleteHistoryPartial": "உங்கள் தகவலின் பெரும்பகுதி நீக்கப்பட்டது, ஆனால் ஸ்கேன் செய்யப்பட்ட ஒரு காகிதத்தை நீக்க முடியவில்லை. பதிவு மேசையில் தெரிவிக்கவும்.",
+  "deleteHistoryFailed": "எதுவும் நீக்கப்படவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயலுங்கள்."
 }

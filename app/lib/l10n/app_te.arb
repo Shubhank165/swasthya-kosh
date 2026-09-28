@@ -151,14 +151,14 @@
   "@notLinked": {
     "description": ""
   },
-  "profileDeleteHistory": "Delete my history",
-  "profileDeleteSubtitle": "Remove everything this hospital has recorded about you",
-  "deleteHistoryTitle": "Delete your history?",
-  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Lifestyle assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
-  "deleteHistoryConfirm": "Delete everything",
-  "deleteHistoryCancel": "Keep my history",
-  "deleteHistoryDone": "Your history has been deleted.",
-  "deleteHistoryNothing": "There was nothing recorded to delete.",
-  "deleteHistoryPartial": "Most of your history was deleted, but one scanned document could not be removed. Please tell the registration desk.",
-  "deleteHistoryFailed": "Nothing was deleted. Check your connection and try again."
+  "profileDeleteHistory": "నా సమాచారాన్ని తొలగించు",
+  "profileDeleteSubtitle": "ఈ ఆసుపత్రి మీ గురించి నమోదు చేసిన అన్నింటినీ తీసివేయండి",
+  "deleteHistoryTitle": "మీ సమాచారాన్ని తొలగించాలా?",
+  "deleteHistoryBody": "దీనితో మీ ప్రతి సందర్శన, మీరు ఇచ్చిన అన్ని సమాధానాలు, మీరు స్కాన్ చేసిన అన్ని కాగితాలు మరియు మీ జీవనశైలి మూల్యాంకనం ఈ ఆసుపత్రి రికార్డుల నుండి తొలగిపోతాయి. మీ వైద్యుడు వాటిని ఇకపై చూడలేరు. దీన్ని వెనక్కి తీసుకోలేము.",
+  "deleteHistoryConfirm": "అన్నీ తొలగించు",
+  "deleteHistoryCancel": "నా సమాచారాన్ని ఉంచు",
+  "deleteHistoryDone": "మీ సమాచారం తొలగించబడింది.",
+  "deleteHistoryNothing": "తొలగించడానికి ఏమీ నమోదు కాలేదు.",
+  "deleteHistoryPartial": "మీ సమాచారంలో చాలా భాగం తొలగించబడింది, కానీ స్కాన్ చేసిన ఒక కాగితాన్ని తీసివేయలేకపోయాము. దయచేసి నమోదు డెస్క్‌కు తెలియజేయండి.",
+  "deleteHistoryFailed": "ఏమీ తొలగించబడలేదు. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి."
 }

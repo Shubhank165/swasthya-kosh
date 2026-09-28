@@ -448,6 +448,40 @@ and `prakriti_self_report` carries "self-reported and provisional" to match the
 
 ---
 
+## The delete-my-history wording, in seven languages
+
+`app/lib/l10n/app_{bn,gu,kn,mr,pa,ta,te}.arb` — ten strings covering the
+irreversible-erasure flow: the profile entry, the confirmation dialog, and the
+four outcome messages.
+
+Engineer-authored against the English and Hindi originals and **not reviewed by
+a native speaker**, the same standing caveat the rest of this app's seven
+non-Hindi translations carry. What makes these different from a stilted
+navigation label is the consequence: `deleteHistoryConfirm` ("Delete
+everything") and `deleteHistoryCancel` ("Keep my history") sit next to each
+other on a dialog that cannot be undone. A translation that blurs the two is a
+patient deleting their record while trying to save it.
+
+- [ ] Have a native speaker of each check that the confirm and cancel labels
+      cannot be mistaken for one another, and that `deleteHistoryBody` says the
+      deletion is permanent.
+- [ ] `deleteHistoryPartial` tells the patient to speak to the registration
+      desk. Confirm that is the right instruction at the facility, and that the
+      desk can act on it.
+
+## A coverage gap, recorded rather than left silent
+
+`LifestyleScreen`'s populated path — the screen with a bundle that actually
+carries the module — has **no widget test**. Driving it needs the encrypted
+local store, and an in-memory override does not settle under `pumpAndSettle`:
+the loading indicator spins and the test hangs rather than fails, which is worse
+than not having it. The empty path (the honest "not available yet" placeholder)
+and the card that opens it are both covered.
+
+- [ ] Worth closing before this screen carries anything a physician reads.
+
+---
+
 ## Not on this list
 
 The pathways, the red-flag rules and the coverage model. They were reviewed

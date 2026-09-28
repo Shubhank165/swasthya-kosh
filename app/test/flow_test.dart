@@ -210,7 +210,10 @@ void main() {
       expect((fields['dyspnoea'] as Map)['value'], true);
       // And accounts for the ones it never got to, explicitly.
       expect((fields['duration'] as Map)['status'], 'not_asked');
-      expect((fields['digestion'] as Map)['status'], 'not_asked');
+      // `digestion` is in the bundle's lifestyle plan and is deliberately
+      // absent: the module is not part of a visit, so it was never put and the
+      // record does not claim it was skipped either.
+      expect(fields.containsKey('digestion'), isFalse);
     });
 
     test('the record survives the app dying on the urgent screen', () async {
@@ -236,7 +239,6 @@ void main() {
       final flow = await begin();
       await flow.answer(const CodedValue('fever'), 'Fever');
       await flow.answer(const NumberValue(3), '3 days');
-      await flow.answer(const BoolValue(true), 'Yes');
 
       // §5: documents (screen 9) sit between the interview and the review.
       expect(flow.stage, FlowStage.documents);
@@ -260,7 +262,6 @@ void main() {
       final flow = await begin();
       await flow.answer(const CodedValue('fever'), 'Fever');
       await flow.answer(const NumberValue(3), '3 days');
-      await flow.answer(const BoolValue(true), 'Yes');
       flow.continueToReview();
       await flow.submit();
 
@@ -273,7 +274,6 @@ void main() {
       final flow = await begin();
       await flow.answer(const CodedValue('fever'), 'Fever');
       await flow.answer(const NumberValue(3), '3 days');
-      await flow.answer(const BoolValue(true), 'Yes');
       flow.continueToReview();
 
       await Future.wait([flow.submit(), flow.submit()]);
@@ -430,7 +430,6 @@ void main() {
       final flow = await begin();
       await flow.answer(const CodedValue('fever'), 'Fever');
       await flow.answer(const NumberValue(3), '3 days');
-      await flow.answer(const BoolValue(true), 'Yes');
       return flow;
     }
 
@@ -552,7 +551,8 @@ void main() {
         ),
       ]);
       await flow.answer(const CodedValue('fever'), 'Fever');
-      await flow.answer(const BoolValue(true), 'Yes'); // the Lifestyle question
+      // Nothing more is put: the branch's only question, `duration`, arrived
+      // already settled as a carried-forward fact.
       flow.continueToReview();
       await flow.submit();
 
@@ -597,7 +597,6 @@ void main() {
         ],
       );
       await flow.answer(const CodedValue('fever'), 'Fever');
-      await flow.answer(const BoolValue(true), 'Yes');
       flow.continueToReview();
       await flow.submit();
 

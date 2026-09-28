@@ -85,7 +85,13 @@ flutter:
   uses-material-design: true
   generate: true
   assets:
-    - assets/bundle/
+    # No `assets/bundle/` entry. The question bundle is fetched over HTTP and
+    # cached in application-support storage — see content/bundle_repository.dart
+    # — so nothing ever reads it as an asset. The declaration was dead and
+    # printed "unable to find directory entry in pubspec.yaml" on every release
+    # build, which is a real error message that meant nothing and trained
+    # everyone to read past it.
+    #
     # The offline ASR models — shipped in the APK so voice input works on
     # first launch with no download, and never fetched. ~103 MB of
     # Whisper-tiny int8 for English, ~140 MB of IndicConformer int8 for Hindi;

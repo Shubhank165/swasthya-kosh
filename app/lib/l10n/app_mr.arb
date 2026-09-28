@@ -151,14 +151,14 @@
   "@notLinked": {
     "description": ""
   },
-  "profileDeleteHistory": "Delete my history",
-  "profileDeleteSubtitle": "Remove everything this hospital has recorded about you",
-  "deleteHistoryTitle": "Delete your history?",
-  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Lifestyle assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
-  "deleteHistoryConfirm": "Delete everything",
-  "deleteHistoryCancel": "Keep my history",
-  "deleteHistoryDone": "Your history has been deleted.",
-  "deleteHistoryNothing": "There was nothing recorded to delete.",
-  "deleteHistoryPartial": "Most of your history was deleted, but one scanned document could not be removed. Please tell the registration desk.",
-  "deleteHistoryFailed": "Nothing was deleted. Check your connection and try again."
+  "profileDeleteHistory": "माझी माहिती काढून टाका",
+  "profileDeleteSubtitle": "या रुग्णालयाने तुमच्याबद्दल नोंदवलेले सर्व काढून टाका",
+  "deleteHistoryTitle": "तुमची माहिती काढून टाकायची?",
+  "deleteHistoryBody": "यामुळे तुमची प्रत्येक भेट, तुम्ही दिलेली सर्व उत्तरे, तुम्ही स्कॅन केलेले सर्व कागद आणि तुमचे जीवनशैली मूल्यांकन या रुग्णालयाच्या नोंदींमधून निघून जाईल. तुमचे डॉक्टर ते पुन्हा पाहू शकणार नाहीत. हे परत घेता येणार नाही.",
+  "deleteHistoryConfirm": "सर्व काढून टाका",
+  "deleteHistoryCancel": "माझी माहिती राहू द्या",
+  "deleteHistoryDone": "तुमची माहिती काढून टाकली आहे.",
+  "deleteHistoryNothing": "काढून टाकण्यासाठी काहीही नोंदवलेले नव्हते.",
+  "deleteHistoryPartial": "तुमची बहुतांश माहिती काढून टाकली, पण एक स्कॅन केलेला कागद काढता आला नाही. कृपया नोंदणी कक्षाला सांगा.",
+  "deleteHistoryFailed": "काहीही काढून टाकले गेले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा."
 }

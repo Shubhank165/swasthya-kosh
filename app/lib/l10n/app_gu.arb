@@ -151,14 +151,14 @@
   "@notLinked": {
     "description": ""
   },
-  "profileDeleteHistory": "Delete my history",
-  "profileDeleteSubtitle": "Remove everything this hospital has recorded about you",
-  "deleteHistoryTitle": "Delete your history?",
-  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Lifestyle assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
-  "deleteHistoryConfirm": "Delete everything",
-  "deleteHistoryCancel": "Keep my history",
-  "deleteHistoryDone": "Your history has been deleted.",
-  "deleteHistoryNothing": "There was nothing recorded to delete.",
-  "deleteHistoryPartial": "Most of your history was deleted, but one scanned document could not be removed. Please tell the registration desk.",
-  "deleteHistoryFailed": "Nothing was deleted. Check your connection and try again."
+  "profileDeleteHistory": "મારી માહિતી કાઢી નાખો",
+  "profileDeleteSubtitle": "આ હોસ્પિટલે તમારા વિશે જે નોંધ્યું છે તે બધું કાઢી નાખો",
+  "deleteHistoryTitle": "તમારી માહિતી કાઢી નાખીએ?",
+  "deleteHistoryBody": "આનાથી તમારી દરેક મુલાકાત, તમે આપેલા બધા જવાબો, તમે સ્કેન કરેલા બધા કાગળ અને તમારું જીવનશૈલી મૂલ્યાંકન આ હોસ્પિટલના રેકોર્ડમાંથી નીકળી જશે. તમારા ડૉક્ટર તે પછી જોઈ શકશે નહીં. આ પાછું લઈ શકાતું નથી.",
+  "deleteHistoryConfirm": "બધું કાઢી નાખો",
+  "deleteHistoryCancel": "મારી માહિતી રહેવા દો",
+  "deleteHistoryDone": "તમારી માહિતી કાઢી નાખવામાં આવી છે.",
+  "deleteHistoryNothing": "કાઢી નાખવા માટે કંઈ નોંધાયેલું ન હતું.",
+  "deleteHistoryPartial": "તમારી મોટા ભાગની માહિતી કાઢી નાખવામાં આવી, પરંતુ એક સ્કેન કરેલો કાગળ કાઢી શકાયો નહીં. કૃપા કરીને નોંધણી ડેસ્કને જણાવો.",
+  "deleteHistoryFailed": "કંઈ પણ કાઢી નાખવામાં આવ્યું નથી. તમારું કનેક્શન તપાસીને ફરી પ્રયાસ કરો."
 }

@@ -428,7 +428,13 @@ void main() {
     });
   });
 
-  group('the Lifestyle section on a return visit', () {
+  group('the Lifestyle module is not part of a visit', () {
+    // It used to be. It rode along on every intake as an unlabelled extra
+    // section, which made a symptom visit longer than the symptom warranted,
+    // and it now lives on its own screen (`home/lifestyle_screen.dart`) —
+    // answered once, whenever the patient chooses. These tests are what stop it
+    // quietly coming back: a bundle that still declares the plan must not cause
+    // the walker to walk it.
     ContentBundle module() => bundleWith(
           questions: [
             question('complaint', field: 'chief_complaint', type: 'single_choice',
@@ -442,42 +448,37 @@ void main() {
           lifestyleCurrentState: ['agni', 'nidra'],
         );
 
-    test('a first visit gets the full module', () {
+    test('a bundle that declares the module does not make the walker walk it', () {
       final walker = IntakeWalker(bundle: module(), language: 'en');
-      expect(walker.plan, containsAll(['agni', 'nidra', 'vihara']));
-    });
-
-    test('a return visit gets the current-state subset', () {
-      // §5 screen 8. What a patient reports about their own constitution does
-      // not change between two visits a fortnight apart; Agni, Nidra and
-      // Koshtha are exactly what the Vaidya wants today's answer to.
-      final walker =
-          IntakeWalker(bundle: module(), language: 'en', returnVisit: true);
-      expect(walker.plan, contains('agni'));
+      expect(walker.plan, isNot(contains('agni')));
+      expect(walker.plan, isNot(contains('nidra')));
       expect(walker.plan, isNot(contains('vihara')));
     });
 
-    test('a bundle that names no subset falls back to the full module', () {
-      // An older backend, or content where no clinician has marked one. A
-      // returning patient answering nine questions is slower; one asked none of
-      // them arrives with no Agni, Nidra or Koshtha at all.
-      final older = bundleWith(
-        questions: [question('agni'), question('vihara')],
-        lifestyle: ['agni', 'vihara'],
-      );
-      final walker =
-          IntakeWalker(bundle: older, language: 'en', returnVisit: true);
-      expect(walker.plan, containsAll(['agni', 'vihara']));
+    test('the plan is the core plus the chosen complaint branch, and nothing else', () {
+      final walker = IntakeWalker(bundle: module(), language: 'en');
+      expect(walker.plan, ['complaint']);
     });
 
-    test('the subset is what the record accounts for, not the full module', () {
-      final walker =
+    test('a return visit is no different, because the module is not here at all', () {
+      // `returnVisit` used to select a smaller subset of the module. With the
+      // module gone from the visit there is nothing for it to select, and a
+      // walker that behaved differently would mean it had come back.
+      final first = IntakeWalker(bundle: module(), language: 'en');
+      final again =
           IntakeWalker(bundle: module(), language: 'en', returnVisit: true);
+      expect(again.plan, first.plan);
+    });
+
+    test('nothing in the module is recorded not_asked', () {
+      final walker = IntakeWalker(bundle: module(), language: 'en');
       walker.closeOut();
       // A question that was never in the plan is not `not_asked` — it was not
       // part of this intake at all, and claiming it was put and skipped would
-      // be a different statement.
-      expect(walker.answers.containsKey('vihara'), isFalse);
+      // be a different statement about the patient.
+      for (final id in ['agni', 'nidra', 'vihara']) {
+        expect(walker.answers.containsKey(id), isFalse, reason: id);
+      }
     });
   });
 }

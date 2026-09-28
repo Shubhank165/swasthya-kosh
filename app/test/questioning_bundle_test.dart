@@ -245,20 +245,24 @@ void main() {
       expect(asked, greaterThan(3));
     });
 
-    test('a returning patient is asked the three current-state questions', () {
-      // §5 screen 8 — agni, koshtha and nidra are what a Vaidya wants today's
-      // answer to; the rest of the module does not move between two visits.
-      final full = IntakeWalker(bundle: bundle, language: 'en').plan
-          .where((id) => id.startsWith('lifestyle.'))
-          .toSet();
-      final returning =
-          IntakeWalker(bundle: bundle, language: 'en', returnVisit: true)
-              .plan
-              .where((id) => id.startsWith('lifestyle.'))
-              .toSet();
-      expect(returning, isNotEmpty);
-      expect(returning.length, lessThan(full.length));
-      expect(returning, contains('lifestyle.appetite'));
+    test('the real bundle declares the Lifestyle module and no visit walks it', () {
+      // The compiled bundle still carries the module, because the standalone
+      // screen serves it from the same content. What must not happen is a visit
+      // walking it: that is how a symptom intake became longer than the symptom
+      // warranted, and the fixture is the only place the real plan can be
+      // checked rather than a two-question stand-in.
+      expect(bundle.lifestyle, isNotEmpty,
+          reason: 'the module left the content entirely, which is a different change');
+
+      for (final returnVisit in [false, true]) {
+        final plan = IntakeWalker(
+          bundle: bundle,
+          language: 'en',
+          returnVisit: returnVisit,
+        ).plan;
+        expect(plan.where((id) => id.startsWith('lifestyle.')), isEmpty,
+            reason: 'returnVisit: $returnVisit');
+      }
     });
   });
 }

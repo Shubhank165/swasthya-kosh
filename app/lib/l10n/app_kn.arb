@@ -151,14 +151,14 @@
   "@notLinked": {
     "description": ""
   },
-  "profileDeleteHistory": "Delete my history",
-  "profileDeleteSubtitle": "Remove everything this hospital has recorded about you",
-  "deleteHistoryTitle": "Delete your history?",
-  "deleteHistoryBody": "This removes every visit, every answer you gave, every document you scanned, and your Lifestyle assessment from this hospital's records. Your doctor will no longer be able to see them. This cannot be undone.",
-  "deleteHistoryConfirm": "Delete everything",
-  "deleteHistoryCancel": "Keep my history",
-  "deleteHistoryDone": "Your history has been deleted.",
-  "deleteHistoryNothing": "There was nothing recorded to delete.",
-  "deleteHistoryPartial": "Most of your history was deleted, but one scanned document could not be removed. Please tell the registration desk.",
-  "deleteHistoryFailed": "Nothing was deleted. Check your connection and try again."
+  "profileDeleteHistory": "ನನ್ನ ಮಾಹಿತಿಯನ್ನು ಅಳಿಸಿ",
+  "profileDeleteSubtitle": "ಈ ಆಸ್ಪತ್ರೆ ನಿಮ್ಮ ಬಗ್ಗೆ ದಾಖಲಿಸಿರುವ ಎಲ್ಲವನ್ನೂ ತೆಗೆದುಹಾಕಿ",
+  "deleteHistoryTitle": "ನಿಮ್ಮ ಮಾಹಿತಿಯನ್ನು ಅಳಿಸಬೇಕೆ?",
+  "deleteHistoryBody": "ಇದರಿಂದ ನಿಮ್ಮ ಪ್ರತಿ ಭೇಟಿ, ನೀವು ಕೊಟ್ಟ ಎಲ್ಲಾ ಉತ್ತರಗಳು, ನೀವು ಸ್ಕ್ಯಾನ್ ಮಾಡಿದ ಎಲ್ಲಾ ಕಾಗದಗಳು ಮತ್ತು ನಿಮ್ಮ ಜೀವನಶೈಲಿ ಮೌಲ್ಯಮಾಪನ ಈ ಆಸ್ಪತ್ರೆಯ ದಾಖಲೆಗಳಿಂದ ಹೋಗುತ್ತವೆ. ನಿಮ್ಮ ವೈದ್ಯರು ಇನ್ನು ಅವುಗಳನ್ನು ನೋಡಲಾಗುವುದಿಲ್ಲ. ಇದನ್ನು ಹಿಂತಿರುಗಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+  "deleteHistoryConfirm": "ಎಲ್ಲವನ್ನೂ ಅಳಿಸಿ",
+  "deleteHistoryCancel": "ನನ್ನ ಮಾಹಿತಿಯನ್ನು ಇರಿಸಿ",
+  "deleteHistoryDone": "ನಿಮ್ಮ ಮಾಹಿತಿಯನ್ನು ಅಳಿಸಲಾಗಿದೆ.",
+  "deleteHistoryNothing": "ಅಳಿಸಲು ಏನೂ ದಾಖಲಾಗಿರಲಿಲ್ಲ.",
+  "deleteHistoryPartial": "ನಿಮ್ಮ ಬಹುತೇಕ ಮಾಹಿತಿಯನ್ನು ಅಳಿಸಲಾಗಿದೆ, ಆದರೆ ಒಂದು ಸ್ಕ್ಯಾನ್ ಮಾಡಿದ ಕಾಗದವನ್ನು ತೆಗೆಯಲಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ನೋಂದಣಿ ಮೇಜಿಗೆ ತಿಳಿಸಿ.",
+  "deleteHistoryFailed": "ಏನನ್ನೂ ಅಳಿಸಲಾಗಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
 }
