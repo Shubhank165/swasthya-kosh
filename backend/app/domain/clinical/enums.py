@@ -53,6 +53,39 @@ def certainty_rank(certainty: Certainty) -> int:
     return _CERTAINTY_ORDER.index(certainty)
 
 
+class RedFlagSeverity(StrEnum):
+    """How serious the device judged a fired criterion to be.
+
+    Two values, because the clinical content emits two: `critical` on five
+    rules and `high` on four. This is not a scale to be extended casually — it
+    decides who overtakes whom in a waiting room.
+
+    **`CRITICAL` is the only value that reorders the queue.** A `HIGH` flag
+    still raises an alert a clinician must acknowledge and still marks the
+    intake on the worklist; it does not move the patient in front of anyone.
+    Decision 79 has the argument.
+    """
+
+    CRITICAL = "critical"
+    HIGH = "high"
+
+    @classmethod
+    def parse(cls, raw: object) -> RedFlagSeverity:
+        """A severity from the wire, failing to the tier that does *not* jump.
+
+        An unrecognised value becomes `HIGH`, never `CRITICAL`. The direction
+        matters more than the default: a device sending a value this build has
+        never heard of must not be able to reorder a waiting room by sending
+        garbage, and the safe failure is the one that leaves the queue alone.
+        The alert still fires either way, so nothing is hidden by this — only
+        the overtaking is withheld.
+        """
+        try:
+            return cls(str(raw).strip().lower())
+        except ValueError:
+            return cls.HIGH
+
+
 class Section(StrEnum):
     """Sections of the history, in the clinical order it is taken.
 

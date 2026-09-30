@@ -39,10 +39,16 @@ async def worklist(
 ) -> WorklistOut:
     """The ordered list for a department.
 
-    Arrival order. A fired red-flag criterion pulls the row into
-    `pending_alerts` so it cannot be scrolled past, but it does **not** move the
-    intake up the list — reordering a waiting room on a machine's reading of a
-    symptom is a triage decision, and this system does not make those.
+    Arrival order, with one exception. An unacknowledged **critical** red-flag
+    criterion moves the intake to the front — decision 77 reversed the older
+    rule, and decision 79 narrowed it to critical only, so a `high` criterion
+    now marks the row and leaves its position alone. A fired criterion of
+    either severity also pulls the row into `pending_alerts` so it cannot be
+    scrolled past.
+
+    Nothing here reads a symptom. The severity is the device's, the criterion
+    is the device's, and acknowledgement returns the row to arrival order.
+    `priority` on each entry says which case a row is in.
 
     `state` narrows the list; `total` still counts the whole window, so a filter
     that hides thirty patients says so rather than making the department look
@@ -113,10 +119,15 @@ async def acknowledge(
 ) -> AcknowledgeResponse:
     """Record that a person has seen an alert.
 
-    Acknowledgement is a record of a human having looked, and nothing else. It
-    escalates nothing, reorders nothing and notifies nobody automatically — what
-    happens next is the acknowledging clinician's decision, made outside this
-    system.
+    Acknowledgement is a record of a human having looked. It escalates nothing
+    and notifies nobody automatically — what happens next is the acknowledging
+    clinician's decision, made outside this system.
+
+    It **does** reorder: an acknowledged criterion stops holding the intake at
+    the front of the queue, because the fast lane exists to get a flag in front
+    of a person and it has done that. Decision 77. This docstring said
+    "reorders nothing" for as long as that was true and kept saying it
+    afterwards, which is how a false claim ends up in a published schema.
 
     A second acknowledgement is a 409 rather than a silent success: two people
     each assuming the other has seen it is the failure worth being noisy about.

@@ -12,12 +12,17 @@ should be treated as breaking the feature rather than tuning it:
 The same intake produces the same class on every evaluation, on any machine,
 for ever. A probabilistic priority is one nobody can answer a complaint about.
 
-**Only what the device already decided.** `EMERGENCY` follows from a red-flag
-criterion the Jetson fired during the interview and a human has not yet
-acknowledged, or from the interview being cut short by one. This module reads
-that outcome; it does not re-derive it from symptoms, and it has no access to
-clinical text with which to try. A second opinion that disagrees with the first
-is worse than no second opinion.
+**Only what the device already decided.** `EMERGENCY` follows from a *critical*
+red-flag criterion the Jetson fired during the interview and a human has not
+yet acknowledged, or from the interview being cut short by one. This module
+reads that outcome; it does not re-derive it from symptoms, and it has no
+access to clinical text with which to try. A second opinion that disagrees with
+the first is worse than no second opinion.
+
+**And only the severe ones.** Every fired criterion used to overtake, because
+this module counted alerts rather than reading them. It now reads their
+severity, and only `critical` moves anybody. Decision 79 has the argument and
+the objection against it.
 
 **Escalation only.** A rule may move an intake up. Nothing here moves one down:
 `WALKIN` is the floor, it is where everyone starts, and a patient cannot be
@@ -33,8 +38,10 @@ queue domain comes back.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import StrEnum
 
+from app.domain.clinical.enums import RedFlagSeverity
 from app.domain.record import IntakeStatus
 
 
@@ -59,7 +66,7 @@ PRIORITY_RANK: dict[PriorityClass, int] = {
 def priority_for(
     *,
     status: IntakeStatus,
-    unacknowledged_alerts: int,
+    unacknowledged_severities: Sequence[RedFlagSeverity],
     seen_at: object | None = None,
 ) -> PriorityClass:
     """The class one intake sorts in.
@@ -70,8 +77,11 @@ def priority_for(
     1. Seen. A patient the doctor has already read drops to the floor — not
        because they matter less, but because they are no longer waiting, and
        leaving them at the top would hold the front of the list for ever.
-    2. An unacknowledged red-flag event. This is the emergency fast lane, and
-       it is the device's finding, not this module's.
+    2. An unacknowledged **critical** red-flag event. This is the emergency
+       fast lane, and it is the device's finding, not this module's. A `high`
+       flag is still a flag — it raises an alert, it marks the intake, a
+       clinician still has to acknowledge it — and it does not move the
+       patient in front of anybody who arrived first.
     3. The interview stopped because a criterion fired. The same finding
        arriving by a different route: the Jetson cut the intake short rather
        than finishing it, which it only does for a red flag.
@@ -86,8 +96,12 @@ def priority_for(
 
     if seen_at is not None:
         return PriorityClass.WALKIN
-    if unacknowledged_alerts > 0:
+    if any(s is RedFlagSeverity.CRITICAL for s in unacknowledged_severities):
         return PriorityClass.EMERGENCY
     if status is IntakeStatus.ABORTED_RED_FLAG:
+        # No severity of its own to read. The device stops an interview only
+        # for a criterion it judged serious enough to stop for, and a patient
+        # the machine refused to keep questioning is not one to leave in
+        # arrival order on the strength of a missing field.
         return PriorityClass.EMERGENCY
     return PriorityClass.WALKIN

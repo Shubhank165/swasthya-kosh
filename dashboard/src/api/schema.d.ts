@@ -66,10 +66,12 @@ export interface paths {
          *     invalidates every cached copy. The version is what a human reads in a
          *     changelog; the ETag is what is actually enforced.
          *
-         *     80 KB of Devanagari and English prompts on what may be a patient's mobile
-         *     data, fetched on every app launch. The 304 is not an optimisation detail —
-         *     it is the difference between an app that opens instantly on a bad connection
-         *     and one that does not.
+         *     190-odd KB of prompts and option text in nine languages, on what may be a
+         *     patient's mobile data, fetched on every app launch. It was 80 KB and two
+         *     languages before the engine's content replaced the hand-authored set; the
+         *     304 was worth having then and is worth more now. It is not an optimisation
+         *     detail — it is the difference between an app that opens instantly on a bad
+         *     connection and one that does not.
          */
         get: operations["bundle_api_v1_content_bundle_get"];
         put?: never;
@@ -227,6 +229,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/kiosk/whoami": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Confirm a kiosk token and report the hospital it is bound to
+         * @description 200 with the bound hospital for a valid kiosk token; 401 for a missing or
+         *     unrecognised one; 403 for a token of the wrong role (a patient session, or
+         *     a header-auth principal that is not `kiosk`).
+         *
+         *     The `hospital_id` is the one the token is registered against in Secret
+         *     Manager, which is authoritative — it is the value that will scope every
+         *     upload the device makes, regardless of what the device puts in a request.
+         */
+        get: operations["whoami_api_v1_kiosk_whoami_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/intakes/ingest": {
         parameters: {
             query?: never;
@@ -249,6 +277,11 @@ export interface paths {
          *     back with `needs_manual_review: true` and a 200, because a device that keeps
          *     retrying an unparseable payload eventually drops it, and the answers are
          *     worth more than the status code.
+         *
+         *     **In that case `intake_id` is null**, and the device must not post anything
+         *     against it. A raw row is not an intake: it has no report, no worklist entry
+         *     and nowhere to attach a document. `reason` and `errors` say what failed the
+         *     contract, so the payload can be fixed rather than retried unchanged.
          */
         post: operations["ingest_api_v1_intakes_ingest_post"];
         delete?: never;
@@ -469,6 +502,141 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/intakes/{intake_id}/prefill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest answers to upcoming questions from a free-text one
+         * @description Best-effort only. The interview does not wait on this to move the
+         *     patient to the next question, and a failure or an empty result here
+         *     changes nothing about how it proceeds — the questions are simply asked as
+         *     they always were.
+         *
+         *     `intake_id` scopes the call to one interview the same way every other
+         *     `/intakes/{intake_id}/...` route does; nothing is read from or written to
+         *     the record here, and no clinical text this call carries is stored or
+         *     logged beyond the count of questions asked and suggested (§ see
+         *     `app/services/prefill.py`). A suggestion becomes part of the record only
+         *     when the patient accepts it on their own screen, at which point it travels
+         *     through `POST /intakes/ingest` exactly like any other answer —
+         *     indistinguishable from one the patient typed or tapped unprompted.
+         */
+        post: operations["prefill_api_v1_intakes__intake_id__prefill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/intakes/{intake_id}/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Everything asked for on this intake */
+        get: operations["list_orders_api_v1_intakes__intake_id__orders_get"];
+        put?: never;
+        /**
+         * Issue a lab, imaging, referral or prescription order
+         * @description Record one order, with a slot when the destination has one free.
+         *
+         *     A referral or scan that finds no capacity comes back `unfilled` rather than
+         *     `requested` with a blank time. One says the hospital could not offer an
+         *     appointment; the other says nobody has looked. A patient walking across a
+         *     site deserves to know which.
+         *
+         *     Issuing is a physician's act and is recorded against their id, for the same
+         *     reason verification is: an order nobody signed is an order nobody owns.
+         */
+        post: operations["issue_order_api_v1_intakes__intake_id__orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pharmacy/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Items low, expiring, expired or out
+         * @description What a pharmacist should see before a patient reaches the counter.
+         *
+         *     Items the pharmacy has never recorded are absent rather than listed as a
+         *     shortage: "we have none" and "we have never heard of it" are different
+         *     answers, and only one of them is an alert.
+         */
+        get: operations["stock_alerts_api_v1_pharmacy_alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/intakes/{intake_id}/wait": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Queue position, and a time when the data supports one
+         * @description Where this patient stands.
+         *
+         *     `minutes` is null and `confident` false when the department has not yet
+         *     seen enough patients today to average over. A waiting room told "about
+         *     eight minutes" that waits ninety stops believing the screen, so the
+         *     estimate says when it does not know.
+         */
+        get: operations["wait_estimate_api_v1_intakes__intake_id__wait_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Waiting, flagged and unfilled, by department
+         * @description Where the time is going, longest wait first.
+         *
+         *     Counted over the last day from rows this system already holds. Nothing is
+         *     modelled, forecast or predicted — the number an administrator wants is how
+         *     long the person who has been waiting longest has been waiting, and that is
+         *     a subtraction.
+         */
+        get: operations["operations_api_v1_operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/patients/resolve": {
         parameters: {
             query?: never;
@@ -561,6 +729,109 @@ export interface paths {
         get: operations["my_history_api_v1_patients_me_history_get"];
         put?: never;
         post?: never;
+        /**
+         * Erase everything this hospital holds about the signed-in patient
+         * @description The withdrawal clause in `consent_v1.yaml`, made self-service.
+         *
+         *     Every patient is shown "you can ask us to delete what we recorded, at any
+         *     time before or after your consultation". Until this route existed there was
+         *     no delete path in the service at all, so that sentence was a promise nobody
+         *     could keep without a database console.
+         *
+         *     **Registered beside the `GET` on the same path and before `/{ref}/history`**,
+         *     for the reason that route's docstring gives: FastAPI matches in registration
+         *     order, and a later `/{ref}` would bind `ref="me"`.
+         *
+         *     **The patient comes from the session, never from the request.** There is no
+         *     path parameter and no body — the only record this can erase is the one
+         *     belonging to the token's holder. That is what makes it safe to expose a
+         *     destructive verb to a patient role at all.
+         *
+         *     **It erases across linked identifiers**, not just the one in hand. A patient
+         *     who signed in by phone and later linked an ABHA address has one history
+         *     under two references, and deleting half of it while reporting success is
+         *     the failure worth engineering against.
+         *
+         *     Sign-in survives deliberately: erasure is not sign-out. A patient who
+         *     deletes their record and starts a new intake is starting fresh, not locked
+         *     out.
+         */
+        delete: operations["erase_my_history_api_v1_patients_me_history_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/me/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The signed-in patient's own uploaded documents
+         * @description The document library behind the app's Documents tab — stage 4.
+         *
+         *     **Registered before `/{ref}/...` for the same reason `me/history` is.**
+         *     FastAPI matches in registration order, so were this second, a request for
+         *     `/patients/me/documents` would bind `ref="me"` on a staff route.
+         *
+         *     **The patient comes from the session, never from the request.** There is no
+         *     path parameter here: the intakes are resolved from `principal.patient_ref`,
+         *     which is the peppered HMAC the token was issued against, and the document
+         *     query is scoped to exactly those. A caller cannot widen it, because they
+         *     never supply the scope.
+         *
+         *     `list_documents` on the intake router exists and is staff-only, which is
+         *     correct for what it returns — confidence figures and everything the evidence
+         *     panel needs. This returns strictly less (`PatientDocumentOut`), because a
+         *     patient looking at their own scans must not be handed a machine's reading of
+         *     them (§8).
+         */
+        get: operations["my_documents_api_v1_patients_me_documents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Store the signed-in patient's lifestyle self-report
+         * @description The module's answers, filed against the patient rather than a visit.
+         *
+         *     **Registered above `/{ref}/history` for the reason `my_history` gives.**
+         *     FastAPI matches in registration order, so a `/me/...` route declared after a
+         *     `/{ref}/...` one is a route that never runs — `me` binds as a patient
+         *     identifier instead, on a guard meant for staff.
+         *
+         *     **Neither the hospital nor the patient is in the body.** Both come from the
+         *     session: `principal.hospital_id` and `principal.patient_ref`, per decision
+         *     21. A profile can only be submitted for the holder of the credential
+         *     submitting it, so there is nothing here to tamper with.
+         *
+         *     **`phone`, because that is what the session is.** The token is issued
+         *     against a peppered HMAC of the number, never the number, and that is the
+         *     same reference an intake is filed under. A profile stored this way is still
+         *     found after the patient links an ABHA address, because
+         *     `PatientIdentifierLink` resolves one patient's identifiers to each other —
+         *     which is why this does not key on ABHA and does not need to.
+         *
+         *     Answering again supersedes the previous revision rather than editing it.
+         *     Nothing here is ever updated in place; decision 4.
+         */
+        post: operations["submit_patient_profile_api_v1_patients_me_profile_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -608,10 +879,16 @@ export interface paths {
          * Intakes waiting for a doctor, in arrival order
          * @description The ordered list for a department.
          *
-         *     Arrival order. A fired red-flag criterion pulls the row into
-         *     `pending_alerts` so it cannot be scrolled past, but it does **not** move the
-         *     intake up the list — reordering a waiting room on a machine's reading of a
-         *     symptom is a triage decision, and this system does not make those.
+         *     Arrival order, with one exception. An unacknowledged **critical** red-flag
+         *     criterion moves the intake to the front — decision 77 reversed the older
+         *     rule, and decision 79 narrowed it to critical only, so a `high` criterion
+         *     now marks the row and leaves its position alone. A fired criterion of
+         *     either severity also pulls the row into `pending_alerts` so it cannot be
+         *     scrolled past.
+         *
+         *     Nothing here reads a symptom. The severity is the device's, the criterion
+         *     is the device's, and acknowledgement returns the row to arrival order.
+         *     `priority` on each entry says which case a row is in.
          *
          *     `state` narrows the list; `total` still counts the whole window, so a filter
          *     that hides thirty patients says so rather than making the department look
@@ -668,10 +945,15 @@ export interface paths {
          * Acknowledge a red-flag event
          * @description Record that a person has seen an alert.
          *
-         *     Acknowledgement is a record of a human having looked, and nothing else. It
-         *     escalates nothing, reorders nothing and notifies nobody automatically — what
-         *     happens next is the acknowledging clinician's decision, made outside this
-         *     system.
+         *     Acknowledgement is a record of a human having looked. It escalates nothing
+         *     and notifies nobody automatically — what happens next is the acknowledging
+         *     clinician's decision, made outside this system.
+         *
+         *     It **does** reorder: an acknowledged criterion stops holding the intake at
+         *     the front of the queue, because the fast lane exists to get a flag in front
+         *     of a person and it has done that. Decision 77. This docstring said
+         *     "reorders nothing" for as long as that was true and kept saying it
+         *     afterwards, which is how a false claim ends up in a published schema.
          *
          *     A second acknowledgement is a 409 rather than a silent success: two people
          *     each assuming the other has seen it is the failure worth being noisy about.
@@ -723,10 +1005,12 @@ export interface paths {
          *     the system rather than about a patient, and the person making that claim on
          *     a slide should be the person who can see how it was computed.
          *
-         *     It replaces the figures the shelved evaluation harness used to produce.
-         *     Those measured question selection, which now runs on the Jetson, so they no
-         *     longer describe anything this backend does — and none of them may be quoted
-         *     until this number has data behind it.
+         *     Measured from what physicians actually did, and therefore the one number
+         *     here that needs real use before it means anything. It is not the evaluation
+         *     harness: `evaluation/` measures whether the pipeline kept its promises on
+         *     synthetic scenarios, which is a claim about the code and is true on an empty
+         *     database. This is a claim about the extraction, and is not quotable until
+         *     this number has data behind it.
          */
         get: operations["correction_rate_api_v1_metrics_correction_rate_get"];
         put?: never;
@@ -1027,6 +1311,66 @@ export interface components {
             /** Value */
             value: boolean;
         };
+        /** CareOrderListOut */
+        CareOrderListOut: {
+            /** Intake Id */
+            intake_id: string;
+            /**
+             * Orders
+             * @default []
+             */
+            orders: components["schemas"]["CareOrderOut"][];
+        };
+        /**
+         * CareOrderOut
+         * @description One thing the doctor asked for, and whether it has a time.
+         */
+        CareOrderOut: {
+            /** Id */
+            id: string;
+            /** Intake Id */
+            intake_id: string;
+            /** Kind */
+            kind: string;
+            /** Code */
+            code: string;
+            /** Display */
+            display: string;
+            /** Status */
+            status: string;
+            /** Destination */
+            destination?: string | null;
+            /** Slot At */
+            slot_at?: string | null;
+            /** Ordered By */
+            ordered_by: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * CareOrderRequest
+         * @description Issue one order.
+         *
+         *     `intake_id` is in the path and the hospital comes from the principal, so a
+         *     body cannot name either. Decision 21's rule, applied here.
+         */
+        CareOrderRequest: {
+            /** Kind */
+            kind: string;
+            /** Code */
+            code: string;
+            /** Display */
+            display: string;
+            /** Destination */
+            destination?: string | null;
+            /** Note */
+            note?: string | null;
+        };
         /**
          * Coded
          * @description A value drawn from a controlled vocabulary.
@@ -1181,6 +1525,19 @@ export interface components {
              */
             precision: "day" | "month" | "year";
         };
+        /** DepartmentLoadOut */
+        DepartmentLoadOut: {
+            /** Department Code */
+            department_code: string;
+            /** Waiting */
+            waiting: number;
+            /** Flagged */
+            flagged: number;
+            /** Longest Wait Minutes */
+            longest_wait_minutes: number;
+            /** Unfilled Orders */
+            unfilled_orders: number;
+        };
         /** DepartmentOut */
         DepartmentOut: {
             /** Code */
@@ -1271,6 +1628,80 @@ export interface components {
              * @enum {string}
              */
             unit: "hour" | "day" | "week" | "month" | "year";
+        };
+        /**
+         * ErasureResponse
+         * @description What an erasure actually removed.
+         *
+         *     Counts rather than a bare `ok`, because the app tells the patient what went
+         *     — "3 visits and 2 documents deleted" is a sentence they can check against
+         *     what they remember, and a silent success is not.
+         *
+         *     `complete` is false when the object store refused to delete a scan. The
+         *     rows are gone either way; the bytes are not, and a screen that said
+         *     "deleted" over the top of that would be a lie.
+         */
+        ErasureResponse: {
+            /**
+             * Intakes
+             * @default 0
+             */
+            intakes: number;
+            /**
+             * Facts
+             * @default 0
+             */
+            facts: number;
+            /**
+             * Documents
+             * @default 0
+             */
+            documents: number;
+            /**
+             * Document Objects
+             * @default 0
+             */
+            document_objects: number;
+            /**
+             * Reports
+             * @default 0
+             */
+            reports: number;
+            /**
+             * Timelines
+             * @default 0
+             */
+            timelines: number;
+            /**
+             * Red Flags
+             * @default 0
+             */
+            red_flags: number;
+            /**
+             * Consent Artefacts
+             * @default 0
+             */
+            consent_artefacts: number;
+            /**
+             * Raw Payloads
+             * @default 0
+             */
+            raw_payloads: number;
+            /**
+             * Patient Profiles
+             * @default 0
+             */
+            patient_profiles: number;
+            /**
+             * Identifier Links
+             * @default 0
+             */
+            identifier_links: number;
+            /**
+             * Complete
+             * @default true
+             */
+            complete: boolean;
         };
         /** FactOut */
         FactOut: {
@@ -1398,7 +1829,7 @@ export interface components {
          */
         IngestResponse: {
             /** Intake Id */
-            intake_id: string;
+            intake_id?: string | null;
             /** Status */
             status: string;
             /** Unresolved Fields */
@@ -1430,6 +1861,12 @@ export interface components {
              * @default false
              */
             demo: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Errors */
+            errors?: {
+                [key: string]: unknown;
+            }[];
         };
         /** IntakeOut */
         IntakeOut: {
@@ -1475,6 +1912,19 @@ export interface components {
              * @default false
              */
             demo: boolean;
+        };
+        /**
+         * KioskIdentityOut
+         * @description The principal behind a kiosk bearer token — the payload of
+         *     `GET /kiosk/whoami`. No patient data; a provisioning check only.
+         */
+        KioskIdentityOut: {
+            /** Role */
+            role: string;
+            /** Hospital Id */
+            hospital_id: string;
+            /** User Id */
+            user_id: string;
         };
         /**
          * MetricsOut
@@ -1528,6 +1978,87 @@ export interface components {
             /** Code */
             code: string;
         };
+        /**
+         * OperationsOut
+         * @description Where the time is going. Counted, never modelled.
+         */
+        OperationsOut: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /**
+             * Departments
+             * @default []
+             */
+            departments: components["schemas"]["DepartmentLoadOut"][];
+        };
+        /**
+         * PatientDocumentOut
+         * @description One document, as its own patient may see it.
+         *
+         *     **Deliberately narrower than `DocumentOut`.** No confidence figure and no
+         *     extracted content of any kind: §8 keeps unverified extraction away from the
+         *     patient, because a value read off a prescription and shown back to them
+         *     without a physician between is a diagnosis surface.
+         *
+         *     What is left is the photograph, when it was added, whether the hospital has
+         *     processed it, and — where it was refused — why, which is the one piece of
+         *     feedback a patient can actually act on by taking the picture again.
+         *
+         *     `kind` stays. It is a document type, not a finding: telling somebody the
+         *     page they photographed was filed as a prescription asserts nothing about
+         *     their health.
+         */
+        PatientDocumentOut: {
+            /** Document Id */
+            document_id: string;
+            kind: components["schemas"]["DocumentKind"];
+            /** Status */
+            status: string;
+            /**
+             * Page Count
+             * @default 1
+             */
+            page_count: number;
+            /** Rejection Reason */
+            rejection_reason?: string | null;
+            /** Uploaded At */
+            uploaded_at?: string | null;
+            /** Processed At */
+            processed_at?: string | null;
+            /** Url */
+            url?: string | null;
+        };
+        /**
+         * PatientProfileRequest
+         * @description A patient's completed lifestyle profile.
+         *
+         *     No patient and no hospital in the body: both come from the session token,
+         *     per decision 21. A profile can only ever be submitted for the holder of the
+         *     credential that submitted it.
+         */
+        PatientProfileRequest: {
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /** Content Version */
+            content_version?: string | null;
+            /** Answers */
+            answers?: components["schemas"]["ProfileAnswerIn"][];
+        };
+        /** PatientProfileResponse */
+        PatientProfileResponse: {
+            /** Profile Id */
+            profile_id: string;
+            /** Superseded */
+            superseded?: string | null;
+            /** Answers Stored */
+            answers_stored: number;
+        };
         /** PatientSessionResponse */
         PatientSessionResponse: {
             /** Token */
@@ -1552,6 +2083,94 @@ export interface components {
          * @enum {string}
          */
         PhysicianAction: "verified" | "amended" | "rejected";
+        /**
+         * PrefillQuestionIn
+         * @description One upcoming question the kiosk has not yet put to the patient — the
+         *     minimal shape the prefill path needs, not a whole `Question`.
+         */
+        PrefillQuestionIn: {
+            /** Field Id */
+            field_id: string;
+            /** Answer Type */
+            answer_type: string;
+            /**
+             * Prompt
+             * @default
+             */
+            prompt: string;
+            /** Options */
+            options?: string[] | null;
+            /** Option Labels */
+            option_labels?: {
+                [key: string]: string;
+            } | null;
+            /** Unit */
+            unit?: string | null;
+            /** Min */
+            min?: number | null;
+            /** Max */
+            max?: number | null;
+        };
+        /**
+         * PrefillRequest
+         * @description What the patient has already said, and what is coming up.
+         *
+         *     `free_text` is never logged — see `app/services/prefill.py` — and this
+         *     request is the only place it travels beyond the device: the app already
+         *     holds it as the answer it just recorded locally, and sends a copy here only
+         *     long enough to ask what might come next.
+         */
+        PrefillRequest: {
+            /** Free Text */
+            free_text: string;
+            /** Questions */
+            questions?: components["schemas"]["PrefillQuestionIn"][];
+        };
+        /** PrefillResponse */
+        PrefillResponse: {
+            /** Enabled */
+            enabled: boolean;
+            /** Suggestions */
+            suggestions?: components["schemas"]["PrefillSuggestionOut"][];
+        };
+        /**
+         * PrefillSuggestionOut
+         * @description One validated suggestion. `value` is in the same shape
+         *     `AnswerValue.toJson()` produces for its `kind` on the app side, so the
+         *     client can hand it straight to `answerValueFromDraft`.
+         */
+        PrefillSuggestionOut: {
+            /** Field Id */
+            field_id: string;
+            /** Kind */
+            kind: string;
+            /** Value */
+            value: unknown;
+        };
+        /**
+         * ProfileAnswerIn
+         * @description One answered field of the patient profile, as the app sends it.
+         *
+         *     The vocabularies are the record's own — `FieldStatus` and `Certainty` —
+         *     and are validated in `services/patient_profile.py` rather than narrowed to an
+         *     enum here, so the error a client gets names the field that was wrong rather
+         *     than failing the whole body with a schema message.
+         */
+        ProfileAnswerIn: {
+            /** Field Id */
+            field_id: string;
+            /** Status */
+            status: string;
+            /**
+             * Certainty
+             * @default reported
+             */
+            certainty: string;
+            /** Value */
+            value?: unknown | null;
+            /** Original Text */
+            original_text?: string | null;
+        };
         /**
          * Quantity
          * @description A magnitude with a unit. The unit is mandatory: a bare `120` is not
@@ -1670,6 +2289,37 @@ export interface components {
              */
             maximum: number;
         };
+        /** StockAlertListOut */
+        StockAlertListOut: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /**
+             * Alerts
+             * @default []
+             */
+            alerts: components["schemas"]["StockAlertOut"][];
+        };
+        /**
+         * StockAlertOut
+         * @description One item a pharmacist should see before the patient arrives.
+         */
+        StockAlertOut: {
+            /** Code */
+            code: string;
+            /** Display */
+            display: string;
+            /** On Hand */
+            on_hand: number;
+            /** Reorder Level */
+            reorder_level: number;
+            /** Expires On */
+            expires_on?: string | null;
+            /** State */
+            state: string;
+        };
         /**
          * TerminologyMatchOut
          * @description One candidate. `mappings` is empty when no mapping exists — which is a
@@ -1745,6 +2395,26 @@ export interface components {
             /** Language */
             language?: string | null;
         };
+        /**
+         * WaitEstimateOut
+         * @description Position, and a time only when the data supports one.
+         *
+         *     `minutes` is null and `confident` false when the department has not seen
+         *     enough patients today to average over. A waiting room told a number that
+         *     turns out to be wrong stops believing the screen.
+         */
+        WaitEstimateOut: {
+            /** Intake Id */
+            intake_id: string;
+            /** Position */
+            position: number;
+            /** Ahead */
+            ahead: number;
+            /** Minutes */
+            minutes?: number | null;
+            /** Confident */
+            confident: boolean;
+        };
         /** WorklistEntryOut */
         WorklistEntryOut: {
             /** Intake Id */
@@ -1762,6 +2432,11 @@ export interface components {
             arrived_at: string;
             /** Language */
             language: string;
+            /**
+             * Priority
+             * @default walkin
+             */
+            priority: string;
             /**
              * Unacknowledged Alerts
              * @default 0
@@ -2067,6 +2742,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    whoami_api_v1_kiosk_whoami_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KioskIdentityOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -2468,6 +3177,226 @@ export interface operations {
             };
         };
     };
+    prefill_api_v1_intakes__intake_id__prefill_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path: {
+                intake_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrefillRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrefillResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_orders_api_v1_intakes__intake_id__orders_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path: {
+                intake_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareOrderListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_order_api_v1_intakes__intake_id__orders_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path: {
+                intake_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CareOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stock_alerts_api_v1_pharmacy_alerts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockAlertListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wait_estimate_api_v1_intakes__intake_id__wait_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path: {
+                intake_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaitEstimateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    operations_api_v1_operations_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     resolve_api_v1_patients_resolve_post: {
         parameters: {
             query?: never;
@@ -2567,6 +3496,114 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    erase_my_history_api_v1_patients_me_history_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErasureResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_documents_api_v1_patients_me_documents_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientDocumentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_patient_profile_api_v1_patients_me_profile_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+                "X-User-Id"?: string | null;
+                "X-User-Role"?: string | null;
+                "X-Hospital-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientProfileResponse"];
                 };
             };
             /** @description Validation Error */

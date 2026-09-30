@@ -376,6 +376,7 @@ const en = {
   'pharmacy.title': 'Pharmacy',
   'pharmacy.subtitle': 'The shelf: what is short, what is expiring, what has run out.',
   'pharmacy.needsAttention': 'Needs attention',
+  'worklist.movedUp': 'Moved up — critical flag',
 } as const;
 
 export type StringKey = keyof typeof en;
@@ -723,6 +724,7 @@ const hi: Record<StringKey, string> = {
   'pharmacy.title': 'औषधालय',
   'pharmacy.subtitle': 'शेल्फ़: क्या कम है, क्या समाप्त हो रहा है, क्या खत्म हो चुका है।',
   'pharmacy.needsAttention': 'ध्यान देने योग्य',
+  'worklist.movedUp': 'ऊपर लाया गया — गंभीर चेतावनी',
 };
 
 export const STRINGS: Record<Locale, Record<StringKey, string>> = { en, hi };

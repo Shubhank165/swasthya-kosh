@@ -1626,3 +1626,59 @@ physician had to fix what the pipeline recorded; it is a claim about the
 extraction and needs real use behind it. This is a claim about the code, and is
 true on an empty database. Two different numbers, and quoting either as the
 other is the mistake this paragraph exists to prevent.
+
+## 79. Only a critical criterion jumps the queue
+
+Decision 77 let a fired red-flag criterion move an intake to the front. It read
+a *count* of unacknowledged alerts, so every criterion jumped — and the content
+emits two severities, `critical` on five rules and `high` on four. A `high`
+finding (fever severity ≥ 8, pain ≥ 9) overtook an earlier routine patient
+identically to chest pain with breathlessness.
+
+`RedFlagEventRecord.severity` was carried through ingest, stored, indexed and
+returned on `/alerts` the whole time. Nothing read it.
+
+**Now: `critical` moves a patient, `high` does not.** A `high` criterion still
+fires, still raises an alert, still marks the row on the worklist and still has
+to be acknowledged by a clinician. What it stops doing is moving somebody in
+front of people who arrived first.
+
+*Severity is not a quantity.* Five `high` findings do not add up to one
+`critical` one, and `test_many_high_flags_never_add_up_to_a_critical_one` pins
+that. A rule that let them accumulate would be this module doing triage by
+arithmetic, which is the thing decision 77 promised it would not do.
+
+*An unknown severity fails to the tier that does not jump.* `RedFlagSeverity.parse`
+maps anything unrecognised to `HIGH`. The direction matters more than the
+default: a device sending a value this build has never heard of must not be able
+to reorder a waiting room by sending garbage. Case and surrounding whitespace
+are normalised first, because `" Critical "` is a critical flag with sloppy
+formatting and failing *that* to `HIGH` would drop a real emergency.
+
+*`ABORTED_RED_FLAG` still jumps regardless.* The status carries no severity of
+its own, and the device stops an interview only for a criterion it judged
+serious enough to stop for. A patient the machine refused to keep questioning is
+not one to leave in arrival order on the strength of a missing field.
+
+**The reason is now visible.** `WorklistEntry.priority` was computed on every
+read and then silently dropped — `WorklistEntryOut` had no such field, so the
+dashboard could see that somebody had jumped and never why. It is on the wire
+now. A patient moved ahead of people who were waiting first is something the
+doctor reading that list is owed an explanation for.
+
+**Two docstrings were shipping a false claim.** `GET /worklist` still said a
+criterion "does **not** move the intake up the list" and
+`POST /alerts/{id}/acknowledge` said acknowledgement "reorders nothing". Both
+were true before decision 77 and false after it, and both are published in the
+OpenAPI schema. Corrected here, and worth noting as a failure mode in itself:
+the code was changed, the tests were changed, and the sentence describing the
+old behaviour to every API consumer was left alone.
+
+**To revisit.** The honest objection is that a `high` criterion that waits is a
+clinical judgement, and the queue is now making it. A fever of 9/10 sitting
+behind six routine patients is a defensible triage policy and it is not one this
+software was asked to set. The counter-argument is that the previous behaviour
+made the same kind of judgement in the opposite direction and made it for *every*
+criterion, which emptied the fast lane of meaning. The facility-configurable
+version of this is a severity threshold per department; it is one constant and a
+settings row, and it is the first thing to build if a clinician asks.

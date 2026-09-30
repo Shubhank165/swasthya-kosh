@@ -19,6 +19,7 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
+from app.domain.clinical.enums import RedFlagSeverity
 from app.domain.record import (
     CanonicalRecord,
     DocumentKind,
@@ -386,6 +387,31 @@ class IntakeRepository:
             .group_by(RedFlagEventRecord.intake_id)
         )
         return {intake_id: int(count) for intake_id, count in result.all()}
+
+    async def unacknowledged_alert_severities(
+        self, *, hospital_id: str, intake_ids: Sequence[str]
+    ) -> dict[str, list[RedFlagSeverity]]:
+        """Severities, not a count — the queue reads them to decide who jumps.
+
+        A count cannot answer "is any of these critical", and the answer to
+        that question is what reorders a waiting room. Unparseable values come
+        back as `HIGH` via `RedFlagSeverity.parse`, which is the tier that does
+        not overtake: a device sending a severity this build has never seen
+        must not be able to move a patient by sending garbage.
+        """
+        if not intake_ids:
+            return {}
+        result = await self._session.execute(
+            select(RedFlagEventRecord.intake_id, RedFlagEventRecord.severity).where(
+                RedFlagEventRecord.hospital_id == hospital_id,
+                RedFlagEventRecord.intake_id.in_(list(intake_ids)),
+                RedFlagEventRecord.acknowledged_by.is_(None),
+            )
+        )
+        severities: dict[str, list[RedFlagSeverity]] = {}
+        for intake_id, raw in result.all():
+            severities.setdefault(intake_id, []).append(RedFlagSeverity.parse(raw))
+        return severities
 
     async def alerts(
         self,

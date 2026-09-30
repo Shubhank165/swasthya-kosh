@@ -77,7 +77,7 @@ class WorklistService:
             limit=limit,
         )
         intake_ids = [row.id for row in rows]
-        alerts = await self._intakes.unacknowledged_alert_counts(
+        severities = await self._intakes.unacknowledged_alert_severities(
             hospital_id=hospital_id, intake_ids=intake_ids
         )
         counts = await self._intakes.fact_counts(
@@ -90,7 +90,8 @@ class WorklistService:
         entries: list[WorklistEntry] = []
         for row in rows:
             fact_counts = counts.get(row.id, {})
-            unacknowledged = alerts.get(row.id, 0)
+            flags = severities.get(row.id, [])
+            unacknowledged = len(flags)
             needs_verification = bool(fact_counts.get("needs_verification", 0))
             contradictions = conflicts.get(row.id, 0)
             needs_review = (
@@ -113,7 +114,7 @@ class WorklistService:
                     intake_status=IntakeStatus(row.status),
                     priority=priority_for(
                         status=IntakeStatus(row.status),
-                        unacknowledged_alerts=unacknowledged,
+                        unacknowledged_severities=flags,
                         seen_at=row.seen_at,
                     ),
                     arrived_at=row.received_at,

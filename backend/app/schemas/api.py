@@ -365,6 +365,13 @@ class WorklistEntryOut(ApiModel):
     intake_status: str
     arrived_at: datetime
     language: str
+    #: Why this intake sits where it does. `emergency` means a critical
+    #: criterion the device fired is still unacknowledged, and the patient has
+    #: been moved ahead of people who arrived before them — which a doctor
+    #: reading the list is owed an explanation for. It was computed on every
+    #: read and then silently dropped here, so the dashboard could see that
+    #: somebody had jumped but never why.
+    priority: str = "walkin"
     unacknowledged_alerts: int = 0
     unresolved_count: int = 0
     contradiction_count: int = 0

@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from app.domain.clinical.enums import RedFlagSeverity
 from app.domain.queue.priority import PRIORITY_RANK, PriorityClass, priority_for
 from app.domain.record import IntakeStatus
 from app.domain.worklist import WorklistEntry, WorklistState, order
@@ -35,18 +36,65 @@ def entry(
 
 
 class TestWhatMovesAnIntakeUp:
-    def test_an_unacknowledged_red_flag_is_the_fast_lane(self) -> None:
+    def test_a_critical_flag_is_the_fast_lane(self) -> None:
         assert (
-            priority_for(status=IntakeStatus.COMPLETE, unacknowledged_alerts=1)
+            priority_for(
+                status=IntakeStatus.COMPLETE,
+                unacknowledged_severities=[RedFlagSeverity.CRITICAL],
+            )
             is PriorityClass.EMERGENCY
         )
 
-    def test_an_interview_cut_short_by_a_criterion_is_the_same_finding(self) -> None:
-        """The Jetson stops an interview only for a red flag, so the status is
-        the finding arriving by a different route."""
+    def test_a_high_flag_waits_its_turn(self) -> None:
+        """The change decision 79 records, and the one worth stating twice.
+
+        A `high` criterion still fires, still raises an alert, still marks the
+        intake and still has to be acknowledged by a clinician. What it stops
+        doing is moving the patient in front of people who arrived first.
+        """
 
         assert (
-            priority_for(status=IntakeStatus.ABORTED_RED_FLAG, unacknowledged_alerts=0)
+            priority_for(
+                status=IntakeStatus.COMPLETE,
+                unacknowledged_severities=[RedFlagSeverity.HIGH],
+            )
+            is PriorityClass.WALKIN
+        )
+
+    def test_one_critical_among_several_is_enough(self) -> None:
+        assert (
+            priority_for(
+                status=IntakeStatus.COMPLETE,
+                unacknowledged_severities=[
+                    RedFlagSeverity.HIGH,
+                    RedFlagSeverity.HIGH,
+                    RedFlagSeverity.CRITICAL,
+                ],
+            )
+            is PriorityClass.EMERGENCY
+        )
+
+    def test_many_high_flags_never_add_up_to_a_critical_one(self) -> None:
+        """Severity is not a quantity. Five moderate findings are not an
+        emergency, and a rule that let them accumulate into one would be this
+        module doing triage by arithmetic."""
+
+        assert (
+            priority_for(
+                status=IntakeStatus.COMPLETE,
+                unacknowledged_severities=[RedFlagSeverity.HIGH] * 5,
+            )
+            is PriorityClass.WALKIN
+        )
+
+    def test_an_interview_cut_short_is_the_same_finding(self) -> None:
+        """The Jetson stops an interview only for a criterion it judged serious
+        enough to stop for, and the status carries no severity of its own."""
+
+        assert (
+            priority_for(
+                status=IntakeStatus.ABORTED_RED_FLAG, unacknowledged_severities=[]
+            )
             is PriorityClass.EMERGENCY
         )
 
@@ -56,16 +104,45 @@ class TestWhatMovesAnIntakeUp:
     )
     def test_everything_else_waits_its_turn(self, status: IntakeStatus) -> None:
         assert (
-            priority_for(status=status, unacknowledged_alerts=0)
+            priority_for(status=status, unacknowledged_severities=[])
             is PriorityClass.WALKIN
         )
 
     def test_an_acknowledged_alert_no_longer_jumps(self) -> None:
         """Acknowledgement is a person deciding. Once they have, the queue
-        stops deciding for them."""
+        stops deciding for them — the service stops passing the severity."""
 
         assert (
-            priority_for(status=IntakeStatus.COMPLETE, unacknowledged_alerts=0)
+            priority_for(status=IntakeStatus.COMPLETE, unacknowledged_severities=[])
+            is PriorityClass.WALKIN
+        )
+
+
+class TestAnUnknownSeverity:
+    """A device sending a value this build has never seen.
+
+    It must not be able to reorder a waiting room by sending garbage, so the
+    failure direction is *not jumping*. The alert still fires either way;
+    only the overtaking is withheld.
+    """
+
+    @pytest.mark.parametrize("raw", ["catastrophic", "", "CRITICAL!", None, 7, "moderate"])
+    def test_it_lands_on_the_tier_that_does_not_jump(self, raw: object) -> None:
+        assert RedFlagSeverity.parse(raw) is RedFlagSeverity.HIGH
+
+    def test_case_and_whitespace_are_not_a_new_severity(self) -> None:
+        """`"  Critical "` is a critical flag with sloppy formatting, not an
+        unknown value — failing that to HIGH would drop a real emergency."""
+
+        for raw in ("CRITICAL", " critical ", "Critical"):
+            assert RedFlagSeverity.parse(raw) is RedFlagSeverity.CRITICAL
+
+    def test_an_unknown_severity_does_not_move_the_patient(self) -> None:
+        assert (
+            priority_for(
+                status=IntakeStatus.COMPLETE,
+                unacknowledged_severities=[RedFlagSeverity.parse("catastrophic")],
+            )
             is PriorityClass.WALKIN
         )
 
@@ -81,9 +158,16 @@ class TestWhatItMayNotDo:
 
         worst = min(
             (
-                priority_for(status=status, unacknowledged_alerts=alerts, seen_at=seen)
+                priority_for(
+                    status=status, unacknowledged_severities=severities, seen_at=seen
+                )
                 for status in IntakeStatus
-                for alerts in (0, 1, 5)
+                for severities in (
+                    [],
+                    [RedFlagSeverity.HIGH],
+                    [RedFlagSeverity.CRITICAL],
+                    [RedFlagSeverity.HIGH, RedFlagSeverity.CRITICAL],
+                )
                 for seen in (None, NOW)
             ),
             key=lambda p: -PRIORITY_RANK[p],
@@ -98,7 +182,7 @@ class TestWhatItMayNotDo:
         assert (
             priority_for(
                 status=IntakeStatus.ABORTED_RED_FLAG,
-                unacknowledged_alerts=3,
+                unacknowledged_severities=[RedFlagSeverity.CRITICAL],
                 seen_at=NOW,
             )
             is PriorityClass.WALKIN
@@ -110,9 +194,11 @@ class TestWhatItMayNotDo:
         inventing a status the hospital assigns."""
 
         produced = {
-            priority_for(status=status, unacknowledged_alerts=alerts, seen_at=seen)
+            priority_for(
+                status=status, unacknowledged_severities=severities, seen_at=seen
+            )
             for status in IntakeStatus
-            for alerts in (0, 1)
+            for severities in ([], [RedFlagSeverity.HIGH], [RedFlagSeverity.CRITICAL])
             for seen in (None, NOW)
         }
         assert produced <= {PriorityClass.EMERGENCY, PriorityClass.WALKIN}

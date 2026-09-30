@@ -327,6 +327,7 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
                   role="listitem"
                   data-testid="worklist-row"
                   data-state={entry.state}
+                  data-priority={entry.priority}
                   className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-[#fbfcfb]"
                 >
                   <div className="flex items-center gap-4">
@@ -344,6 +345,18 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
                         <span className="font-semibold text-sm text-ink">
                           {isHi ? 'इंटेक' : 'Intake'} #{entry.intake_id.slice(0, 8)}
                         </span>
+                        {/* A patient moved ahead of people who arrived before
+                            them is something the doctor reading this list is
+                            owed an explanation for. The backend decides; this
+                            only renders what it decided. */}
+                        {entry.priority === 'emergency' && (
+                          <span
+                            data-testid="priority-reason"
+                            className="rounded-md border border-urgent/40 bg-urgent-soft px-2 py-0.5 text-[10px] font-semibold uppercase text-urgent"
+                          >
+                            {isHi ? 'ऊपर लाया गया — गंभीर चेतावनी' : 'Moved up — critical flag'}
+                          </span>
+                        )}
                         <span className="rounded-md bg-surface-sunken px-2 py-0.5 text-[10px] font-semibold text-ink-muted uppercase border border-line">
                           {entry.patient_ref_type === 'phone'
                             ? (isHi ? 'ऐप उपयोगकर्ता' : 'App User')
