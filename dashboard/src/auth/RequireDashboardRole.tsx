@@ -12,7 +12,7 @@
 import type { ReactNode } from 'react';
 import { Refusal } from '../components/Refusal';
 import { useT } from '../i18n';
-import { canSeeClinicalContent, useSession, type DashboardRole } from './session';
+import { isDashboardRole, useSession, type DashboardRole } from './session';
 import { LoginPage } from './LoginPage';
 
 export function RequireDashboardRole({
@@ -20,7 +20,13 @@ export function RequireDashboardRole({
   allow,
 }: {
   children: ReactNode;
-  /** Narrower than the coarse gate, for screens like the correction rate. */
+  /**
+   * Which roles may see this screen. **Every clinical screen must pass
+   * `CLINICAL_ROLES`** — the outer gate only establishes that somebody with a
+   * dashboard account is signed in, which a receptionist and a pharmacist both
+   * are. Reaching the shell and reading a record are different questions, and
+   * the outer wrapper answers only the first.
+   */
   allow?: readonly DashboardRole[];
 }) {
   const session = useSession((state) => state.session);
@@ -29,7 +35,8 @@ export function RequireDashboardRole({
 
   if (session === null) return <LoginPage />;
 
-  if (!canSeeClinicalContent(session)) {
+  // `patient` and `kiosk` credentials never render a dashboard screen at all.
+  if (!isDashboardRole(session.role)) {
     return (
       <Refusal
         titleKey="refusal.notClinicalTitle"

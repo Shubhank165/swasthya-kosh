@@ -23,9 +23,12 @@ from fastapi.routing import APIRoute
 
 from app.api.auth import Role, require_roles
 from tests.conftest import (
+    ADMIN_HEADERS,
+    CHEMIST_HEADERS,
     KIOSK_HEADERS,
     OTHER_STAFF_HEADERS,
     PHYSICIAN_HEADERS,
+    RECEPTIONIST_HEADERS,
     STAFF_HEADERS,
 )
 
@@ -90,14 +93,26 @@ EXPECTED: dict[tuple[str, str], set[Role]] = {
     # radiology needs to see the slot.
     ("POST", "/api/v1/intakes/{intake_id}/orders"): {Role.PHYSICIAN},
     ("GET", "/api/v1/intakes/{intake_id}/orders"): {Role.STAFF},
-    # Stock and queue position carry no clinical content: a medicine name and
-    # a count, a position and a number of minutes. Staff, like the worklist.
-    ("GET", "/api/v1/pharmacy/alerts"): {Role.STAFF},
-    ("GET", "/api/v1/intakes/{intake_id}/wait"): {Role.STAFF},
+    # The shelf belongs to the pharmacy counter. A medicine name and a count
+    # carry no clinical content, but there is no reason for a ward nurse to
+    # read the stock list either, and a role that is given what it does not
+    # need is a role nobody audits.
+    ("GET", "/api/v1/pharmacy/alerts"): {Role.CHEMIST},
+    # Queue position is a number and an ordinal. The front desk is exactly who
+    # answers "how much longer", so a receptionist reads it too.
+    ("GET", "/api/v1/intakes/{intake_id}/wait"): {Role.STAFF, Role.RECEPTIONIST},
     # The operations view is aggregate across every department, which is a
     # wider read than any one clinician needs. Admin.
     ("GET", "/api/v1/operations"): {Role.ADMIN},
-    ("GET", "/api/v1/worklist"): {Role.STAFF},
+    # The worklist carries counts, states and timestamps and no clinical text
+    # at all — `WorklistEntryOut` has no field that could hold one. That is
+    # what makes it safe for the front desk.
+    ("GET", "/api/v1/worklist"): {Role.STAFF, Role.RECEPTIONIST},
+    # `/alerts` is NOT widened with it, and the difference is the point:
+    # `AlertOut.criteria_met` names the answers that met the rule
+    # ("breathlessness=true", "severity>=8"). That is clinical content about a
+    # named patient. A receptionist needs to know someone is urgent — the
+    # worklist's red-flag state says so — and does not need to know why.
     ("GET", "/api/v1/alerts"): {Role.STAFF},
     ("POST", "/api/v1/alerts/{intake_id}/acknowledge"): {Role.STAFF},
     ("GET", "/api/v1/metrics/ingest"): {Role.STAFF},
@@ -262,6 +277,73 @@ class TestEveryRouteIsAccountedFor:
 
 class TestTheGuardsActuallyRefuse:
     """The other half. A wired guard that never refuses is not a guard."""
+
+    # --- the front desk and the pharmacy counter --------------------------
+    #
+    # These two roles exist to be *narrow*. The tests that matter are the ones
+    # asserting what they cannot reach, because the failure mode is silent:
+    # a role quietly folded into `STAFF` reads every record in the hospital
+    # and nothing anywhere says so.
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/api/v1/intakes/any",
+            "/api/v1/intakes/any/report",
+            "/api/v1/intakes/any/documents",
+            "/api/v1/intakes/any/facts/f-1/evidence",
+            "/api/v1/alerts",
+        ],
+    )
+    def test_a_receptionist_reaches_no_clinical_record(
+        self, app_client: Any, path: str
+    ) -> None:
+        """403, not 404. The front desk is refused by role, before anything
+        looks for the intake — so the refusal cannot leak whether it exists."""
+        response = app_client.get(path, headers=RECEPTIONIST_HEADERS)
+        assert response.status_code == 403, path
+        assert response.json()["code"] == "forbidden"
+
+    def test_a_receptionist_reads_the_queue(self, app_client: Any) -> None:
+        assert (
+            app_client.get("/api/v1/worklist", headers=RECEPTIONIST_HEADERS).status_code
+            == 200
+        )
+
+    def test_a_receptionist_cannot_acknowledge_a_red_flag(self, app_client: Any) -> None:
+        """Acknowledgement is a clinician saying "I have seen this", and it
+        releases the intake from the front of the queue. A front desk that
+        could do it could clear an emergency off the top of the list."""
+        response = app_client.post(
+            "/api/v1/alerts/any/acknowledge",
+            headers=RECEPTIONIST_HEADERS,
+            json={"rule_id": "RF_X"},
+        )
+        assert response.status_code == 403
+
+    def test_a_chemist_reaches_no_clinical_record(self, app_client: Any) -> None:
+        for path in ("/api/v1/intakes/any/report", "/api/v1/worklist"):
+            response = app_client.get(path, headers=CHEMIST_HEADERS)
+            assert response.status_code == 403, path
+
+    def test_a_chemist_reads_the_shelf(self, app_client: Any) -> None:
+        assert (
+            app_client.get("/api/v1/pharmacy/alerts", headers=CHEMIST_HEADERS).status_code
+            == 200
+        )
+
+    def test_staff_no_longer_read_the_shelf(self, app_client: Any) -> None:
+        """Moved, not widened. The pharmacy counter owns the stock list now."""
+        assert (
+            app_client.get("/api/v1/pharmacy/alerts", headers=STAFF_HEADERS).status_code
+            == 403
+        )
+
+    def test_an_admin_still_sees_everything(self, app_client: Any) -> None:
+        for path in ("/api/v1/worklist", "/api/v1/pharmacy/alerts", "/api/v1/operations"):
+            assert (
+                app_client.get(path, headers=ADMIN_HEADERS).status_code == 200
+            ), path
 
     def test_a_kiosk_cannot_read_the_worklist(self, app_client: Any) -> None:
         response = app_client.get("/api/v1/worklist", headers=KIOSK_HEADERS)

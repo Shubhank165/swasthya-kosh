@@ -347,6 +347,35 @@ const en = {
   'stock.state.expired': 'Expired',
   'stock.state.out': 'Out of stock',
   'stock.state.unknown': 'Not recorded',
+  // The front desk and the pharmacy counter.
+  'nav.reception': 'Front desk',
+  'nav.pharmacy': 'Pharmacy',
+
+  'reception.title': 'Front desk',
+  'reception.subtitle': 'Who is waiting, in what order, and how long it has been.',
+  'reception.queueAria': 'Waiting queue',
+  'reception.waiting': 'Waiting',
+  'reception.flagged': 'Urgent',
+  'reception.longestWait': 'Longest wait',
+  'reception.minutes': 'min',
+  'reception.minutesValue': '{minutes} min',
+  'reception.position': '#',
+  'reception.token': 'Token',
+  'reception.department': 'Department',
+  'reception.arrived': 'Arrived',
+  'reception.waited': 'Waited',
+  'reception.state': 'Status',
+  'reception.urgent': 'Urgent — send ahead',
+  'reception.routine': 'Routine',
+  'reception.nobodyWaiting': 'Nobody is waiting.',
+  'reception.loadError': 'The queue could not be loaded.',
+  'reception.noRecordsNote':
+    'This desk sees the queue and not the record. Symptoms, answers and documents are the consulting room’s, and this screen is refused them by the server rather than by hiding a button.',
+  'reception.noRecordsLink': 'A doctor opens them here.',
+
+  'pharmacy.title': 'Pharmacy',
+  'pharmacy.subtitle': 'The shelf: what is short, what is expiring, what has run out.',
+  'pharmacy.needsAttention': 'Needs attention',
 } as const;
 
 export type StringKey = keyof typeof en;
@@ -665,6 +694,35 @@ const hi: Record<StringKey, string> = {
   'stock.state.expired': 'समाप्त',
   'stock.state.out': 'स्टॉक में नहीं',
   'stock.state.unknown': 'दर्ज नहीं',
+  // The front desk and the pharmacy counter.
+  'nav.reception': 'रिसेप्शन',
+  'nav.pharmacy': 'औषधालय',
+
+  'reception.title': 'रिसेप्शन',
+  'reception.subtitle': 'कौन प्रतीक्षा में है, किस क्रम में, और कितनी देर से।',
+  'reception.queueAria': 'प्रतीक्षा कतार',
+  'reception.waiting': 'प्रतीक्षारत',
+  'reception.flagged': 'तत्काल',
+  'reception.longestWait': 'सबसे लंबी प्रतीक्षा',
+  'reception.minutes': 'मिनट',
+  'reception.minutesValue': '{minutes} मिनट',
+  'reception.position': 'क्र.',
+  'reception.token': 'टोकन',
+  'reception.department': 'विभाग',
+  'reception.arrived': 'आगमन',
+  'reception.waited': 'प्रतीक्षा',
+  'reception.state': 'स्थिति',
+  'reception.urgent': 'तत्काल — पहले भेजें',
+  'reception.routine': 'सामान्य',
+  'reception.nobodyWaiting': 'कोई प्रतीक्षा में नहीं है।',
+  'reception.loadError': 'कतार लोड नहीं हो सकी।',
+  'reception.noRecordsNote':
+    'यह डेस्क कतार देखती है, अभिलेख नहीं। लक्षण, उत्तर और कागज़ात परामर्श कक्ष के हैं, और यह स्क्रीन उन्हें बटन छिपाकर नहीं, बल्कि सर्वर द्वारा अस्वीकार किए जाने पर नहीं दिखाती।',
+  'reception.noRecordsLink': 'डॉक्टर उन्हें यहाँ खोलते हैं।',
+
+  'pharmacy.title': 'औषधालय',
+  'pharmacy.subtitle': 'शेल्फ़: क्या कम है, क्या समाप्त हो रहा है, क्या खत्म हो चुका है।',
+  'pharmacy.needsAttention': 'ध्यान देने योग्य',
 };
 
 export const STRINGS: Record<Locale, Record<StringKey, string>> = { en, hi };

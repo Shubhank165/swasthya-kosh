@@ -18,6 +18,7 @@ import {
   HeartPulse,
   Lock,
   ShieldCheck,
+  Pill,
   Stethoscope,
   UserRound,
 } from 'lucide-react';
@@ -97,39 +98,45 @@ export function LoginPage() {
       setDepartmentCode(firstDepartment);
     }
   }, [departments, firstDepartment, departmentCode]);
-  const [role, setRole] = useState<'doctor' | 'receptionist'>('doctor');
+  const [role, setRole] = useState<DashboardRole>('physician');
   const [doctorName, setDoctorName] = useState(DOCTORS[0]!);
   const [pin, setPin] = useState('');
 
+  /**
+   * Who each role signs in as. The label is chrome; the `DashboardRole` is what
+   * travels to the backend as `X-User-Role`, and the backend has to recognise
+   * it — a role this list invents is a 401 on every request.
+   *
+   * `triage` used to be here, mapped from the Receptionist button, and the
+   * backend has never had such a role: signing in as a receptionist 401'd on
+   * every call and the auth-failure handler signed them straight back out.
+   */
+  const SIGN_IN_AS: { role: DashboardRole; label: string; labelHi: string; desk: string }[] = [
+    { role: 'physician', label: 'Doctor', labelHi: 'डॉक्टर', desk: DOCTORS[0]! },
+    { role: 'receptionist', label: 'Receptionist', labelHi: 'रिसेप्शन', desk: 'Reception Counter 1' },
+    { role: 'chemist', label: 'Pharmacy', labelHi: 'औषधालय', desk: 'Pharmacy Counter' },
+    { role: 'admin', label: 'Administrator', labelHi: 'प्रशासक', desk: 'Administrator' },
+  ];
+
   function submit(event: FormEvent) {
     event.preventDefault();
-    const dashboardRole: DashboardRole = role === 'doctor' ? 'physician' : 'triage';
-    const userId = role === 'doctor' ? doctorName : 'Reception Counter 1';
-
+    const chosen = SIGN_IN_AS.find((entry) => entry.role === role) ?? SIGN_IN_AS[0]!;
     signIn({
-      userId,
-      role: dashboardRole,
+      userId: role === 'physician' ? doctorName : chosen.desk,
+      role,
       hospitalId: hospitalId || 'aiia-delhi',
       departmentCode: departmentCode || null,
     });
   }
 
-  function handleDemo(demoRole: 'doctor' | 'receptionist') {
-    if (demoRole === 'doctor') {
-      signIn({
-        userId: 'Dr. R. Sharma',
-        role: 'physician',
-        hospitalId: 'aiia-delhi',
-        departmentCode: 'general_medicine',
-      });
-    } else {
-      signIn({
-        userId: 'Triage Desk 1',
-        role: 'triage',
-        hospitalId: 'aiia-delhi',
-        departmentCode: 'general_medicine',
-      });
-    }
+  function handleDemo(demoRole: DashboardRole) {
+    const chosen = SIGN_IN_AS.find((entry) => entry.role === demoRole) ?? SIGN_IN_AS[0]!;
+    signIn({
+      userId: demoRole === 'physician' ? 'Dr. R. Sharma' : chosen.desk,
+      role: demoRole,
+      hospitalId: 'aiia-delhi',
+      departmentCode: 'general_medicine',
+    });
   }
 
   return (
@@ -311,32 +318,32 @@ export function LoginPage() {
                 {isHi ? 'मैं इस रूप में साइन इन कर रहा हूँ' : 'I am signing in as'}
               </span>
               <div className="grid grid-cols-2 gap-2 rounded-xl bg-surface-sunken p-1 border border-line">
-                <button
-                  type="button"
-                  onClick={() => setRole('doctor')}
-                  className={`flex h-10 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-all ${
-                    role === 'doctor'
-                      ? 'bg-white text-brand shadow-sm'
-                      : 'text-ink-muted hover:text-ink'
-                  }`}
-                >
-                  <Stethoscope className="size-4" /> {isHi ? 'डॉक्टर' : 'Doctor'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole('receptionist')}
-                  className={`flex h-10 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-all ${
-                    role === 'receptionist'
-                      ? 'bg-white text-saffron shadow-sm'
-                      : 'text-ink-muted hover:text-ink'
-                  }`}
-                >
-                  <UserRound className="size-4" /> {isHi ? 'रिसेप्शनिस्ट' : 'Receptionist'}
-                </button>
+                {SIGN_IN_AS.map((entry) => (
+                  <button
+                    key={entry.role}
+                    type="button"
+                    data-testid={`signin-as-${entry.role}`}
+                    onClick={() => setRole(entry.role)}
+                    className={`flex h-10 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-all ${
+                      role === entry.role
+                        ? 'bg-white text-brand shadow-sm'
+                        : 'text-ink-muted hover:text-ink'
+                    }`}
+                  >
+                    {entry.role === 'physician' ? (
+                      <Stethoscope className="size-4" />
+                    ) : entry.role === 'chemist' ? (
+                      <Pill className="size-4" />
+                    ) : (
+                      <UserRound className="size-4" />
+                    )}
+                    {isHi ? entry.labelHi : entry.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {role === 'doctor' && (
+            {role === 'physician' && (
               <label className="block animate-fade-rise">
                 <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   {isHi ? 'डॉक्टर का नाम' : 'Doctor name'}
@@ -385,20 +392,24 @@ export function LoginPage() {
               {isHi ? 'एक-क्लिक डेमो प्रवेश' : 'One-click demo access'}
             </p>
             <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => handleDemo('doctor')}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand/30 bg-white px-3 py-2 text-xs font-semibold text-brand shadow-sm transition-colors hover:bg-brand-soft"
-              >
-                <Stethoscope className="size-4" /> {isHi ? 'डेमो: डॉक्टर लॉगिन' : 'Demo: Doctor Login'}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemo('receptionist')}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-saffron/30 bg-white px-3 py-2 text-xs font-semibold text-saffron shadow-sm transition-colors hover:bg-saffron-soft"
-              >
-                <UserRound className="size-4" /> {isHi ? 'डेमो: रिसेप्शनिस्ट' : 'Demo: Receptionist'}
-              </button>
+              {SIGN_IN_AS.map((entry) => (
+                <button
+                  key={entry.role}
+                  type="button"
+                  data-testid={`demo-${entry.role}`}
+                  onClick={() => handleDemo(entry.role)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand/30 bg-white px-3 py-2 text-xs font-semibold text-brand shadow-sm transition-colors hover:bg-brand-soft"
+                >
+                  {entry.role === 'physician' ? (
+                    <Stethoscope className="size-4" />
+                  ) : entry.role === 'chemist' ? (
+                    <Pill className="size-4" />
+                  ) : (
+                    <UserRound className="size-4" />
+                  )}
+                  {isHi ? `डेमो: ${entry.labelHi}` : `Demo: ${entry.label}`}
+                </button>
+              ))}
             </div>
           </div>
         </section>

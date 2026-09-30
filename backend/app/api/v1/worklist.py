@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from app.api.auth import RequireAdmin, RequireStaff
+from app.api.auth import RequireAdmin, RequireQueueReader, RequireStaff
 from app.api.deps import ClockDep, MetricsRepoDep, SettingsDep, WorklistServiceDep
 from app.api.serialise import worklist_out
 from app.domain.worklist import WorklistState
@@ -30,7 +30,7 @@ router = APIRouter(tags=["worklist"])
     summary="Intakes waiting for a doctor, in arrival order",
 )
 async def worklist(
-    principal: RequireStaff,
+    principal: RequireQueueReader,
     service: WorklistServiceDep,
     settings: SettingsDep,
     department: Annotated[str | None, Query()] = None,

@@ -375,6 +375,16 @@ ADMIN_HEADERS = {
     "X-User-Role": "admin",
     "X-Hospital-Id": HOSPITAL_ID,
 }
+RECEPTIONIST_HEADERS = {
+    "X-User-Id": "reception-1",
+    "X-User-Role": "receptionist",
+    "X-Hospital-Id": HOSPITAL_ID,
+}
+CHEMIST_HEADERS = {
+    "X-User-Id": "pharmacy-1",
+    "X-User-Role": "chemist",
+    "X-Hospital-Id": HOSPITAL_ID,
+}
 OTHER_STAFF_HEADERS = {
     "X-User-Id": "staff-2",
     "X-User-Role": "staff",

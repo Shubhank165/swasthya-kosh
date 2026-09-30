@@ -91,3 +91,95 @@ describe('who may open this dashboard', () => {
     expect(screen.getByText(/server refused/i)).toBeVisible();
   });
 });
+
+/**
+ * The front desk and the pharmacy counter.
+ *
+ * Both belong on this dashboard and neither belongs in a patient's record, and
+ * the whole phase turns on those being different questions. `canSeeClinicalContent`
+ * used to mean "is the role in `DASHBOARD_ROLES`", so adding either role would
+ * silently have granted it every clinical screen. These tests are what stops
+ * that being reintroduced by somebody adding a sixth role to the union.
+ */
+describe('a receptionist', () => {
+  it('reaches the front desk', async () => {
+    stubFetch({ 'GET /worklist*': () => ({ body: WORKLIST }) });
+    signInAs('receptionist');
+    renderWithProviders(<App />, { route: '/reception' });
+
+    expect(await screen.findByTestId('reception-queue')).toBeVisible();
+    expect(screen.queryByTestId('refusal')).toBeNull();
+  });
+
+  it('is refused the report, and asks the backend for nothing', async () => {
+    const { calls } = stubFetch({
+      'GET /intakes/i-1': () => ({ body: {} }),
+      'GET /intakes/i-1/report*': () => ({ body: {} }),
+    });
+    signInAs('receptionist');
+    renderWithProviders(<App />, { route: '/intakes/i-1' });
+
+    expect(await screen.findByTestId('refusal')).toBeVisible();
+    // The refusal is a role decision, taken before anything is fetched. A
+    // screen that asks first has already put the record in a response.
+    await waitFor(() => expect(calls).toHaveLength(0));
+  });
+
+  it('is refused the worklist itself', async () => {
+    stubFetch({ 'GET /worklist*': () => ({ body: WORKLIST }) });
+    signInAs('receptionist');
+    renderWithProviders(<App />, { route: '/' });
+
+    expect(await screen.findByTestId('refusal')).toBeVisible();
+  });
+
+  it('shows no symptom text anywhere on its own screen', async () => {
+    // The queue payload has no field that could carry one, and this asserts
+    // the screen does not go looking for a name either.
+    stubFetch({ 'GET /worklist*': () => ({ body: WORKLIST }) });
+    signInAs('receptionist');
+    renderWithProviders(<App />, { route: '/reception' });
+
+    await screen.findByTestId('reception-queue');
+    const rendered = document.body.textContent ?? '';
+    for (const forbidden of ['पेट में दर्द', 'abdominal', 'fever', 'breathlessness']) {
+      expect(rendered.toLowerCase()).not.toContain(forbidden.toLowerCase());
+    }
+  });
+});
+
+describe('a chemist', () => {
+  it('reaches the pharmacy', async () => {
+    stubFetch({
+      'GET /pharmacy/alerts': () => ({ body: { generated_at: '2026-09-06T09:00:00Z', alerts: [] } }),
+    });
+    signInAs('chemist');
+    renderWithProviders(<App />, { route: '/pharmacy' });
+
+    expect(await screen.findByTestId('pharmacy-stock')).toBeVisible();
+  });
+
+  it('is refused the report and the worklist', async () => {
+    for (const route of ['/intakes/i-1', '/']) {
+      const { unmount } = renderWithProviders(<App />, { route });
+      signInAs('chemist');
+      expect(await screen.findByTestId('refusal')).toBeVisible();
+      unmount();
+    }
+  });
+});
+
+describe('the nav', () => {
+  it('offers each role only the screens it may open', async () => {
+    stubFetch({
+      'GET /pharmacy/alerts': () => ({ body: { generated_at: '2026-09-06T09:00:00Z', alerts: [] } }),
+    });
+    signInAs('chemist');
+    renderWithProviders(<App />, { route: '/pharmacy' });
+
+    await screen.findByTestId('pharmacy-stock');
+    // A tab that leads to a refusal is a tab that should not be drawn.
+    expect(screen.queryByRole('link', { name: /worklist/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /alerts/i })).toBeNull();
+  });
+});

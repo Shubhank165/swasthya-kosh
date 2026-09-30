@@ -1,17 +1,41 @@
 /**
  * Who is looking at this screen — 3/3 §8.
  *
- * Four roles reach the dashboard: `physician`, `staff`, `triage`, `admin`.
- * **`patient` and `kiosk` tokens are refused outright** — they are credentials
- * issued to a phone and to a device in a corridor, and neither should ever
- * render a worklist. That check lives here rather than in a route guard so
- * there is one place it can be got wrong.
+ * Five roles reach the dashboard: `physician`, `staff`, `receptionist`,
+ * `chemist`, `admin`. **`patient` and `kiosk` tokens are refused outright** —
+ * they are credentials issued to a phone and to a device in a corridor, and
+ * neither should ever render a worklist. That check lives here rather than in a
+ * route guard so there is one place it can be got wrong.
+ *
+ * Reaching the dashboard is not the same as reading a record, and conflating
+ * the two is the mistake this file used to make — see `canSeeClinicalContent`.
  */
 
 import { create } from 'zustand';
 import { setAccessToken, setPrincipalHeaders } from '../api/client';
 
-export const DASHBOARD_ROLES = ['physician', 'staff', 'triage', 'admin'] as const;
+export const DASHBOARD_ROLES = [
+  'physician',
+  'staff',
+  'receptionist',
+  'chemist',
+  'admin',
+] as const;
+
+/**
+ * The roles that may see a patient's record.
+ *
+ * **An allow-list, deliberately not `isDashboardRole`.** It used to be the
+ * latter, which meant "reaches the dashboard" and "may read a history" were the
+ * same question — so adding any role to `DASHBOARD_ROLES` silently granted it
+ * every clinical screen. A receptionist and a pharmacist both belong on this
+ * dashboard and neither belongs in a patient's record, and that distinction
+ * cannot survive being inferred from set membership.
+ *
+ * The backend enforces the same split independently (`app/api/auth.py`), so a
+ * mistake here shows as a refusal from the server rather than as a leak.
+ */
+export const CLINICAL_ROLES: readonly DashboardRole[] = ['physician', 'staff', 'admin'];
 export type DashboardRole = (typeof DASHBOARD_ROLES)[number];
 
 export function isDashboardRole(role: string): role is DashboardRole {
@@ -77,5 +101,5 @@ export const useSession = create<SessionState>((set) => ({
  * screen renders or a refusal does.
  */
 export function canSeeClinicalContent(session: Session | null): boolean {
-  return session !== null && isDashboardRole(session.role);
+  return session !== null && CLINICAL_ROLES.includes(session.role);
 }

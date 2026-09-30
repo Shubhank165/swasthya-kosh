@@ -69,6 +69,17 @@ class Role(StrEnum):
     #: the least controlled device in the system and holds the fewest rights.
     PATIENT = "patient"
     KIOSK = "kiosk"
+    #: The front desk. Sees the queue, who is waiting and which doctors are
+    #: free — and **not one clinical record**. A receptionist needs to route a
+    #: patient, which needs a name on a list and a doctor's availability; it
+    #: does not need a history, and the one thing standing between the OPD
+    #: counter and every patient's record is that this role is not `STAFF`.
+    RECEPTIONIST = "receptionist"
+    #: The pharmacy counter. Sees the shelf: what is low, what expires, what to
+    #: order. Deliberately holds no clinical access at all — the inventory is a
+    #: separate concern from the record, and a dispensing view that reads
+    #: histories would be a second door into them.
+    CHEMIST = "chemist"
     STAFF = "staff"
     PHYSICIAN = "physician"
     ADMIN = "admin"
@@ -82,13 +93,39 @@ class Role(StrEnum):
 #: implication, because "read this patient's own history" is scoped by *whose*
 #: history it is, and a role hierarchy cannot express that. Staff read patient
 #: data through the routes that name a patient explicitly and are audited.
+#: `RECEPTIONIST` and `CHEMIST` inherit nothing and are inherited by nothing
+#: except `ADMIN`. Neither is a narrower `STAFF`, and making either one would
+#: hand it every clinical route in the system: `GET /intakes/{id}/report` is
+#: `RequireStaff`, so a receptionist who implied `STAFF` would read reports.
+#: They are siblings, not subsets, and the one-line temptation to write
+#: `STAFF: {STAFF, RECEPTIONIST}` is the whole bug this comment exists to stop.
 _IMPLIED: dict[Role, frozenset[Role]] = {
-    Role.ADMIN: frozenset({Role.ADMIN, Role.PHYSICIAN, Role.STAFF, Role.KIOSK}),
+    Role.ADMIN: frozenset(
+        {
+            Role.ADMIN,
+            Role.PHYSICIAN,
+            Role.STAFF,
+            Role.KIOSK,
+            Role.RECEPTIONIST,
+            Role.CHEMIST,
+        }
+    ),
     Role.PHYSICIAN: frozenset({Role.PHYSICIAN, Role.STAFF}),
     Role.STAFF: frozenset({Role.STAFF}),
     Role.KIOSK: frozenset({Role.KIOSK}),
     Role.PATIENT: frozenset({Role.PATIENT}),
+    Role.RECEPTIONIST: frozenset({Role.RECEPTIONIST}),
+    Role.CHEMIST: frozenset({Role.CHEMIST}),
 }
+
+#: Every role must appear, or `has_any` raises `KeyError` at request time
+#: instead of returning a clean 403 — an unguarded dict lookup on a value that
+#: arrives in a header. Checked at import rather than left to a test, because
+#: the failure is a 500 on a live route.
+assert set(_IMPLIED) == set(Role), (
+    f"_IMPLIED is missing {set(Role) - set(_IMPLIED)}; "
+    "a role absent here is a KeyError on every request that carries it"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,3 +260,14 @@ RequirePatient = Annotated[Principal, Depends(require_roles(Role.PATIENT))]
 RequireIntakeSubmitter = Annotated[
     Principal, Depends(require_roles(Role.KIOSK, Role.STAFF, Role.PATIENT))
 ]
+#: The queue, and only the queue. Who is waiting, how long, and which doctors
+#: are free — everything the front desk needs to route somebody, and nothing
+#: that would let it read a record. Deliberately a *separate* alias from
+#: `RequireStaff` rather than a widening of it: the routes that carry clinical
+#: content keep `RequireStaff`, so the split is visible at every call site
+#: instead of living in one role table nobody reads twice.
+RequireQueueReader = Annotated[
+    Principal, Depends(require_roles(Role.STAFF, Role.RECEPTIONIST))
+]
+#: The pharmacy counter.
+RequireChemist = Annotated[Principal, Depends(require_roles(Role.CHEMIST))]

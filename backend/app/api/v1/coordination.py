@@ -9,7 +9,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.auth import RequireAdmin, RequirePhysician, RequireStaff
+from app.api.auth import (
+    RequireAdmin,
+    RequireChemist,
+    RequirePhysician,
+    RequireQueueReader,
+    RequireStaff,
+)
 from app.api.deps import ClockDep, CoordinationServiceDep
 from app.core.errors import ValidationError
 from app.domain.coordination import OrderKind
@@ -91,7 +97,7 @@ async def list_orders(
     summary="Items low, expiring, expired or out",
 )
 async def stock_alerts(
-    principal: RequireStaff,
+    principal: RequireChemist,
     service: CoordinationServiceDep,
     clock: ClockDep,
 ) -> StockAlertListOut:
@@ -126,7 +132,7 @@ async def stock_alerts(
 )
 async def wait_estimate(
     intake_id: str,
-    principal: RequireStaff,
+    principal: RequireQueueReader,
     service: CoordinationServiceDep,
 ) -> WaitEstimateOut:
     """Where this patient stands.
