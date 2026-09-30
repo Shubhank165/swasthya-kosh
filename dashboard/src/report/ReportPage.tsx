@@ -111,7 +111,7 @@ export function ReportPage() {
         </p>
         <Link
           to="/"
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-herb hover:underline"
+          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:underline"
         >
           <ArrowLeft className="size-3.5" /> {isHi ? 'ओपीडी कतार पर वापस' : 'Back to OPD queue'}
         </Link>
@@ -148,7 +148,7 @@ export function ReportPage() {
         <div className="brand-gradient h-1.5 w-full" />
         <div className="flex flex-wrap items-center justify-between gap-6 p-6">
           <div className="flex items-center gap-4">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-herb-soft text-xl font-bold text-herb shadow-sm">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-brand-soft text-xl font-bold text-brand shadow-sm">
               {refType === 'phone' ? 'P' : 'A'}
             </span>
             <div>
@@ -169,7 +169,14 @@ export function ReportPage() {
                 <span className="rounded-lg bg-surface-sunken px-2.5 py-1 font-medium text-ink-muted border border-line">
                   <span className="text-ink-muted/80">{isHi ? 'ओपीडी: ' : 'OPD: '}</span>
                   <span className="text-ink font-semibold">
-                    {humanise(intake.data.department_code ?? 'Kayachikitsa')}
+                    {/* An intake with no department is filed with no department —
+                        the kiosk offers a "not sure, the staff will guide me"
+                        option and this is what it looks like downstream. Naming
+                        a department here would invent one, which is the same
+                        class of mistake as rendering `not_asked` as "no". */}
+                    {intake.data.department_code
+                      ? humanise(intake.data.department_code)
+                      : t('header.departmentNone')}
                   </span>
                 </span>
               </div>
@@ -184,8 +191,8 @@ export function ReportPage() {
               onClick={() => verifyRecord.mutate({})}
               className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 text-xs sm:text-sm font-semibold shadow-sm transition-all hover:-translate-y-px ${
                 isVerified
-                  ? 'bg-herb-soft text-herb border border-herb/30'
-                  : 'bg-herb text-white hover:bg-herb-deep'
+                  ? 'bg-brand-soft text-brand border border-brand/30'
+                  : 'bg-brand text-white hover:bg-brand-deep'
               }`}
             >
               {isVerified ? <Check className="size-4" /> : <FileDown className="size-4" />}
@@ -234,7 +241,7 @@ export function ReportPage() {
               onClick={() => setActiveTab(t.id)}
               className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
                 isActive
-                  ? 'bg-herb text-white shadow-sm'
+                  ? 'bg-brand text-white shadow-sm'
                   : 'text-ink-muted hover:bg-surface-sunken hover:text-ink'
               }`}
             >
@@ -316,7 +323,7 @@ function CopyTextButton({ text, isHi = false }: { text: string; isHi?: boolean }
       onClick={copy}
       className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-ink shadow-sm transition-colors hover:bg-surface-sunken"
     >
-      {copied ? <Check className="size-3.5 text-herb" /> : null}
+      {copied ? <Check className="size-3.5 text-brand" /> : null}
       {copied
         ? (isHi ? 'क्लिपबोर्ड पर कॉपी किया गया' : 'Copied to clipboard')
         : (isHi ? 'क्लिनिकल विवरण कॉपी करें' : 'Copy clinical text')}

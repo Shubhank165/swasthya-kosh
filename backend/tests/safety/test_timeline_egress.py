@@ -129,7 +129,7 @@ class TestTheRequestCarriesNoPHI:
         """The same strings `test_logging_phi.py` forbids in a log line. What
         must not reach a log must not reach a model."""
         request = TimelineRequest(
-            today={"chief_complaint": "fever", "department": "kayachikitsa"},
+            today={"chief_complaint": "fever", "department": "general_medicine"},
             candidates=(PRIOR_VISIT, OWN_DOCUMENT),
         )
         serialised = json.dumps(request.model_dump(mode="json"), ensure_ascii=False)

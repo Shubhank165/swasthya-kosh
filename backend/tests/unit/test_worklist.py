@@ -41,7 +41,7 @@ def _entry(
     return WorklistEntry(
         intake_id=intake_id,
         hospital_id="aiia-delhi",
-        department_code="kayachikitsa",
+        department_code="general_medicine",
         state=state,
         intake_status=status,
         arrived_at=BASE + timedelta(minutes=minutes),
@@ -183,10 +183,10 @@ class TestAssembly:
             _entry("flagged", minutes=45, state=WorklistState.RED_FLAG_PENDING, alerts=1),
             _entry("later", minutes=60),
         ]
-        worklist = assemble(rows, department_code="kayachikitsa", generated_at=BASE)
+        worklist = assemble(rows, department_code="general_medicine", generated_at=BASE)
         assert [entry.intake_id for entry in worklist.pending_alerts] == ["flagged"]
         assert worklist.total == 3
-        assert worklist.department_code == "kayachikitsa"
+        assert worklist.department_code == "general_medicine"
 
     def test_an_acknowledged_alert_leaves_the_pending_list(self) -> None:
         """Acknowledgement is a record of a person having looked, and that is

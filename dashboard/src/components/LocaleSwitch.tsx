@@ -41,7 +41,7 @@ export function LocaleSwitch() {
             setLocale(val as Locale);
           }
         }}
-        className="h-8 rounded-full border border-line bg-white/90 py-1 pl-8 pr-3 text-xs font-medium text-ink shadow-sm outline-none transition-colors hover:border-herb focus:ring-2 focus:ring-herb cursor-pointer"
+        className="h-8 rounded-full border border-line bg-white/90 py-1 pl-8 pr-3 text-xs font-medium text-ink shadow-sm outline-none transition-colors hover:border-brand focus:ring-2 focus:ring-brand cursor-pointer"
       >
         {ALL_LANGUAGES.map((lang) => (
           <option

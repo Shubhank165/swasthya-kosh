@@ -128,7 +128,7 @@ async def _create_hospitals(opened: AsyncSession) -> None:
     await repository.create(
         hospital_id=HOSPITAL_ID,
         display_name="All India Institute of Ayurveda",
-        departments=["kayachikitsa", "panchakarma", "general"],
+        departments=["general_medicine", "orthopaedics", "general"],
         default_language="hi",
     )
     await repository.create(

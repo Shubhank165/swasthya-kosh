@@ -64,7 +64,7 @@ class TestTheBackendAcceptsIt:
         assert payload["schema_version"] == "0.1"
 
     def test_the_hospital_and_department_survive(self, record: Any) -> None:
-        assert record.department_code == "kayachikitsa"
+        assert record.department_code == "general_medicine"
 
 
 class TestTheFiveStatusesSurvive:

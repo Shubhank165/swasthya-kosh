@@ -213,7 +213,7 @@ function IssueForm({ intakeId, t }: { intakeId: string; t: Translate }) {
           type="submit"
           disabled={!ready || issue.isPending}
           data-testid="issue-order-submit"
-          className="rounded-xl bg-herb px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-herb-deep disabled:opacity-50"
+          className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-deep disabled:opacity-50"
         >
           {issue.isPending ? t('common.loading') : t('orders.issue')}
         </button>

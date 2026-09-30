@@ -19,7 +19,7 @@ export default {
         verified: { DEFAULT: '#1a6b45', soft: '#eef8f2' },
         urgent: { DEFAULT: '#b3261e', soft: '#fdecea' },
         // Clinical portal palette
-        herb: { DEFAULT: '#0f766e', soft: '#e6f4ea', deep: '#134e4a' },
+        brand: { DEFAULT: '#0f766e', soft: '#e6f4ea', deep: '#134e4a' },
         saffron: { DEFAULT: '#b45309', soft: '#fef3c7' },
         alert: { DEFAULT: '#b91c1c', soft: '#fee2e2' },
         'surface-tint': '#f8faf9',

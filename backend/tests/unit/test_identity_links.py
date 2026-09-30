@@ -40,7 +40,7 @@ def _payload(intake_id: str, ref_type: str, ref_value: str | None, when: str) ->
         "status": "complete",
         "language": "hi",
         "reporter": "self",
-        "department_code": "kayachikitsa",
+        "department_code": "general_medicine",
         "patient_ref": {"type": ref_type, "value": ref_value},
         "turns": [],
         "fields": {

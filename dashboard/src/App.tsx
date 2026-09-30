@@ -7,7 +7,7 @@
  * backend's own guard rather than trusting it.
  */
 import { Link, NavLink, Route, Routes } from 'react-router-dom';
-import { Leaf, LogOut } from 'lucide-react';
+import { HeartPulse, LogOut } from 'lucide-react';
 
 import { AlertsPage } from './alerts/AlertsPage';
 import { LocaleSwitch } from './components/LocaleSwitch';
@@ -79,7 +79,7 @@ function TopBar() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-3">
           <span className="brand-gradient flex size-10 items-center justify-center rounded-xl text-white shadow-sm">
-            <Leaf className="size-5" />
+            <HeartPulse className="size-5" />
           </span>
           <span className="leading-tight">
             <span className="block font-semibold text-ink text-base">MediKiosk</span>
@@ -104,7 +104,7 @@ function TopBar() {
           <LocaleSwitch />
 
           <div className="hidden items-center gap-2.5 border-l border-line pl-3 sm:flex">
-            <span className="flex size-9 items-center justify-center rounded-full bg-herb-soft text-xs font-bold text-herb">
+            <span className="flex size-9 items-center justify-center rounded-full bg-brand-soft text-xs font-bold text-brand">
               {initials}
             </span>
             <span className="leading-tight">
@@ -140,7 +140,7 @@ function Tab({ to, label }: { to: string; label: string }) {
       className={({ isActive }) =>
         `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
           isActive
-            ? 'bg-herb-soft text-herb font-semibold'
+            ? 'bg-brand-soft text-brand font-semibold'
             : 'text-ink-muted hover:bg-surface-sunken hover:text-ink'
         }`
       }

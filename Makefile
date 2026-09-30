@@ -134,3 +134,7 @@ migrate-cloud: ## Run migrations against Cloud SQL as a one-shot job, pre-deploy
 .PHONY: deploy
 deploy: check build-image migrate-cloud  ## Test, build, migrate, then deploy both services
 	PROJECT_ID=$(PROJECT_ID) REGION=$(REGION) infra/gcp/40-deploy.sh
+
+.PHONY: warm
+warm:  ## Wake the deployed API before a demo. See the note in warm.sh.
+	PROJECT_ID=$(PROJECT_ID) REGION=$(REGION) infra/gcp/warm.sh

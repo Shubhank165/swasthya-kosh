@@ -43,19 +43,20 @@ from app.services.terminology import seed_terminology
 logger = get_logger(__name__)
 
 HOSPITAL_ID = "aiia-delhi"
-#: A realistic OPD rather than a sample of one. Four departments left a
-#: woman needing gynaecology and a parent with a sick child no destination but
-#: the escape hatch — which is a routing failure, not a cosmetic one. Display
-#: names for all eight already existed in `api/v1/hospitals.py`; only the seed
-#: was short.
+#: A realistic OPD rather than a sample of one. Four departments left a woman
+#: needing gynaecology and a parent with a sick child no destination but the
+#: escape hatch — which is a routing failure, not a cosmetic one. Display names
+#: for all of these live in `api/v1/hospitals.py`; this list is what the seeded
+#: hospital actually offers.
 DEPARTMENTS: list[str] = [
-    "kayachikitsa",
-    "panchakarma",
-    "shalya",
-    "shalakya",
-    "prasuti",
-    "kaumarbhritya",
-    "swasthavritta",
+    "general_medicine",
+    "orthopaedics",
+    "paediatrics",
+    "ent",
+    "obstetrics_gynaecology",
+    "dermatology",
+    "ophthalmology",
+    "cardiology",
     "general",
 ]
 
@@ -98,7 +99,7 @@ def sample_payloads() -> list[dict[str, Any]]:
             "status": "complete",
             "language": "hi",
             "reporter": "self",
-            "department_code": "kayachikitsa",
+            "department_code": "general_medicine",
             "patient_ref": {"type": "hospital_id", "value": "UHID-100241"},
             "turns": [
                 _turn(1, "ask_complaint", "पेट में दर्द", 0.93),
@@ -145,7 +146,7 @@ def sample_payloads() -> list[dict[str, Any]]:
             "status": "partial",
             "language": "hi",
             "reporter": "family_attendant",
-            "department_code": "kayachikitsa",
+            "department_code": "general_medicine",
             "patient_ref": {"type": "guest"},
             "turns": [
                 _turn(1, "ask_complaint", "बुखार", 0.90),
@@ -232,7 +233,7 @@ def sample_payloads() -> list[dict[str, Any]]:
             "status": "complete",
             "language": "en",
             "reporter": "self",
-            "department_code": "panchakarma",
+            "department_code": "orthopaedics",
             "patient_ref": {"type": "hospital_id", "value": "UHID-100518"},
             "turns": [
                 _turn(1, "ask_complaint", "pain in both knees", 0.96),
@@ -292,7 +293,7 @@ def app_visit_payloads(reference: str) -> list[dict[str, Any]]:
             "status": "complete",
             "language": "hi",
             "reporter": "self",
-            "department_code": "kayachikitsa",
+            "department_code": "general_medicine",
             "patient_ref": ref,
             "turns": [_turn(1, "ask_complaint", "घुटनों में दर्द", 0.92)],
             "fields": {
@@ -328,7 +329,7 @@ def app_visit_payloads(reference: str) -> list[dict[str, Any]]:
             "status": "complete",
             "language": "hi",
             "reporter": "self",
-            "department_code": "kayachikitsa",
+            "department_code": "general_medicine",
             "patient_ref": ref,
             "turns": [_turn(1, "ask_complaint", "पैर में चोट", 0.88)],
             "fields": {

@@ -9,7 +9,7 @@
   "language": "hi",
   "language_locked_at_turn": 2,
   "reporter": "self",
-  "department_code": "kayachikitsa",
+  "department_code": "general_medicine",
   "patient_ref": {
     "type": "hospital_id",
     "value": "UHID-100241"

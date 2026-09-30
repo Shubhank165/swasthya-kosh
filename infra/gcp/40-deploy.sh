@@ -90,7 +90,12 @@ echo "    ${API_SA%%@*} -> roles/iam.serviceAccountTokenCreator (on itself)"
 
 # --- API --------------------------------------------------------------------
 # min-instances 0: an OPD is not a 24-hour service and a cold start between
-# patients costs nobody anything.
+# patients costs nobody anything — with one exception, which is worth naming
+# rather than rediscovering. Prefill is best-effort: the app swallows a failed
+# suggestion silently so the interview never waits, so a prefill that times out
+# during a cold start is indistinguishable from one that had nothing to say.
+# Measured 9.4s cold against the app's 10s connect timeout. `make warm` before a
+# demo; `--min-instances=1` if it ever matters to a real deployment.
 say "Deploying ${API_SERVICE}"
 gc run deploy "${API_SERVICE}" "${common[@]}" \
   --service-account="${API_SA}" \

@@ -40,7 +40,7 @@ Map<String, dynamic> buildRecord({RedFlagHitRecord? flag}) {
     language: 'hi',
     reporter: 'self',
     appVersion: '1.0.0',
-    departmentCode: 'kayachikitsa',
+    departmentCode: 'general_medicine',
     patientRef: const PatientRef.phone('a1b2c3d4e5f60718'),
   );
 

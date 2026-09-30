@@ -37,7 +37,7 @@ const STATE_BADGES: Record<
   ready: {
     en: 'Ready for Review',
     hi: 'समीक्षा के लिए तैयार',
-    tone: 'bg-herb-soft text-herb',
+    tone: 'bg-brand-soft text-brand',
   },
   needs_review: {
     en: 'Needs Review',
@@ -113,10 +113,14 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
   // twice: one patient with chest pain read as "2 Emergency Red-Flags".
   const redFlagCount = rawEntries.filter((e) => e.state === 'red_flag_pending').length;
 
+  // An id with no entry gets the id, not another hospital's name. Naming a
+  // facility the session is not scoped to is worse than showing a slug: every
+  // query behind this header is filtered by `hospital_id`, so the header would
+  // be describing somewhere other than the list underneath it.
   const matchedHospital = HOSPITALS.find((h) => h.id === session?.hospitalId);
   const hospitalName = isHi
-    ? (matchedHospital?.nameHi ?? 'अखिल भारतीय आयुर्वेद संस्थान, नई दिल्ली')
-    : (matchedHospital?.nameEn ?? 'All India Institute of Ayurveda, New Delhi');
+    ? (matchedHospital?.nameHi ?? session?.hospitalId ?? '')
+    : (matchedHospital?.nameEn ?? session?.hospitalId ?? '');
 
   const todayStr = new Intl.DateTimeFormat(isHi ? 'hi-IN' : 'en-IN', {
     weekday: 'long',
@@ -130,7 +134,7 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
       {/* Facility bar card */}
       <div className="surface-card flex flex-wrap items-center justify-between gap-4 p-5 animate-fade-rise">
         <div className="flex items-center gap-3.5">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-herb-soft text-herb shadow-sm">
+          <span className="flex size-11 items-center justify-center rounded-xl bg-brand-soft text-brand shadow-sm">
             <Building2 className="size-6" />
           </span>
           <div>
@@ -173,12 +177,12 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
         </div>
 
         <div className="surface-card overflow-hidden animate-fade-rise">
-          <div className="h-1.5 w-full bg-herb" />
+          <div className="h-1.5 w-full bg-brand" />
           <div className="p-5">
             <p className="text-xs font-medium text-ink-muted">
               {isHi ? 'परामर्श हेतु तैयार' : 'Ready for Doctor'}
             </p>
-            <p className="mt-2 text-3xl font-bold text-herb">{readyCount}</p>
+            <p className="mt-2 text-3xl font-bold text-brand">{readyCount}</p>
             <p className="mt-1 text-[11px] text-ink-muted">
               {isHi ? 'कियोस्क इनटेक पूर्ण एवं सत्यापित' : 'Kiosk intake completed & verified'}
             </p>
@@ -258,7 +262,7 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={isHi ? 'इंटेक आईडी या विभाग से खोजें…' : 'Search by intake ID or department…'}
-            className="h-10 w-full rounded-xl border border-line bg-white pl-9 pr-4 text-xs text-ink outline-none transition-shadow placeholder:text-ink-muted focus:border-herb focus:ring-2 focus:ring-herb"
+            className="h-10 w-full rounded-xl border border-line bg-white pl-9 pr-4 text-xs text-ink outline-none transition-shadow placeholder:text-ink-muted focus:border-brand focus:ring-2 focus:ring-brand"
           />
         </div>
 
@@ -273,8 +277,8 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
                 onClick={() => setDepartment(dept.id === 'all' ? null : dept.id)}
                 className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
                   isSelected
-                    ? 'bg-herb text-white shadow-sm'
-                    : 'border border-line bg-white text-ink-muted hover:border-herb/50 hover:text-ink'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'border border-line bg-white text-ink-muted hover:border-brand/50 hover:text-ink'
                 }`}
               >
                 {dept.label}
@@ -293,7 +297,7 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
       <div className="surface-card overflow-hidden">
         <div className="flex items-center justify-between border-b border-line bg-[#f8faf9] px-6 py-3.5">
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wider uppercase text-ink-muted">
-            <Clock className="size-4 text-herb" />
+            <Clock className="size-4 text-brand" />
             {isHi ? 'लाइव कतार — आगमन समय अनुसार' : 'Live Queue — Ordered by Arrival Time'}
           </div>
           <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-ink-muted border border-line">
@@ -383,7 +387,7 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
 
                     <Link
                       to={`/intakes/${entry.intake_id}`}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-herb px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-herb-deep hover:-translate-y-px"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-brand-deep hover:-translate-y-px"
                     >
                       {isHi ? 'रोगी फ़ाइल खोलें' : 'Open Patient File'} <ArrowRight className="size-3.5" />
                     </Link>

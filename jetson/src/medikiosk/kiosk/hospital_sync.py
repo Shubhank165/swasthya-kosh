@@ -106,10 +106,11 @@ def departments(cached: dict[str, Any], hospital_id: str) -> list[dict[str, Any]
 def department_code(cached: dict[str, Any], hospital_id: str, queue: str | None) -> str | None:
     """Map our queue name onto a department the hospital actually runs.
 
-    Ours are English specialty names ("Cardiology"); theirs are codes with display names, some
-    of them Ayurvedic departments with no specialty equivalent. A name we cannot match returns
-    None rather than a guess - the backend files an intake with no department perfectly well,
-    and inventing `kayachikitsa` for an orthopaedic complaint would be worse than silence.
+    Ours are English specialty names ("Cardiology"); theirs are slugs with display names, and
+    the two now mostly line up. Mostly is not always: a hospital is free to run a department
+    this queue has no name for, and to omit one it does. A name we cannot match returns None
+    rather than a guess - the backend files an intake with no department perfectly well, and
+    inventing `orthopaedics` for a cardiac complaint would be worse than silence.
     """
 
     if not queue:

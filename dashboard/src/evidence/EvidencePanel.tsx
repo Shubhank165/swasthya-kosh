@@ -80,7 +80,7 @@ export function EvidenceDrawer({
           {/* Header */}
           <div className="flex items-center justify-between border-b border-line px-5 py-4 bg-[#f8faf9]">
             <div className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-herb-soft text-herb">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-brand-soft text-brand">
                 <ScanSearch className="size-4" />
               </span>
               <div>
