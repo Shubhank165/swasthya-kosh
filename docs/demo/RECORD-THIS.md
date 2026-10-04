@@ -108,12 +108,23 @@ export KIOSK_TOKEN='<your kiosk token>'
 
 Then make the font big: **Ctrl `+`** about four times.
 
-### Browser
+### Browser — open these four tabs, in this order
 
-1. Open **http://localhost:5173**
-2. Zoom to **110%**: **Ctrl `+`** once
-3. Hide bookmarks: **Ctrl Shift B**
-4. Click **Demo: Doctor**
+| Tab | URL |
+|---|---|
+| 1. Dashboard | `http://localhost:5173` |
+| 2. Cloud Run | `https://console.cloud.google.com/run/detail/asia-south1/medikiosk-api/metrics?project=medikiosk-sih-2026` |
+| 3. Cloud Run logs | `https://console.cloud.google.com/run/detail/asia-south1/medikiosk-api/logs?project=medikiosk-sih-2026` |
+| 4. Cloud SQL | `https://console.cloud.google.com/sql/instances/medikiosk-pg/overview?project=medikiosk-sih-2026` |
+
+**Sign in to Google in tabs 2–4 now**, before you record. Dismiss any
+"Welcome to Cloud Console" banners now too.
+
+Then on tab 1:
+
+1. Zoom to **110%**: **Ctrl `+`** once
+2. Hide bookmarks: **Ctrl Shift B**
+3. Click **Demo: Doctor**
 
 ### Final checks
 
@@ -129,29 +140,44 @@ Record each beat separately. Stop recording between beats.
 
 ---
 
-## BEAT 1 — Where this runs  (~40 sec)
+## BEAT 1 — Where this runs  (~50 sec)
 
-**SHOW:** Terminal 2, full screen.
-
-**DO:**
-```bash
-curl -s $API/readyz | python3 -m json.tool
-```
+**SHOW:** Browser tab 2 — the Cloud Run service page in the Google Cloud
+Console.
 
 **SAY:**
 
-> "This is our backend, live on Google Cloud Run in Mumbai — asia-south1.
-> Everything in this project is region-locked to India, so patient data never
-> leaves the country."
+> "This is the Google Cloud Console. Project MediKiosk. This is our API running
+> on Cloud Run."
 
-**DO:** Point the cursor at the `providers` block.
+**DO:** Point at the **Region** field.
 
 **SAY:**
 
-> "OCR runs on Gemini. Repair and prefill run on Vertex AI. Storage is Google
-> Cloud Storage, documents queue through Pub/Sub, and the database is Cloud SQL.
-> This is the readiness endpoint reporting what the service is actually
-> configured with — not a slide."
+> "Region: asia-south1 — Mumbai. Everything in this project is region-locked to
+> India. The deploy scripts refuse to run anywhere else, so patient data cannot
+> leave the country by accident."
+
+**DO:** Point at the service **URL**, then click the **Revisions** tab.
+
+**SAY:**
+
+> "Live revision, serving 100% of traffic. Minimum instances is one, so there's
+> no cold start — the service is always up."
+
+**DO:** Switch to browser tab 4 — **Cloud SQL**.
+
+**SAY:**
+
+> "The database is Cloud SQL — Postgres 16, also in Mumbai, on a private IP.
+> It's not reachable from the internet; only our Cloud Run services can see it."
+
+**DO:** Switch back to tab 2.
+
+**SAY (optional, if you want the full stack named):**
+
+> "Documents go to Cloud Storage, OCR is queued through Pub/Sub, and the models
+> are Gemini and Vertex AI — all in the same region."
 
 ---
 
@@ -213,6 +239,46 @@ python3 infra/demo/submit_intake.py routine
 **SAY:**
 
 > "Token number, language Hindi, General Medicine, one unresolved field."
+
+**SAY (lead into the next shot):**
+
+> "You've only got my word so far that this went to the cloud. Let me show you."
+
+---
+
+## BEAT 3B — Proof it hit Google  ⭐ (~45 sec)
+
+**SHOW:** Browser tab 3 — **Cloud Run → Logs**.
+
+**DO:** Make sure the log stream is scrolled to the newest entry. If it isn't
+updating, click the **Play / Stream logs** button at the top of the log panel.
+
+**SAY:**
+
+> "That submission didn't go to my laptop. Here are Google's own logs for the
+> service, live."
+
+**DO:** Point at the line reading `POST .../api/v1/intakes/ingest` with status
+`200`.
+
+**SAY:**
+
+> "There it is. POST to the ingest endpoint, status 200, ninety milliseconds —
+> the request I just made, logged by Cloud Run."
+
+**DO:** Point at the `intake_ingested` line just below it.
+
+**SAY:**
+
+> "And our own structured log underneath: intake_ingested, with the intake ID.
+> Match it against the token on the dashboard — same record."
+
+**SAY (this one is worth landing):**
+
+> "Notice what's *not* here. No symptoms, no names, no phone numbers. These logs
+> carry identifiers and counters only. That isn't a convention we follow — we
+> have a test that writes clinical text into a log call and fails the build if
+> any of it comes out the other side."
 
 ---
 
@@ -368,3 +434,19 @@ python3 infra/demo/submit_intake.py critical
 | Says "reconnecting" | Terminal 1 died. Restart it |
 | Got signed out | You pressed reload. Sign in again |
 | Blank/black OBS preview | Right-click source → Properties → share the screen again |
+| Console logs not moving | Click **Stream logs** at the top of the log panel |
+| Logs show nothing recent | Set the time range to **Last 1 hour** and clear any query filter |
+| Console asks you to log in mid-take | You skipped the sign-in step in Part 2. Stop, sign in, re-record |
+
+## Backup if the Console is slow or won't cooperate
+
+Run this in Terminal 2 instead of Beat 3B — same proof, no browser:
+
+```bash
+gcloud logging read \
+  'resource.labels.service_name="medikiosk-api" AND httpRequest.requestMethod="POST"' \
+  --project=medikiosk-sih-2026 --limit=3 \
+  --format='value(timestamp,httpRequest.requestUrl,httpRequest.status)'
+```
+
+It prints the same request Cloud Run logged, straight from Google.
