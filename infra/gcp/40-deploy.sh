@@ -89,18 +89,34 @@ gc iam service-accounts add-iam-policy-binding "${API_SA}" \
 echo "    ${API_SA%%@*} -> roles/iam.serviceAccountTokenCreator (on itself)"
 
 # --- API --------------------------------------------------------------------
-# min-instances 0: an OPD is not a 24-hour service and a cold start between
-# patients costs nobody anything — with one exception, which is worth naming
-# rather than rediscovering. Prefill is best-effort: the app swallows a failed
-# suggestion silently so the interview never waits, so a prefill that times out
-# during a cold start is indistinguishable from one that had nothing to say.
-# Measured 9.4s cold against the app's 10s connect timeout. `make warm` before a
-# demo; `--min-instances=1` if it ever matters to a real deployment.
-say "Deploying ${API_SERVICE}"
+# `API_MIN_INSTANCES` is the cold-start knob, and it now defaults to **1**.
+#
+# The original argument for 0 was that an OPD is not a 24-hour service and a
+# cold start between patients costs nobody anything. That holds for every route
+# but one. Prefill is best-effort: the app swallows a failed suggestion silently
+# so the interview never waits, which means a prefill that times out during a
+# cold start is indistinguishable, on screen, from one that had nothing to say.
+# The feature does not break — it stops existing, with nothing in any log.
+#
+# Measured against this service: **8.7s cold, 0.13s warm**, against the app's
+# 10s connect timeout (`app/lib/core/api.dart`). That is close enough to the
+# ceiling that the first patient of any session may silently get no suggestions.
+#
+# **This costs money and the cost is the point of the knob.** One instance held
+# warm bills continuously whether or not anybody uses it, unlike scale-to-zero.
+# That is a deliberate trade: a feature that is invisibly absent is worse than
+# a feature that is visibly paid for. Set `API_MIN_INSTANCES=0` to go back to
+# scale-to-zero and `make warm` before anything that matters.
+#
+# The worker stays at 0 deliberately: it is Pub/Sub push-driven, nobody is
+# waiting on a screen for it, and a cold start there genuinely costs nobody
+# anything.
+API_MIN_INSTANCES="${API_MIN_INSTANCES:-1}"
+say "Deploying ${API_SERVICE} (min-instances=${API_MIN_INSTANCES})"
 gc run deploy "${API_SERVICE}" "${common[@]}" \
   --service-account="${API_SA}" \
   --allow-unauthenticated \
-  --min-instances=0 \
+  --min-instances="${API_MIN_INSTANCES}" \
   --max-instances=10 \
   --concurrency=80 \
   --cpu=1 --memory=1Gi \
