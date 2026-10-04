@@ -43,9 +43,16 @@ source → **Properties** → share again.
 
 **Output**
 - Output Mode: **Simple**
+- Recording Path: **`/home/shubhank165/Videos`**
 - Recording Quality: **High Quality, Medium File Size**
 - Recording Format: **MKV**
-- Encoder: **Hardware** if offered, else **Software (x264)**
+- Video Encoder: **Software (x264)**
+
+> Pick **x264**, not a hardware option. This laptop's OBS offers QSV, but the
+> Intel MFX runtime it needs doesn't load here, and choosing it gives you
+> "Starting the output failed" with a misleading note about video drivers. x264
+> on an i5-1340P handles this recording without breaking a sweat.
+> (**Hardware (VAAPI, H.264)** also works if you want the CPU back.)
 
 **Audio**
 - Mic/Auxiliary: your microphone
@@ -349,4 +356,5 @@ python3 infra/demo/submit_intake.py critical
 | Says "reconnecting" | The first terminal stopped. Restart it |
 | You got signed out | You hit reload. Just sign in again |
 | OBS preview is black | Right-click the source → Properties → share again |
+| "Starting the output failed" | Settings → Output → Video Encoder → **Software (x264)** |
 | Cloud logs look frozen | Click **Stream logs** at the top of the panel |
