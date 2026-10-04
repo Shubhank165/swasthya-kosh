@@ -22,10 +22,12 @@ import {
   Stethoscope,
   UserRound,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
 import { useHospitals } from '../api/queries';
 import { LocaleSwitch } from '../components/LocaleSwitch';
 import { useLocale, useT } from '../i18n';
-import { useSession, type DashboardRole } from './session';
+import { HOME_FOR, useSession, type DashboardRole } from './session';
 
 /**
  * Fallback only, used when `/hospitals` cannot be reached.
@@ -67,6 +69,24 @@ export function LoginPage() {
   const locale = useLocale((state) => state.locale);
   const isHi = locale === 'hi';
   const signIn = useSession((state) => state.signIn);
+  const navigate = useNavigate();
+
+  /**
+   * Sign in, then land on a screen this role may actually open.
+   *
+   * Without the navigate, a sign-in leaves the browser on whatever URL was
+   * already there — which on a shared OPD terminal is the previous person's
+   * screen. A pharmacist signing in behind a receptionist got "Not available
+   * to this role" for `/reception`, a screen they never asked for, and had to
+   * work out that the nav tab was the way forward.
+   *
+   * `replace`, so the back button does not return to the sign-in screen of a
+   * session that no longer exists.
+   */
+  function enter(session: Parameters<typeof signIn>[0]) {
+    signIn(session);
+    navigate(HOME_FOR[session.role], { replace: true });
+  }
   const endedBecause = useSession((state) => state.endedBecause);
 
   const hospitals = useHospitals();
@@ -121,7 +141,7 @@ export function LoginPage() {
   function submit(event: FormEvent) {
     event.preventDefault();
     const chosen = SIGN_IN_AS.find((entry) => entry.role === role) ?? SIGN_IN_AS[0]!;
-    signIn({
+    enter({
       userId: role === 'physician' ? doctorName : chosen.desk,
       role,
       hospitalId: hospitalId || 'aiia-delhi',
@@ -131,7 +151,7 @@ export function LoginPage() {
 
   function handleDemo(demoRole: DashboardRole) {
     const chosen = SIGN_IN_AS.find((entry) => entry.role === demoRole) ?? SIGN_IN_AS[0]!;
-    signIn({
+    enter({
       userId: demoRole === 'physician' ? 'Dr. R. Sharma' : chosen.desk,
       role: demoRole,
       hospitalId: 'aiia-delhi',

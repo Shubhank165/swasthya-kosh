@@ -43,6 +43,16 @@ from app.services.terminology import seed_terminology
 logger = get_logger(__name__)
 
 HOSPITAL_ID = "aiia-delhi"
+#: What a patient and a physician actually read on screen.
+#:
+#: The hospital **id** stays `aiia-delhi` deliberately: it appears in 27 source
+#: and test files, and the deployed `KIOSK_TOKENS` secret maps each kiosk token
+#: to a hospital id, so renaming it means rewriting that secret and
+#: re-provisioning every kiosk. That is a real operational cost for a string no
+#: patient ever sees. The display name is the string they do see, and it is
+#: fictional on purpose — a real hospital's name on a public demo claims a
+#: deployment and an endorsement this project does not have.
+DISPLAY_NAME = "Sanjeevani Multi-Specialty Hospital, New Delhi"
 #: A realistic OPD rather than a sample of one. Four departments left a woman
 #: needing gynaecology and a parent with a sick child no destination but the
 #: escape hatch — which is a routing failure, not a cosmetic one. Display names
@@ -534,12 +544,26 @@ async def seed(
                 before=len(before),
                 after=len(DEPARTMENTS),
             )
+        # The display name is configuration for the same reason, and it was
+        # missed when the departments were generalised: a database seeded
+        # before that change kept the old facility name on every screen while
+        # the code said otherwise, which is precisely the invisible gap the
+        # paragraph above is about.
+        if existing.display_name != DISPLAY_NAME:
+            logger.info(
+                "seed_display_name_reconciled",
+                hospital_id=HOSPITAL_ID,
+                before=existing.display_name,
+                after=DISPLAY_NAME,
+            )
+            existing.display_name = DISPLAY_NAME
+            await session.flush()
         logger.info("seed_skipped_existing")
         return {"hospital_id": HOSPITAL_ID, "created": False}
 
     await hospitals.create(
         hospital_id=HOSPITAL_ID,
-        display_name="All India Institute of Ayurveda, New Delhi",
+        display_name=DISPLAY_NAME,
         location="New Delhi",
         departments=DEPARTMENTS,
         default_language="hi",

@@ -363,3 +363,64 @@ class TestWhatASessionCanReach:
             },
         )
         assert response.status_code == 401
+
+
+class TestAuthenticationReadsOneClock:
+    """The clock that validates a session must be the clock that made it.
+
+    `current_principal` once called `_clock()` directly while its docstring
+    claimed the function was "injected in tests". `dependency_overrides` cannot
+    reach a plain function call, so it never was: sessions were created on the
+    suite's frozen clock and validated against the real one.
+
+    Nothing caught it for thirty days, because thirty days is
+    `patient_session_ttl_hours` — within that window the two clocks disagreed
+    and no assertion could tell. On the thirty-first day every patient-session
+    test in this file went red at once, pointing at authentication, on a day
+    nobody had changed any code.
+
+    The tests above would catch a regression again, but only after the same
+    silent month. These two catch it immediately.
+    """
+
+    def test_the_auth_clock_is_a_dependency_and_not_a_direct_call(self) -> None:
+        """Structural, because the behavioural version has a month-long fuse."""
+        import typing
+
+        from app.api import auth
+
+        # `get_type_hints` rather than `inspect.signature`: this module uses
+        # `from __future__ import annotations`, so every annotation is a string
+        # until something evaluates it, and a string never has `__metadata__`.
+        hints = typing.get_type_hints(auth.current_principal, include_extras=True)
+        dependencies = [
+            dependency
+            for hint in hints.values()
+            for dependency in getattr(hint, "__metadata__", ())
+            if getattr(dependency, "dependency", None) is auth._clock
+        ]
+        assert dependencies, (
+            "current_principal does not depend on `auth._clock`, so "
+            "`dependency_overrides[auth._clock]` cannot reach the clock it "
+            "validates patient sessions against."
+        )
+
+    def test_the_override_actually_takes_effect(self, app_client: Any) -> None:
+        """Behavioural, and independent of what today's date happens to be.
+
+        The suite's frozen clock sits far enough in the past that a session
+        validated against the real clock has already expired. So a sign-in that
+        still works proves the override reached authentication — and this holds
+        on every future date rather than only after the TTL has elapsed.
+        """
+        from tests.conftest import HOSPITAL_ID
+
+        token = _sign_in(app_client)
+        response = app_client.get(
+            "/api/v1/patients/me/history",
+            headers={"Authorization": f"Bearer {token}", "X-Hospital-Id": HOSPITAL_ID},
+        )
+        assert response.status_code == 200, (
+            "A session minted on the frozen clock was refused — authentication "
+            "is reading a different clock than the one that issued it."
+        )

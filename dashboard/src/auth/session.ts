@@ -42,6 +42,29 @@ export function isDashboardRole(role: string): role is DashboardRole {
   return (DASHBOARD_ROLES as readonly string[]).includes(role);
 }
 
+/**
+ * Where each role lands when they sign in.
+ *
+ * Lives here rather than in `App.tsx` because sign-in needs it and `App.tsx`
+ * already imports the sign-in screen — the other direction is a cycle.
+ *
+ * **This is a landing rule, not an access rule.** `RequireDashboardRole` still
+ * refuses rather than redirects, and that stays true: a refusal is the honest
+ * answer when somebody *navigated to* a screen their account may not see.
+ * It is the wrong answer immediately after signing in, when the person asked
+ * for nothing in particular and the URL is left over from whoever used the
+ * terminal before them — which on a shared OPD desk is the normal case. A
+ * receptionist signing in behind a doctor's last URL was shown "Not available
+ * to this role" for a screen they had never asked for.
+ */
+export const HOME_FOR: Record<DashboardRole, string> = {
+  physician: '/',
+  staff: '/',
+  admin: '/',
+  receptionist: '/reception',
+  chemist: '/pharmacy',
+};
+
 export interface Session {
   userId: string;
   role: DashboardRole;

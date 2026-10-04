@@ -340,6 +340,11 @@ def app_client(engine: Any, settings: Settings, still_clock: FrozenClock) -> Ite
     application = create_app()
     application.dependency_overrides[deps.get_settings_dep] = lambda: settings
     application.dependency_overrides[auth.auth_settings] = lambda: settings
+    # Authentication reads its own clock, and it must be the same one the
+    # rest of the test reads. Without this a patient session is *created*
+    # at the frozen date and *validated* against today, so the suite goes
+    # red the day real time passes the frozen date by the session TTL.
+    application.dependency_overrides[auth._clock] = lambda: still_clock
     application.dependency_overrides[deps.get_clock] = lambda: still_clock
     # One factory for the whole client, not one per request. Rebuilding it per
     # request restarts the counter, so two calls that each mint a fact id both

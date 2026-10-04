@@ -29,9 +29,17 @@ const STATE_BADGES: Record<
   string,
   { en: string; hi: string; tone: string }
 > = {
+  // `red_flag_pending` means a criterion fired and **nobody has acknowledged
+  // it yet**. It says nothing about severity. This badge used to read
+  // "Emergency Red-Flag", which was true when every flag overtook the queue;
+  // since decision 79 only a `critical` one does, so the badge was calling a
+  // prolonged fever an emergency on the strength of a state that does not mean
+  // that. The patients who actually overtook somebody are the ones carrying
+  // the "moved up" chip, and that chip is the only thing on this screen
+  // entitled to the word.
   red_flag_pending: {
-    en: 'Emergency Red-Flag',
-    hi: 'आपातकालीन रेड-फ्लैग',
+    en: 'Red-Flag — Unacknowledged',
+    hi: 'रेड-फ्लैग — स्वीकृति शेष',
     tone: 'bg-alert-soft text-alert',
   },
   ready: {
@@ -206,11 +214,13 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
           <div className="h-1.5 w-full bg-alert" />
           <div className="p-5">
             <p className="text-xs font-medium text-ink-muted">
-              {isHi ? 'आपातकालीन रेड-फ्लैग' : 'Emergency Red-Flags'}
+              {isHi ? 'स्वीकृति शेष रेड-फ्लैग' : 'Unacknowledged Red-Flags'}
             </p>
             <p className="mt-2 text-3xl font-bold text-alert">{redFlagCount}</p>
             <p className="mt-1 text-[11px] text-ink-muted">
-              {isHi ? 'सक्रिय आपातकालीन ट्राइएज' : 'Active acute triage events'}
+              {isHi
+                ? 'चिकित्सक की स्वीकृति की प्रतीक्षा में'
+                : 'Awaiting physician acknowledgement'}
             </p>
           </div>
         </div>
@@ -232,11 +242,11 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
             <p className="mt-1 text-sm font-medium text-ink">
               {pending.length === 1 && pending[0]
                 ? isHi
-                  ? `टोकन #${pending[0].intake_id.slice(0, 8)} में तत्काल चिकित्सक ध्यान की आवश्यकता वाले तीव्र लक्षण रिपोर्ट हुए हैं।`
-                  : `Token #${pending[0].intake_id.slice(0, 8)} reported acute symptoms requiring immediate physician attention.`
+                  ? `टोकन #${pending[0].intake_id.slice(0, 8)} का रेड-फ्लैग मानदंड अभी तक किसी चिकित्सक ने स्वीकृत नहीं किया है।`
+                  : `Token #${pending[0].intake_id.slice(0, 8)} fired a red-flag criterion that no physician has acknowledged yet.`
                 : isHi
-                ? `कतार में ${pending.length} रोगियों ने आपातकालीन ट्राइएज मानदंड सक्रिय किए हैं।`
-                : `${pending.length} patients in queue triggered acute emergency triage criteria.`}
+                ? `कतार में ${pending.length} रोगियों के रेड-फ्लैग मानदंड अभी तक स्वीकृत नहीं हुए हैं।`
+                : `${pending.length} patients have a red-flag criterion nobody has acknowledged yet.`}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {pending.map((alert) => (

@@ -9,6 +9,7 @@
  * a physician glancing at it cannot tell which they are looking at.
  */
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/App';
@@ -111,18 +112,29 @@ describe('a receptionist', () => {
     expect(screen.queryByTestId('refusal')).toBeNull();
   });
 
-  it('is refused the report, and asks the backend for nothing', async () => {
+  it('is refused the report, and asks the backend for no part of it', async () => {
     const { calls } = stubFetch({
       'GET /intakes/i-1': () => ({ body: {} }),
       'GET /intakes/i-1/report*': () => ({ body: {} }),
+      'GET /hospitals': () => ({ body: { hospitals: [] } }),
     });
     signInAs('receptionist');
     renderWithProviders(<App />, { route: '/intakes/i-1' });
 
     expect(await screen.findByTestId('refusal')).toBeVisible();
-    // The refusal is a role decision, taken before anything is fetched. A
-    // screen that asks first has already put the record in a response.
-    await waitFor(() => expect(calls).toHaveLength(0));
+
+    // The refusal is a role decision, taken before anything clinical is
+    // fetched. A screen that asks first has already put the record in a
+    // response, whatever it then chooses to render.
+    //
+    // Scoped to clinical routes rather than asserting zero requests outright:
+    // the shell around the refusal legitimately loads the facility directory
+    // for the header, which names a hospital and never a patient. Asserting
+    // "nothing at all" would make a chrome request look like a leak, and —
+    // worse — a future chrome request could be "fixed" by relaxing this into
+    // something that no longer checks the record at all.
+    const clinical = calls.filter((call) => call.path.includes('/intakes/'));
+    await waitFor(() => expect(clinical).toHaveLength(0));
   });
 
   it('is refused the worklist itself', async () => {
@@ -181,5 +193,49 @@ describe('the nav', () => {
     // A tab that leads to a refusal is a tab that should not be drawn.
     expect(screen.queryByRole('link', { name: /worklist/i })).toBeNull();
     expect(screen.queryByRole('link', { name: /alerts/i })).toBeNull();
+  });
+});
+
+/**
+ * Signing in lands you on a screen your role may open.
+ *
+ * Distinct from the refusals above, and the distinction is the point.
+ * `RequireDashboardRole` refuses rather than redirects on purpose — a redirect
+ * tells an account it merely needs to try again, which is false. But that is
+ * the right answer for somebody who *navigated to* a screen, not for somebody
+ * who just signed in: they asked for nothing in particular, and the URL is
+ * whatever the previous person on a shared OPD terminal left behind.
+ *
+ * Before this, a pharmacist signing in behind a receptionist saw "Not available
+ * to this role" for `/reception` — a screen they had never asked for — and had
+ * to discover the nav tab to get anywhere.
+ */
+describe('signing in', () => {
+  it('sends a chemist to the pharmacy even from the front desk URL', async () => {
+    stubFetch({
+      'GET /hospitals': () => ({ body: { hospitals: [] } }),
+      'GET /pharmacy/alerts*': () => ({ body: { alerts: [], generated_at: null } }),
+    });
+    renderWithProviders(<App />, { route: '/reception' });
+
+    await userEvent.click(await screen.findByRole('button', { name: /demo: pharmacy/i }));
+
+    expect(await screen.findByTestId('pharmacy-stock')).toBeVisible();
+    expect(screen.queryByTestId('refusal')).toBeNull();
+  });
+
+  it('sends a receptionist to the front desk even from a report URL', async () => {
+    stubFetch({
+      'GET /hospitals': () => ({ body: { hospitals: [] } }),
+      'GET /worklist*': () => ({ body: WORKLIST }),
+    });
+    renderWithProviders(<App />, { route: '/intakes/i-1' });
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /demo: receptionist/i }),
+    );
+
+    expect(await screen.findByTestId('reception-queue')).toBeVisible();
+    expect(screen.queryByTestId('refusal')).toBeNull();
   });
 });

@@ -67,7 +67,7 @@ class _VisitTile extends StatelessWidget {
           color: Theme.of(context).colorScheme.primary,
         ),
         // The complaint the patient gave, in their own words where the record
-        // kept them. Without it the list reads "6 September, Kayachikitsa" and
+        // kept them. Without it the list reads "6 September, General Medicine" and
         // says nothing about which visit this was.
         title: Text(visit.complaint ?? visit.department ?? '—'),
         subtitle: Text(_date(visit.receivedAt)),

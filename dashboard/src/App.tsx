@@ -10,6 +10,7 @@ import { Link, NavLink, Route, Routes } from 'react-router-dom';
 import { HeartPulse, LogOut } from 'lucide-react';
 
 import { AlertsPage } from './alerts/AlertsPage';
+import { useHospitals } from './api/queries';
 import { LocaleSwitch } from './components/LocaleSwitch';
 import { useT } from './i18n';
 import type { StringKey } from './i18n/strings';
@@ -19,7 +20,7 @@ import { PharmacyPage } from './pharmacy/PharmacyPage';
 import { ReceptionPage } from './reception/ReceptionPage';
 import { RequireDashboardRole } from './auth/RequireDashboardRole';
 import { useIdleTimeout } from './auth/useIdleTimeout';
-import { useSession, type DashboardRole } from './auth/session';
+import { HOME_FOR, useSession, type DashboardRole } from './auth/session';
 import { ReportPage } from './report/ReportPage';
 import { WorklistPage } from './worklist/WorklistPage';
 
@@ -58,15 +59,6 @@ const SCREENS: {
   { path: '/operations', element: OperationsPage, roles: ['admin'], tab: 'nav.operations' },
   { path: '/metrics', element: MetricsPage, roles: ['admin'], tab: 'nav.quality' },
 ];
-
-/** Where each role lands when they sign in. */
-const HOME_FOR: Record<DashboardRole, string> = {
-  physician: '/',
-  staff: '/',
-  admin: '/',
-  receptionist: '/reception',
-  chemist: '/pharmacy',
-};
 
 export function App() {
   const session = useSession((state) => state.session);
@@ -115,6 +107,28 @@ function TopBar() {
     ? session.userId.slice(0, 2).toUpperCase()
     : 'DR';
 
+  /**
+   * The facility's name, not its id.
+   *
+   * `hospital_id` is `aiia-delhi` and stays that way deliberately — it is in 27
+   * files and in the deployed `KIOSK_TOKENS` secret, so renaming it means
+   * re-provisioning every kiosk. But it was being rendered directly, so the
+   * header on every screen read "Aiia-Delhi": the one place the old facility's
+   * initials were still being shown to a user, in a product that is not
+   * AYUSH-specific. The id remains the identifier; the name is what people
+   * read.
+   *
+   * Falls back to the id rather than to another hospital's name: naming a
+   * facility the session is not scoped to would describe somewhere other than
+   * the data underneath it.
+   */
+  const hospitals = useHospitals();
+  const facilityName =
+    hospitals.data?.hospitals?.find((h) => h.hospital_id === session?.hospitalId)
+      ?.display_name ??
+    session?.hospitalId ??
+    'Hospital';
+
   return (
     <header className="sticky top-0 z-30 border-b border-line/80 bg-white/95 backdrop-blur print:hidden">
       <div className="tricolour-rule h-1 w-full" />
@@ -151,7 +165,7 @@ function TopBar() {
                 {session?.userId ?? 'Doctor'}
               </span>
               <span className="block text-[10px] text-ink-muted capitalize">
-                {session?.role} • {session?.hospitalId ?? 'Hospital'}
+                {session?.role} • {facilityName}
               </span>
             </span>
           </div>

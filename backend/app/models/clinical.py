@@ -458,7 +458,12 @@ class RedFlagEventRecord(Base):
 
     __tablename__ = "red_flag_events"
 
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    #: `rf_{intake_id}_{rule_id}`, and so wide enough to hold both: 64 for the
+    #: intake id, 128 for the rule id, plus the two separators. It was 64, which
+    #: no composite of a 64-character id could fit, and the criteria that
+    #: overflowed it were the long-named ones — which in this rule set are
+    #: disproportionately the critical ones. See migration 0009.
+    id: Mapped[str] = mapped_column(String(256), primary_key=True)
     hospital_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     intake_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("intakes.id"), nullable=False, index=True

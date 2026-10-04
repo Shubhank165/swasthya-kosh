@@ -147,7 +147,21 @@ class Principal:
 
 
 def _clock() -> Clock:
-    """The clock authentication reads. Injected in tests; real everywhere else."""
+    """The clock authentication reads.
+
+    A FastAPI dependency rather than a direct call, and that is the whole point
+    of it. It used to be called as `_clock()` from inside `current_principal`
+    while its docstring claimed it was "injected in tests" — which
+    `dependency_overrides` cannot do to a plain function call, so it never was.
+    Sessions were created on the test's frozen clock and validated against the
+    real one.
+
+    That difference is invisible until the two drift past
+    `patient_session_ttl_hours` (720, thirty days) apart. The suite's frozen
+    date is 2026-09-03, so every patient-session test passed for thirty days
+    and then began failing on 2026-10-03 and every day after — with no code
+    change, and pointing at authentication rather than at the clock.
+    """
     return SystemClock()
 
 
@@ -166,6 +180,7 @@ def _token_hospital(settings: Settings, token: str) -> str | None:
 async def current_principal(
     settings: Annotated[Settings, Depends(auth_settings)],
     session: Annotated[AsyncSession, Depends(get_session)],
+    clock: Annotated[Clock, Depends(_clock)],
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
     x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
     x_user_role: Annotated[str | None, Header(alias="X-User-Role")] = None,
@@ -189,9 +204,7 @@ async def current_principal(
         # cannot do is widen access: `patient_ref` is taken from the session and
         # never from the request, so a patient asking for a different patient's
         # history is still asking as themselves.
-        patient_ref = await resolve_session(
-            session, token=token, now=_clock().now()
-        )
+        patient_ref = await resolve_session(session, token=token, now=clock.now())
         if patient_ref is not None:
             if not x_hospital_id:
                 raise UnauthorizedError(

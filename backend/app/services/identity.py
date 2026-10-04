@@ -402,7 +402,7 @@ class IdentityService:
         )
         # `complaint` is filled in below, from the record each row's
         # carry-forward pass already loads. Without it a patient's own list of
-        # visits reads "6 September, Kayachikitsa" and says nothing about which
+        # visits reads "6 September, General Medicine" and says nothing about which
         # visit that was.
         summaries = [
             {
