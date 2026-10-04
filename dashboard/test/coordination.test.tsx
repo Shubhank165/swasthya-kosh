@@ -11,6 +11,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { App } from '../src/App';
 import { OperationsPage } from '../src/coordination/OperationsPage';
 import { OrdersPanel } from '../src/coordination/OrdersPanel';
 import { renderWithProviders, signInAs, signOut, stubFetch } from './harness';
@@ -263,5 +264,43 @@ describe('the operations view', () => {
 
     expect(await screen.findByText(/nothing needs attention/i)).toBeTruthy();
     expect(screen.getByText(/nobody is waiting/i)).toBeTruthy();
+  });
+});
+
+/**
+ * The headline counters must agree with the list under them.
+ */
+describe('the waiting counter', () => {
+  it('does not count a patient who has already been seen', async () => {
+    const entry = (intake_id: string, state: string) => ({
+      intake_id,
+      state,
+      intake_status: 'complete',
+      arrived_at: '2026-10-05T09:00:00Z',
+      language: 'hi',
+      patient_ref_type: 'guest',
+      unacknowledged_alerts: 0,
+      unresolved_count: 0,
+      contradiction_count: 0,
+    });
+
+    stubFetch({
+      'GET /hospitals': () => ({ body: { hospitals: [] } }),
+      'GET /worklist*': () => ({
+        body: {
+          entries: [entry('i-seen', 'seen'), entry('i-ready', 'ready')],
+          pending_alerts: [],
+          total: 2,
+        },
+      }),
+    });
+    signInAs('physician');
+    renderWithProviders(<App />, { route: '/' });
+
+    // Two intakes on the list, one already seen, so exactly one is waiting.
+    const label = await screen.findByText(/Total Patients Waiting/i);
+    const card = label.closest('div')!;
+    await waitFor(() => expect(within(card).getByText('1')).toBeVisible());
+    expect(within(card).queryByText('2')).toBeNull();
   });
 });

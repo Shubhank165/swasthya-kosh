@@ -111,7 +111,14 @@ export function WorklistPage({ realtime = true }: { realtime?: boolean }) {
   }, [rawEntries, searchQuery]);
 
   // KPIs
-  const totalWaiting = rawEntries.length;
+  //
+  // "Waiting" excludes `seen`, because a patient who has been seen is not
+  // waiting. It was `rawEntries.length`, which counted every intake the
+  // worklist holds for the day — so the headline counter read "1 patient
+  // waiting" above a list whose only row was marked Seen. `ReceptionPage`
+  // already filtered this correctly; the two screens disagreed about the same
+  // number.
+  const totalWaiting = rawEntries.filter((e) => e.state !== 'seen').length;
   const readyCount = rawEntries.filter((e) => e.state === 'ready').length;
   const progressCount = rawEntries.filter(
     (e) => e.state === 'partial' || e.state === 'needs_review',
