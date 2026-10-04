@@ -18,11 +18,17 @@ IMAGE="${IMAGE_BASE}:${TAG}"
 
 say "Migrating with ${IMAGE}"
 
+# **No `--args` here.** It is passed per invocation by `run_job` below, because
+# `--args` accumulates rather than replaces: a second `--args=seed` after an
+# `--args=migrate` in this array produced the entrypoint command
+# `migrate seed`, which runs the migrations and silently ignores the rest. The
+# `SEED=true` path therefore ran alembic three times and never seeded, and said
+# "Seeding" while doing it — the schema moved, the demo facility never
+# appeared, and nothing failed.
 job_args=(
   --image="${IMAGE}"
   --region="${REGION}"
   --service-account="${API_SA}"
-  --args=migrate
   --max-retries=0
   --task-timeout=600s
   --set-secrets="DATABASE_URL=${SECRET_DATABASE_URL}:latest"
@@ -32,15 +38,21 @@ job_args=(
   --vpc-egress=private-ranges-only
 )
 
-if exists gc run jobs describe "${MIGRATE_JOB}" --region="${REGION}"; then
-  gc run jobs update "${MIGRATE_JOB}" "${job_args[@]}"
-else
-  gc run jobs create "${MIGRATE_JOB}" "${job_args[@]}"
-fi
+#: Point the job at one entrypoint command and run it to completion.
+#:
+#: `--wait`, so a failure fails this script and the deploy that depends on it
+#: never runs.
+run_job() {
+  local command="$1"
+  if exists gc run jobs describe "${MIGRATE_JOB}" --region="${REGION}"; then
+    gc run jobs update "${MIGRATE_JOB}" "${job_args[@]}" --args="${command}"
+  else
+    gc run jobs create "${MIGRATE_JOB}" "${job_args[@]}" --args="${command}"
+  fi
+  gc run jobs execute "${MIGRATE_JOB}" --region="${REGION}" --wait
+}
 
-# --wait, so a failed migration fails this script and the deploy that depends on
-# it never runs.
-gc run jobs execute "${MIGRATE_JOB}" --region="${REGION}" --wait
+run_job migrate
 
 say "Schema is at head"
 
@@ -49,7 +61,10 @@ say "Schema is at head"
 # against a live database is safe, but it is not part of a deploy.
 if [[ "${SEED:-false}" == "true" ]]; then
   say "Seeding"
-  gc run jobs update "${MIGRATE_JOB}" "${job_args[@]}" --args=seed
-  gc run jobs execute "${MIGRATE_JOB}" --region="${REGION}" --wait
-  gc run jobs update "${MIGRATE_JOB}" "${job_args[@]}"
+  run_job seed
+  # Leave the job pointing at `migrate`, so that anyone who executes it from the
+  # console gets the step this job is named for rather than the last one it
+  # happened to run.
+  gc run jobs update "${MIGRATE_JOB}" "${job_args[@]}" --args=migrate >/dev/null
+  say "Seeded"
 fi

@@ -11,50 +11,51 @@ number on screen is produced live.
 
 ---
 
-## Before you record — three blockers
+## Before you record
 
-### 1. Deploy. The current Cloud Run revision cannot film this video.
+### 1. The deploy is done. Here is what is live.
 
-This is not optional. Measured against the live service:
+`https://medikiosk-api-tjynzes4vq-el.a.run.app`, revision `8b0193a`, verified
+after deploying:
 
-| What | Deployed revision | Needed |
-|---|---|---|
-| `/ws/worklist` | **404 — no websocket route** | the live queue depends on it |
-| `X-User-Role: receptionist` | **401 unknown role** | 200 |
-| `X-User-Role: chemist` | **401 unknown role** | 200 |
-| `/pharmacy/*`, `/coordination/*`, `/intakes/{id}/wait` | **absent** | present |
-| Departments | `kayachikitsa`, `panchakarma`, `shalya` | nine general specialties |
-| Hospital name | All India Institute of Ayurveda | Sanjeevani Multi-Specialty |
+| What | Status |
+|---|---|
+| Hospital | Sanjeevani Multi-Specialty Hospital, New Delhi |
+| Departments | the nine general specialties |
+| `X-User-Role: receptionist` | 200 |
+| `X-User-Role: chemist` | 200 on `/pharmacy/*`, 403 on the worklist |
+| `/ws/worklist` | connects, returns a `subscribed` frame |
+| Providers | ocr `gemini`, repair `vertex`, prefill `vertex`, storage `gcs` |
+| Warm latency | ~0.09 s |
 
-The websocket row is the one that kills the video outright: the centrepiece shot
-is a live push, and the route does not exist on that revision.
-
-```bash
-PROJECT_ID=medikiosk-sih-2026 make deploy
-```
-
-Then confirm, before anything else:
+Re-check in one line if you want to be sure before filming:
 
 ```bash
-curl -s https://<api>/api/v1/hospitals | head -c 200          # expect Sanjeevani
-curl -s -o /dev/null -w '%{http_code}\n' \
-  -H 'X-User-Role: receptionist' -H 'X-Hospital-Id: aiia-delhi' \
-  -H 'X-User-Id: desk' https://<api>/api/v1/worklist           # expect 200
+curl -s https://medikiosk-api-tjynzes4vq-el.a.run.app/api/v1/hospitals | head -c 120
 ```
 
-### 2. Warm the service, or your first shot is a ten-second pause.
+### 2. Cold start is gone — the API now holds one warm instance.
 
-Cloud Run runs at `--min-instances=0`. Cold start measured **8.7 s**; warm,
-**0.13 s**.
+`API_MIN_INSTANCES` defaults to **1**, so there is no cold start to warm away
+and `make warm` is no longer a precondition. That costs money continuously,
+unlike scale-to-zero; `API_MIN_INSTANCES=0 make deploy` puts it back.
+
+Measured after the change: **0.09 s**, against **8.7 s** cold before it.
+
+### 3. You need a kiosk token to stand in for the device.
+
+`infra/demo/submit_intake.py` reads `KIOSK_TOKEN` from the environment and
+never prints it. The deployed token lives in Secret Manager
+(`medikiosk-kiosk-tokens`) and on the kiosks themselves:
 
 ```bash
-make warm
+export KIOSK_TOKEN='…'          # from your own records, not from this repo
+export API=https://medikiosk-api-tjynzes4vq-el.a.run.app
 ```
 
-Run it **immediately before recording**, and again if you break for more than a
-few minutes. If the queue takes ten seconds to appear on camera, this is why.
+If you are driving the real app on a phone instead, you do not need this at all.
 
-### 3. Know what is empty, and do not promise what is not there.
+### 4. Know what is empty, and do not promise what is not there.
 
 The seeder treats pharmacy stock and service slots as *demo data* and never
 re-creates them on a database that already has a hospital row — only
@@ -98,7 +99,7 @@ Each role lands on its own home screen.
 Start on the terminal, not the UI.
 
 ```bash
-curl -s https://<api>/readyz | python3 -m json.tool
+curl -s $API/readyz | python3 -m json.tool
 ```
 
 > "Before anything else — this is not a mock. This is the service answering from
@@ -138,7 +139,7 @@ If you are using the phone: complete an intake in the app and hit submit. If you
 are standing in for the kiosk:
 
 ```bash
-API=https://<api> python3 infra/demo/submit_intake.py routine
+python3 infra/demo/submit_intake.py routine
 ```
 
 > "This posts exactly what the kiosk and the app post — same endpoint, same
@@ -190,7 +191,7 @@ Point at Accept / Amend / Reject.
 Back to the Worklist. Two submissions, in this order, pausing between them.
 
 ```bash
-API=https://<api> python3 infra/demo/submit_intake.py high
+python3 infra/demo/submit_intake.py high
 ```
 
 > "A second patient. The device fired a red-flag criterion — prolonged high
@@ -202,7 +203,7 @@ It appears **below** the first patient.
 > overtaken anybody. It waits its turn."
 
 ```bash
-API=https://<api> python3 infra/demo/submit_intake.py critical
+python3 infra/demo/submit_intake.py critical
 ```
 
 > "Third patient. Breathlessness at rest. Severity **critical** — and the device
@@ -268,9 +269,9 @@ If you want a number:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Queue takes ~10 s to load | cold start | `make warm`, re-record |
-| Connection shows "reconnecting" | websocket not reaching Cloud Run | you are on the old revision — deploy |
-| Receptionist/Pharmacy sign-in 401s | old revision, roles do not exist | deploy |
+| Queue takes ~10 s to load | the warm instance was scaled away | check `API_MIN_INSTANCES=1` on the revision |
+| Connection shows "reconnecting" | websocket not reaching Cloud Run | check the dashboard's proxy target |
+| Receptionist/Pharmacy sign-in 401s | you are pointed at an older revision | re-check the API URL |
 | Signed out unexpectedly | you refreshed the page | sign in again; never refresh |
 | Row does not appear | submission failed | read the terminal — the script prints the intake id |
 | Pharmacy/Operations empty | stock is demo data, not re-seeded | expected; keep that beat short |
@@ -283,3 +284,69 @@ If you want a number:
   header auth is refused in any environment holding real data.
 - Do not say the system diagnoses. It records, screens against explicit
   criteria, and routes. Every clinical judgement stays with the physician.
+
+---
+
+## Recording it
+
+### What is on this machine
+
+| Tool | Version | Verdict |
+|---|---|---|
+| **OBS Studio** | 32.1.2 | **use this** |
+| ffmpeg | 6.1.1 | useful for trimming afterwards, not for capture |
+| gnome-screenshot | — | stills only |
+
+**This session is Wayland** (`XDG_SESSION_TYPE=wayland`), and that decides it.
+ffmpeg's usual `-f x11grab` capture does **not** work on Wayland — it will fail
+or record a black rectangle. OBS handles it through PipeWire, which is already
+running here (PulseAudio on PipeWire 1.0.5). Nothing to install.
+
+### OBS, first run
+
+1. Skip the auto-configuration wizard, or choose **Optimise for recording**.
+2. **Sources → + → Screen Capture (PipeWire)**. A system dialog asks which
+   screen or window to share — this is normal on Wayland, and it is asked once
+   per source. Pick the whole screen; you will be switching between the browser
+   and the terminal, and a single-window capture would lose one of them.
+3. **Settings → Output → Recording**:
+   - Recording format **mkv** — if OBS or the machine dies mid-take, an mkv is
+     still playable, where an mp4 written the same way is not. Remux to mp4 at
+     the end (**File → Remux Recordings**).
+   - Encoder: hardware (VAAPI/NVENC) if offered, otherwise x264.
+   - Quality: **Indistinguishable** or CQP ~20. Text has to stay readable.
+4. **Settings → Video**: set Base and Output resolution to the **same** value.
+   Scaling is what turns terminal text into mush. 1920×1080 if your display
+   allows it.
+5. **Settings → Audio**: pick your microphone as Mic/Aux. Mute Desktop Audio —
+   there is nothing to capture from the page and it only adds hum.
+
+### Before the take
+
+- **Zoom the browser to 110–125%** (`Ctrl` `+`). What is legible on your screen
+  is not legible in a compressed upload.
+- **Increase the terminal font size.** The JSON in Beat 1 is the point of that
+  shot; if it cannot be read it is just green text.
+- Close Slack, mail, and anything that shows a notification banner.
+- Hide bookmarks (`Ctrl` `Shift` `B`) — the URL bar is going to be on screen.
+
+### Trimming afterwards
+
+ffmpeg without re-encoding, so nothing is lost and it is instant:
+
+```bash
+ffmpeg -i recording.mkv -ss 00:00:04 -to 00:04:30 -c copy demo.mp4
+```
+
+To join takes recorded with identical settings:
+
+```bash
+printf "file '%s'\n" take1.mkv take2.mkv > list.txt
+ffmpeg -f concat -safe 0 -i list.txt -c copy demo.mp4
+```
+
+### One habit worth having
+
+Record each beat as its **own take** and join them. A five-minute single take
+means one fumbled sentence at 4:40 costs you the whole thing — and the live
+submission in Beat 3 is not repeatable without resetting the queue.

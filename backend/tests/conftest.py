@@ -13,6 +13,7 @@ Thursday.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -40,6 +41,69 @@ OTHER_HOSPITAL_ID = "test-other"
 #: has to be the same on every machine and in CI.
 FROZEN_NOW = datetime(2026, 9, 3, 10, 21, 5, tzinfo=UTC)
 
+#: Environment variables that configure a *deployment* rather than a test.
+#:
+#: The provider names are derived from the model, so a provider added tomorrow
+#: is stripped the day it is added. The rest are the settings those providers
+#: read once selected — a stray `VERTEX_PROJECT` is as capable of changing what
+#: the suite exercises as `OCR_PROVIDER` is.
+_DEPLOYMENT_ENV: frozenset[str] = frozenset(
+    {name.upper() for name in Settings.model_fields if name.endswith("_provider")}
+    | {
+        "OCR_MODEL_ID",
+        "REPAIR_MODEL_ID",
+        "PREFILL_MODEL_ID",
+        "VERTEX_PROJECT",
+        "VERTEX_REGION",
+        "VERTEX_ZDR_ENABLED",
+        "ALLOW_HEADER_AUTH",
+        "STORAGE_BACKEND",
+        "GCS_BUCKET",
+        "DOCUMENT_QUEUE",
+        "PUBSUB_TOPIC",
+        "ENVIRONMENT",
+        "DEMO_MODE",
+    }
+)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _no_deployment_config_from_the_shell() -> Iterator[None]:
+    """Run the suite against the code, not against the operator's shell.
+
+    `Settings` is a pydantic-settings model, so every field falls back to an
+    environment variable — right for the application, wrong for a test run.
+    The `settings` fixture pins each provider, but that only protects code
+    which receives *that* object: `app/main.py` and `app/api/deps.py` both do
+    `from app.core.config import get_settings`, a by-value import, so patching
+    `config.get_settings` in `app_client` never reaches them and they build
+    providers from the real environment.
+
+    It bites exactly where it hurts most. `make deploy` is
+    `check build-image migrate-cloud deploy`, and a real deploy is invoked as
+
+        OCR_PROVIDER=gemini PREFILL_PROVIDER=vertex ... make deploy
+
+    so the gate runs with the cloud providers already set, while
+    `VERTEX_PROJECT` is assembled inside `40-deploy.sh` and never exported.
+    Roughly two hundred tests then error with `ProviderNotConfigured` — the
+    deploy cannot pass its own gate, and only when deploying with real models.
+
+    Clearing the variables is better than patching the import sites: it is one
+    rule covering every present and future reader of the environment, and it
+    fails in the honest direction — a test that genuinely needs a provider
+    configures it explicitly rather than inheriting one by accident.
+    """
+    stripped = {
+        name: os.environ.pop(name)
+        for name in sorted(_DEPLOYMENT_ENV)
+        if name in os.environ
+    }
+    try:
+        yield
+    finally:
+        os.environ.update(stripped)
+
 
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
@@ -50,9 +114,29 @@ def settings(tmp_path: Path) -> Settings:
         clinical_content_dir=REPO_ROOT / "clinical",
         document_storage_dir=tmp_path / "uploads",
         ocr_fixtures_dir=FIXTURES / "ocr",
+        # **Every** provider is pinned, and that is load-bearing rather than
+        # tidy. `Settings` reads the ambient environment, so any provider left
+        # unpinned here is configured by whatever the shell happens to hold —
+        # which during `make deploy` is the real cloud configuration, because
+        # the deploy sets `OCR_PROVIDER` and friends for its own scripts and
+        # `make check` runs inside it.
+        #
+        # `prefill_provider` was the one that got missed when prefill was added,
+        # and the result was that `make deploy` could not pass its own gate:
+        # the deploy exports `PREFILL_PROVIDER=vertex` but builds VERTEX_PROJECT
+        # inside the deploy script, so the suite tried to construct a Vertex
+        # adapter with no project and ~200 tests errored with
+        # `ProviderNotConfigured`. A gate that fails because you are deploying
+        # with real models is a gate somebody will start skipping.
+        #
+        # `test_providers_are_pinned` below fails if a new provider is added
+        # without being pinned here.
         ocr_provider="mock",
         repair_provider="mock",
+        prefill_provider="mock",
         abha_provider="mock",
+        otp_provider="mock",
+        timeline_provider="none",
         storage_backend="local",
         demo_mode=False,
         log_json=False,
